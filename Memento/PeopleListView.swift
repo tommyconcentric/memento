@@ -1,0 +1,229 @@
+import SwiftUI
+import SwiftData
+
+/// The app's main scaffold: a split view that collapses to a stack on
+/// iPhone and shows the people list beside the open profile on iPad
+/// and Mac.
+struct PeopleListView: View {
+    @Environment(\.modelContext) private var context
+    @Query(sort: [SortDescriptor(\PersonGroup.sortOrder)]) private var groups: [PersonGroup]
+    @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+
+    @State private var selectedPerson: Person?
+    @State private var searchText = ""
+    @State private var showingAddPerson = false
+    @State private var showingFolders = false
+    @State private var showingSettings = false
+    @State private var showingTree = false
+    @State private var showingCalendar = false
+    @State private var showingImport = false
+
+    private var filteredPeople: [Person] {
+        guard !searchText.trimmed.isEmpty else { return people }
+        return people.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText)
+            || $0.company.localizedCaseInsensitiveContains(searchText)
+            || $0.jobTitle.localizedCaseInsensitiveContains(searchText)
+            || $0.hobbies.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        NavigationSplitView {
+            sidebar
+        } detail: {
+            if let person = selectedPerson, !person.isDeleted {
+                NavigationStack {
+                    PersonDetailView(person: person)
+                }
+            } else {
+                detailPlaceholder
+            }
+        }
+        .sheet(isPresented: $showingAddPerson) {
+            PersonEditorView(person: nil)
+        }
+        .sheet(isPresented: $showingFolders) {
+            GroupsManagerView()
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $showingTree) {
+            MyFamilyTreeView()
+        }
+        .sheet(isPresented: $showingCalendar) {
+            CalendarView()
+        }
+        .sheet(isPresented: $showingImport) {
+            ImportContactsView()
+        }
+    }
+
+    // MARK: - Sidebar (people list)
+
+    private var sidebar: some View {
+        List(selection: $selectedPerson) {
+            ForEach(groups) { group in
+                let members = filteredPeople.filter {
+                    $0.group?.persistentModelID == group.persistentModelID
+                }
+                if !members.isEmpty {
+                    Section {
+                        ForEach(members) { person in
+                            PersonRow(person: person) { delete(person) }
+                                .tag(person)
+                        }
+                    } header: {
+                        Text("\(group.name) · \(members.count)")
+                    }
+                }
+            }
+
+            let ungrouped = filteredPeople.filter { $0.group == nil }
+            if !ungrouped.isEmpty {
+                Section("Ungrouped") {
+                    ForEach(ungrouped) { person in
+                        PersonRow(person: person) { delete(person) }
+                            .tag(person)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
+        .navigationTitle("Memento")
+        .searchable(text: $searchText, prompt: "Search by name, company, hobby")
+        .navigationSplitViewColumnWidth(min: 300, ideal: 350)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarLeading) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Settings")
+                Button {
+                    showingFolders = true
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .accessibilityLabel("Manage folders")
+            }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    showingTree = true
+                } label: {
+                    Image(systemName: "tree")
+                }
+                .accessibilityLabel("My family tree")
+                Button {
+                    showingCalendar = true
+                } label: {
+                    Image(systemName: "calendar")
+                }
+                .accessibilityLabel("Important dates calendar")
+                Menu {
+                    Button("New Person", systemImage: "person.badge.plus") {
+                        showingAddPerson = true
+                    }
+                    Button("Import Contacts…", systemImage: "square.and.arrow.down") {
+                        showingImport = true
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add or import people")
+            }
+        }
+        .overlay {
+            if people.isEmpty {
+                ContentUnavailableView {
+                    Label("No People Yet", systemImage: "person.2")
+                } description: {
+                    Text("Add your first person to start keeping notes about the people in your life.")
+                } actions: {
+                    Button("Add Person") { showingAddPerson = true }
+                        .buttonStyle(.borderedProminent)
+                }
+            } else if !searchText.trimmed.isEmpty && filteredPeople.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            }
+        }
+    }
+
+    private var detailPlaceholder: some View {
+        ContentUnavailableView {
+            Label("Pick Someone", systemImage: "person.2")
+        } description: {
+            Text("Choose a person to see their details, family tree and notes.")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background)
+    }
+
+    private func delete(_ person: Person) {
+        if selectedPerson?.persistentModelID == person.persistentModelID {
+            selectedPerson = nil
+        }
+        context.delete(person)
+        try? context.save()
+        NotificationManager.refreshFromContext(context)
+    }
+}
+
+// MARK: - Row
+
+struct PersonRow: View {
+    let person: Person
+    var onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            AvatarView(
+                data: person.profilePhotoData,
+                name: person.name,
+                size: 48,
+                desaturated: person.isDeceased
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(person.name)
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(person.isDeceased ? .secondary : .primary)
+                    if person.isDeceased {
+                        Image(systemName: "leaf")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if !person.subtitle.isEmpty {
+                    Text(person.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if !person.isDeceased, let days = person.daysUntilNextBirthday, days <= 14 {
+                Text(days == 0 ? "🎂 today" : "🎂 \(days)d")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.bougainvillea)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.bougainvillea.opacity(0.15), in: Capsule())
+            }
+        }
+        .padding(.vertical, 3)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .listRowBackground(Theme.card)
+    }
+}

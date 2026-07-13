@@ -1,0 +1,274 @@
+import SwiftUI
+import SwiftData
+
+/// A month calendar of everyone's birthdays, anniversaries and other
+/// important dates. Days show the person's photo (or initials) in a circle;
+/// tap a day to see who and what it is.
+struct CalendarView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+
+    @State private var displayedMonth = Date.now
+    @State private var selectedDay: Int?
+
+    private var calendar: Calendar { .current }
+
+    struct DayEvent: Identifiable {
+        let id = UUID()
+        let person: Person
+        let title: String
+        let isBirthday: Bool
+        let sourceYear: Int?
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    monthHeader
+                    weekdayHeader
+                    dayGrid
+                    Divider()
+                    selectedDaySection
+                }
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Important Dates")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .onAppear(perform: selectTodayIfVisible)
+        }
+    }
+
+    // MARK: - Month navigation
+
+    private var monthHeader: some View {
+        HStack {
+            Button {
+                shiftMonth(-1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            Spacer()
+            Text(displayedMonth.formatted(.dateTime.month(.wide).year()))
+                .font(.headline)
+            Spacer()
+            Button {
+                shiftMonth(1)
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func shiftMonth(_ delta: Int) {
+        if let newMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth) {
+            displayedMonth = newMonth
+            selectedDay = nil
+            selectTodayIfVisible()
+        }
+    }
+
+    private func selectTodayIfVisible() {
+        if calendar.isDate(displayedMonth, equalTo: .now, toGranularity: .month) {
+            selectedDay = calendar.component(.day, from: .now)
+        }
+    }
+
+    // MARK: - Grid
+
+    private var weekdayHeader: some View {
+        let symbols = calendar.veryShortWeekdaySymbols
+        let start = calendar.firstWeekday - 1
+        let ordered = Array(symbols[start...] + symbols[..<start])
+        return HStack {
+            ForEach(Array(ordered.enumerated()), id: \.offset) { _, symbol in
+                Text(symbol)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var monthDays: [Int?] {
+        guard let interval = calendar.dateInterval(of: .month, for: displayedMonth),
+              let dayRange = calendar.range(of: .day, in: .month, for: displayedMonth) else {
+            return []
+        }
+        let firstWeekday = calendar.component(.weekday, from: interval.start)
+        let leadingBlanks = (firstWeekday - calendar.firstWeekday + 7) % 7
+        return Array(repeating: nil, count: leadingBlanks) + dayRange.map { Optional($0) }
+    }
+
+    private var dayGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+            ForEach(Array(monthDays.enumerated()), id: \.offset) { _, day in
+                if let day {
+                    dayCell(day)
+                } else {
+                    Color.clear.frame(height: 54)
+                }
+            }
+        }
+    }
+
+    private func dayCell(_ day: Int) -> some View {
+        let events = eventsByDay[day] ?? []
+        let isSelected = selectedDay == day
+        return Button {
+            selectedDay = day
+        } label: {
+            VStack(spacing: 3) {
+                Text("\(day)")
+                    .font(.footnote.weight(isSelected ? .bold : .regular))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                    .frame(width: 28, height: 28)
+                    .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: Circle())
+                HStack(spacing: -6) {
+                    ForEach(events.prefix(2)) { event in
+                        AvatarView(
+                            data: event.person.profilePhotoData,
+                            name: event.person.name,
+                            size: 18,
+                            desaturated: event.person.isDeceased
+                        )
+                    }
+                }
+                .frame(height: 18)
+                if events.count > 2 {
+                    Text("+\(events.count - 2)")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Color.clear.frame(height: 10)
+                }
+            }
+            .frame(height: 54)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Events
+
+    private var eventsByDay: [Int: [DayEvent]] {
+        var map: [Int: [DayEvent]] = [:]
+        let month = calendar.component(.month, from: displayedMonth)
+        for person in people {
+            if let birthday = person.birthday {
+                let comps = calendar.dateComponents([.month, .day, .year], from: birthday)
+                if comps.month == month, let day = comps.day {
+                    map[day, default: []].append(DayEvent(
+                        person: person,
+                        title: "Birthday",
+                        isBirthday: true,
+                        sourceYear: comps.year
+                    ))
+                }
+            }
+            for item in person.importantDates {
+                let comps = calendar.dateComponents([.month, .day, .year], from: item.date)
+                if comps.month == month, let day = comps.day {
+                    map[day, default: []].append(DayEvent(
+                        person: person,
+                        title: item.label,
+                        isBirthday: false,
+                        sourceYear: comps.year
+                    ))
+                }
+            }
+        }
+        return map
+    }
+
+    private var selectedDaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let day = selectedDay {
+                let events = eventsByDay[day] ?? []
+                Text(selectedDayTitle(day))
+                    .font(.headline)
+                if events.isEmpty {
+                    Text("No birthdays or important dates on this day.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(events) { event in
+                            eventRow(event)
+                                .padding(.vertical, 8)
+                            if event.id != events.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                    .mementoCard(padding: 12)
+                }
+            } else {
+                Text("Tap a day to see its birthdays and important dates.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func selectedDayTitle(_ day: Int) -> String {
+        var comps = calendar.dateComponents([.year, .month], from: displayedMonth)
+        comps.day = day
+        if let date = calendar.date(from: comps) {
+            return date.formatted(date: .complete, time: .omitted)
+        }
+        return "Day \(day)"
+    }
+
+    private func eventRow(_ event: DayEvent) -> some View {
+        NavigationLink {
+            PersonDetailView(person: event.person)
+        } label: {
+            HStack(spacing: 12) {
+                AvatarView(
+                    data: event.person.profilePhotoData,
+                    name: event.person.name,
+                    size: 40,
+                    desaturated: event.person.isDeceased
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(event.person.name)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                    Text(eventDetail(event))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if event.person.isDeceased {
+                    Image(systemName: "leaf")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if event.isBirthday {
+                    Text("🎂")
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func eventDetail(_ event: DayEvent) -> String {
+        var detail = event.title
+        if event.isBirthday, !event.person.isDeceased,
+           let year = event.sourceYear {
+            let turns = calendar.component(.year, from: displayedMonth) - year
+            if turns > 0 && turns < 120 {
+                detail += " · turns \(turns)"
+            }
+        }
+        return detail
+    }
+}
