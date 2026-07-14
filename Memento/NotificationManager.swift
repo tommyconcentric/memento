@@ -52,6 +52,12 @@ enum NotificationManager {
 
         for event in events.sorted(by: { $0.daysAway < $1.daysAway }).prefix(60) {
             var components = Calendar.current.dateComponents([.month, .day], from: event.date)
+            // A repeating trigger matches one fixed month/day forever, so a
+            // literal Feb 29 would only ever fire in leap years while still
+            // consuming one of the 60 scheduling slots every other year.
+            if components.month == 2, components.day == 29 {
+                components.day = 28
+            }
             components.hour = 9
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
             let content = UNMutableNotificationContent()

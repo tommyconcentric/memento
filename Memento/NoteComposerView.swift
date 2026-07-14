@@ -16,9 +16,14 @@ struct NoteComposerView: View {
     @State private var drafts: [DraftPhoto] = []
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
+    @State private var isSaving = false
     @State private var loadedInitial = false
     @State private var transcriber = SpeechTranscriber()
     @State private var dictationBaseText = ""
+    // Photos whose bytes haven't synced down from another device yet — kept
+    // out of `drafts` (nothing to preview) but must not be treated as
+    // user-removed when save() diffs against `drafts`.
+    @State private var unsyncedPhotoIDs: Set<PersistentIdentifier> = []
 
     struct DraftPhoto: Identifiable {
         let id = UUID()
@@ -109,7 +114,7 @@ struct NoteComposerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(!canSave)
+                        .disabled(!canSave || isLoadingPhotos || isSaving)
                 }
             }
             .onAppear(perform: loadInitial)
@@ -136,11 +141,17 @@ struct NoteComposerView: View {
         text = note.text
         eventDate = note.eventDate
         location = note.location
-        drafts = note.sortedPhotos.compactMap { photo in
+        drafts = []
+        unsyncedPhotoIDs = []
+        for photo in note.sortedPhotos {
             // A photo whose bytes haven't synced down from another device yet
-            // has nil imageData; skip it rather than showing a broken draft.
-            guard let data = photo.imageData else { return nil }
-            return DraftPhoto(data: data, caption: photo.caption, existingID: photo.persistentModelID)
+            // has nil imageData; skip it rather than showing a broken draft,
+            // but remember it so save() doesn't delete it as user-removed.
+            guard let data = photo.imageData else {
+                unsyncedPhotoIDs.insert(photo.persistentModelID)
+                continue
+            }
+            drafts.append(DraftPhoto(data: data, caption: photo.caption, existingID: photo.persistentModelID))
         }
     }
 
@@ -165,6 +176,8 @@ struct NoteComposerView: View {
     // MARK: - Save
 
     private func save() {
+        guard !isSaving else { return }
+        isSaving = true
         transcriber.stop()
 
         let target: NoteEntry
@@ -180,9 +193,10 @@ struct NoteComposerView: View {
         target.eventDate = eventDate
         target.location = location.trimmed
 
-        // Remove photos that were deleted in the editor.
+        // Remove photos that were deleted in the editor (but not photos that
+        // simply hadn't synced down yet — those were never shown as drafts).
         let existing = target.photosArray
-        let keptIDs = Set(drafts.compactMap(\.existingID))
+        let keptIDs = Set(drafts.compactMap(\.existingID)).union(unsyncedPhotoIDs)
         for photo in existing where !keptIDs.contains(photo.persistentModelID) {
             context.delete(photo)
         }
