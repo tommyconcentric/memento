@@ -22,6 +22,7 @@ extension FamilyRelation {
         if l.contains("mother") || l.contains("father") || l.contains("parent") { return "Child" }
         if l.contains("aunt") || l.contains("uncle") { return "Niece/Nephew" }
         if l.contains("niece") || l.contains("nephew") { return "Aunt/Uncle" }
+        if l.contains("brother") || l.contains("sister") || l.contains("sibling") { return "Sibling" }
         if l.contains("daughter") || l.contains("son") || l.contains("child") { return "Parent" }
         if l.contains("wife") || l.contains("husband") || l.contains("partner") || l.contains("spouse") { return "Partner" }
         if l.contains("cousin") { return "Cousin" }
@@ -36,6 +37,9 @@ enum RelationshipPath {
     /// and children links. Returns a possessive chain for indirect
     /// relations (2+ hops); direct relations already show as a chip.
     static func description(to target: Person, people: [Person], maxHops: Int = 4) -> String? {
+        // Sentinel for "you" that can't collide with a trimmed/lowercased
+        // person name (e.g. someone actually named "You").
+        let root = "\u{0}you"
         func key(_ name: String) -> String { name.trimmed.lowercased() }
         func exists(_ name: String) -> Bool {
             people.contains { $0.name.compare(name.trimmed, options: .caseInsensitive) == .orderedSame }
@@ -43,7 +47,7 @@ enum RelationshipPath {
 
         var adjacency: [String: [(to: String, label: String)]] = [:]
         for p in people where !p.relationshipToUser.trimmed.isEmpty {
-            adjacency["you", default: []].append((key(p.name), p.relationshipToUser.lowercased()))
+            adjacency[root, default: []].append((key(p.name), p.relationshipToUser.lowercased()))
         }
         for p in people {
             var edges: [(to: String, label: String)] = []
@@ -60,8 +64,8 @@ enum RelationshipPath {
         }
 
         let goal = key(target.name)
-        var queue: [(node: String, labels: [String])] = [("you", [])]
-        var seen: Set<String> = ["you"]
+        var queue: [(node: String, labels: [String])] = [(root, [])]
+        var seen: Set<String> = [root]
         while !queue.isEmpty {
             let (node, labels) = queue.removeFirst()
             guard labels.count < maxHops else { continue }
