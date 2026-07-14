@@ -130,7 +130,7 @@ struct CalendarView: View {
                     .font(.footnote.weight(isSelected ? .bold : .regular))
                     .foregroundStyle(isSelected ? .white : .primary)
                     .frame(width: 28, height: 28)
-                    .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: Circle())
+                    .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 HStack(spacing: -6) {
                     ForEach(events.prefix(2)) { event in
                         AvatarView(

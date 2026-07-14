@@ -15,6 +15,8 @@ struct PersonEditorView: View {
     @State private var name = ""
     @State private var photoData: Data?
     @State private var photoItem: PhotosPickerItem?
+    @State private var pendingCropImage: UIImage?
+    @State private var pickerTarget: PickTarget?
     @State private var selectedGroup: PersonGroup?
     @State private var isDeceased = false
 
@@ -51,6 +53,17 @@ struct PersonEditorView: View {
         var relation = "Mother"
     }
 
+    enum PickTarget: Identifiable {
+        case partner
+        case member(Int)
+        var id: String {
+            switch self {
+            case .partner: return "partner"
+            case .member(let index): return "member-\(index)"
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -83,17 +96,36 @@ struct PersonEditorView: View {
                     Toggle("Set a birthday", isOn: $hasBirthday.animation())
                     if hasBirthday {
                         DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
+                            .datePickerStyle(.compact)
                     }
                 }
 
                 Section {
-                    TextField("Partner / spouse", text: $partnerName)
+                    HStack {
+                        TextField("Partner / spouse", text: $partnerName)
+                        Button {
+                            pickerTarget = .partner
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(Theme.aegean)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Link an existing person as partner")
+                    }
                     TextField("Children", text: $childrenNames, axis: .vertical)
                     TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
-                    ForEach($draftFamilyMembers) { $member in
+                    ForEach(draftFamilyMembers.indices, id: \.self) { index in
                         HStack {
-                            TextField("Name", text: $member.name)
-                            Picker("", selection: $member.relation) {
+                            TextField("Name", text: $draftFamilyMembers[index].name)
+                            Button {
+                                pickerTarget = .member(index)
+                            } label: {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundStyle(Theme.aegean)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Link an existing person")
+                            Picker("", selection: $draftFamilyMembers[index].relation) {
                                 ForEach(FamilyRelation.presets, id: \.self) { label in
                                     Text(label).tag(label)
                                 }
@@ -110,7 +142,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Family")
                 } footer: {
-                    Text("Named members (with their relation to this person) build their family tree. Partner and children join the tree automatically.")
+                    Text("Named members (with their relation to this person) build their family tree; partner and children join automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
                 }
 
                 Section("Work") {
@@ -165,6 +197,28 @@ struct PersonEditorView: View {
             .onAppear(perform: loadInitial)
             .onChange(of: photoItem) { _, item in
                 loadPhoto(item)
+            }
+            .sheet(isPresented: Binding(
+                get: { pendingCropImage != nil },
+                set: { if !$0 { pendingCropImage = nil } }
+            )) {
+                if let image = pendingCropImage {
+                    PhotoCropperView(image: image) { data in
+                        photoData = data
+                    }
+                }
+            }
+            .sheet(item: $pickerTarget) { target in
+                PersonPickerSheet(excludeID: person?.persistentModelID) { picked in
+                    switch target {
+                    case .partner:
+                        partnerName = picked.name
+                    case .member(let index):
+                        if draftFamilyMembers.indices.contains(index) {
+                            draftFamilyMembers[index].name = picked.name
+                        }
+                    }
+                }
             }
         }
     }
@@ -263,10 +317,10 @@ struct PersonEditorView: View {
         guard let item else { return }
         Task { @MainActor in
             if let data = try? await item.loadTransferable(type: Data.self),
-               let uiImage = UIImage(data: data),
-               let compressed = uiImage.compressedData(maxDimension: 900) {
-                photoData = compressed
+               let uiImage = UIImage(data: data) {
+                pendingCropImage = uiImage
             }
+            photoItem = nil
         }
     }
 
@@ -320,8 +374,39 @@ struct PersonEditorView: View {
             target.familyMembers.append(FamilyMember(name: member.name.trimmed, relation: member.relation))
         }
 
+        applyReciprocalLinks(around: target)
+
         try? context.save()
         NotificationManager.refreshFromContext(context)
         dismiss()
+    }
+
+    /// If a family member or partner names someone already in Memento,
+    /// write the inverse relationship onto their profile so the link
+    /// shows from both sides.
+    private func applyReciprocalLinks(around target: Person) {
+        let everyone = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+        func find(_ name: String) -> Person? {
+            let trimmed = name.trimmed
+            guard !trimmed.isEmpty else { return nil }
+            return everyone.first {
+                $0.persistentModelID != target.persistentModelID &&
+                $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
+            }
+        }
+        for member in target.familyMembers {
+            guard let other = find(member.name) else { continue }
+            let alreadyLinked = other.familyMembers.contains {
+                $0.name.compare(target.name, options: .caseInsensitive) == .orderedSame
+            }
+            if !alreadyLinked {
+                other.familyMembers.append(
+                    FamilyMember(name: target.name, relation: FamilyRelation.inverse(of: member.relation))
+                )
+            }
+        }
+        if let other = find(target.partnerName), other.partnerName.trimmed.isEmpty {
+            other.partnerName = target.name
+        }
     }
 }

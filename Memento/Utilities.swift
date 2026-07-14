@@ -134,12 +134,12 @@ struct MementoCard: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Theme.aegean.opacity(0.07), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Theme.aegean.opacity(0.14), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.05), radius: 10, y: 3)
+            .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
     }
 }
 
@@ -151,39 +151,46 @@ extension View {
 
 // MARK: - Pill tab picker
 
-/// A modern capsule tab bar with a sliding indicator — replaces the
-/// stock segmented control.
+/// Editorial underline tabs with a sliding indicator — serif labels,
+/// hairline baseline.
 struct PillPicker<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(Value, String)]
     @Namespace private var indicator
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(options, id: \.0) { value, label in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(.snappy(duration: 0.25)) {
                         selection = value
                     }
                 } label: {
-                    Text(label)
-                        .font(.system(.subheadline, design: .rounded, weight: .medium))
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .foregroundStyle(selection == value ? Theme.aegean : Color.secondary)
-                        .background {
+                    VStack(spacing: 9) {
+                        Text(label)
+                            .font(.system(.subheadline, design: .serif))
+                            .fontWeight(selection == value ? .semibold : .regular)
+                            .foregroundStyle(selection == value ? Theme.aegean : Color.secondary)
+                        ZStack {
                             if selection == value {
-                                Capsule()
-                                    .fill(Theme.card)
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
-                                    .matchedGeometryEffect(id: "pill", in: indicator)
+                                Rectangle()
+                                    .fill(Theme.aegean)
+                                    .matchedGeometryEffect(id: "underline", in: indicator)
                             }
                         }
+                        .frame(height: 2)
+                    }
+                    .padding(.top, 4)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
-        .background(Theme.aegean.opacity(0.08), in: Capsule())
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.aegean.opacity(0.15))
+                .frame(height: 1)
+        }
     }
 }

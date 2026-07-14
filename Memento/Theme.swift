@@ -11,6 +11,7 @@ enum Theme {
     static let olive = Color(red: 0.478, green: 0.545, blue: 0.310)         // #7A8B4F
     static let terracotta = Color(red: 0.788, green: 0.435, blue: 0.290)    // #C96F4A
     static let gold = Color(red: 0.753, green: 0.541, blue: 0.176)          // #C08A2D
+    static let bark = Color(red: 0.478, green: 0.333, blue: 0.224)          // #7A5539 — tree trunks
 
     /// Warm whitewash by day, deep night sea in dark mode.
     static let background = dynamic(

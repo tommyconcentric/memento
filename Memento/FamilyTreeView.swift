@@ -8,19 +8,19 @@ import SwiftData
 enum FamilyRelation {
     static let presets: [String] = [
         "Mother", "Father", "Parent", "Stepmother", "Stepfather",
-        "Grandmother", "Grandfather",
+        "Grandmother", "Grandfather", "Grandparent",
         "Wife", "Husband", "Partner",
         "Sister", "Brother", "Sibling", "Stepsister", "Stepbrother", "Cousin",
-        "Aunt", "Uncle",
+        "Aunt", "Uncle", "Aunt/Uncle",
         "Daughter", "Son", "Child", "Stepdaughter", "Stepson",
-        "Niece", "Nephew",
-        "Granddaughter", "Grandson",
-        "Mother-in-law", "Father-in-law", "Sister-in-law", "Brother-in-law",
-        "Daughter-in-law", "Son-in-law"
+        "Niece", "Nephew", "Niece/Nephew",
+        "Granddaughter", "Grandson", "Grandchild",
+        "Mother-in-law", "Father-in-law", "Parent-in-law",
+        "Sister-in-law", "Brother-in-law", "Sibling-in-law",
+        "Daughter-in-law", "Son-in-law", "Child-in-law"
     ]
 
     /// Generation offset relative to the tree's focus person.
-    /// +2 grandparents, +1 parents, 0 same generation, -1 children, -2 grandchildren.
     static func generation(of label: String) -> Int {
         let l = label.lowercased()
         if l.contains("great-grand") || l.contains("great grand") {
@@ -42,7 +42,13 @@ enum FamilyRelation {
             || l.contains("niece") || l.contains("nephew") {
             return -1
         }
-        return 0 // siblings, spouse/partner, cousins, anything unknown
+        return 0
+    }
+
+    /// Labels that belong to a generation lane (for the drag-to-move chooser).
+    static func labels(forGeneration generation: Int) -> [String] {
+        let matching = presets.filter { Self.generation(of: $0) == generation }
+        return matching.isEmpty ? ["Family"] : matching
     }
 
     static func rowTitle(for generation: Int, subject: String) -> String {
@@ -77,8 +83,9 @@ struct TreeRow: Identifiable {
     let nodes: [TreeNode]
 }
 
-func buildTreeRows(nodes: [TreeNode], subjectTitle: String) -> [TreeRow] {
+func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: Set<Int> = []) -> [TreeRow] {
     var byGeneration: [Int: [TreeNode]] = [:]
+    for generation in ensureGenerations { byGeneration[generation] = [] }
     for node in nodes {
         byGeneration[node.generation, default: []].append(node)
     }
@@ -99,53 +106,114 @@ func buildTreeRows(nodes: [TreeNode], subjectTitle: String) -> [TreeRow] {
 // MARK: - Tree rendering
 
 /// Generation rows joined by a spine — designed to live inside a ScrollView.
+/// When `onDropInGeneration` is set, people can be held and dragged between
+/// rows; the handler receives the dropped person's name and the target row.
 struct FamilyTreeContent: View {
     let rows: [TreeRow]
+    var dragEnabled = false
+    var onDropInGeneration: ((String, Int) -> Void)? = nil
+
+    @State private var targetedGeneration: Int? = nil
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(rows) { row in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(row.title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(row.nodes) { node in
-                                FamilyNodeView(node: node)
-                            }
-                        }
-                        .padding(.horizontal, 2)
-                    }
-                }
-                .padding(.vertical, 10)
-
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                laneContainer(row)
                 if row.id != rows.last?.id {
-                    Rectangle()
-                        .fill(Theme.aegean.opacity(0.35))
-                        .frame(width: 2, height: 22)
+                    Capsule()
+                        .fill(LinearGradient(
+                            colors: [Theme.olive.opacity(0.85), Theme.bark],
+                            startPoint: .top, endPoint: .bottom
+                        ))
+                        .frame(width: 3 + CGFloat(index) * 1.8, height: 24)
                         .frame(maxWidth: .infinity)
                 }
             }
         }
     }
+
+    @ViewBuilder
+    private func laneContainer(_ row: TreeRow) -> some View {
+        if let onDropInGeneration {
+            lane(row)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Theme.aegean.opacity(targetedGeneration == row.id ? 0.6 : 0), lineWidth: 2)
+                )
+                .dropDestination(for: String.self) { items, _ in
+                    if let name = items.first { onDropInGeneration(name, row.id) }
+                    return true
+                } isTargeted: { isOver in
+                    targetedGeneration = isOver ? row.id : nil
+                }
+        } else {
+            lane(row)
+        }
+    }
+
+    private func lane(_ row: TreeRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(row.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            if row.nodes.isEmpty {
+                Text(dragEnabled ? "Hold a person and drag them here" : " ")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 10)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(row.nodes) { node in
+                            FamilyNodeView(
+                                node: node,
+                                dragPayload: (dragEnabled && !node.isFocus) ? node.name : nil
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
+        .background(laneTint(row.id), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.vertical, 1)
+    }
+
+    /// Canopy greens for older generations, warm root browns for younger.
+    private func laneTint(_ generation: Int) -> Color {
+        if generation >= 1 { return Theme.olive.opacity(generation >= 2 ? 0.15 : 0.10) }
+        if generation == 0 { return Theme.olive.opacity(0.06) }
+        return Theme.bark.opacity(generation <= -2 ? 0.11 : 0.07)
+    }
 }
 
 struct FamilyNodeView: View {
     let node: TreeNode
+    var dragPayload: String? = nil
 
     var body: some View {
-        Group {
-            if let person = node.linkedPerson {
+        if let person = node.linkedPerson {
+            draggableWrapper(
                 NavigationLink {
                     PersonDetailView(person: person)
                 } label: {
                     content
                 }
                 .buttonStyle(.plain)
-            } else {
-                content
-            }
+            )
+        } else {
+            draggableWrapper(content)
+        }
+    }
+
+    @ViewBuilder
+    private func draggableWrapper<V: View>(_ view: V) -> some View {
+        if let dragPayload {
+            view.draggable(dragPayload)
+        } else {
+            view
         }
     }
 
@@ -160,6 +228,8 @@ struct FamilyNodeView: View {
             .overlay {
                 if node.isFocus {
                     Circle().stroke(Theme.aegean, lineWidth: 3)
+                } else {
+                    Circle().stroke(Theme.olive.opacity(0.4), lineWidth: 1.5)
                 }
             }
             Text(node.name)
@@ -177,11 +247,19 @@ struct FamilyNodeView: View {
     }
 }
 
-// MARK: - My family tree (auto-generated from "Relationship to You" labels)
+// MARK: - My family tree (auto-generated, drag to re-place people)
 
 struct MyFamilyTreeView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+
+    struct MoveRequest: Identifiable {
+        let id = UUID()
+        let person: Person
+        let generation: Int
+    }
+    @State private var pendingMove: MoveRequest?
 
     private var labeled: [Person] {
         people.filter { !$0.relationshipToUser.trimmed.isEmpty }
@@ -203,7 +281,7 @@ struct MyFamilyTreeView: View {
             name: "You", relation: "", photoData: nil,
             linkedPerson: nil, isDeceased: false, isFocus: true, generation: 0
         ))
-        return buildTreeRows(nodes: nodes, subjectTitle: "You")
+        return buildTreeRows(nodes: nodes, subjectTitle: "You", ensureGenerations: [-2, -1, 0, 1, 2])
     }
 
     var body: some View {
@@ -218,11 +296,14 @@ struct MyFamilyTreeView: View {
                     .padding(.top, 60)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Auto-generated from how you've labeled each person's relationship to you. Tap anyone to open their profile.")
+                        Text("Tap anyone to open their profile. Hold a person and drag them to another row to change how you're related.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        FamilyTreeContent(rows: rows)
-                            .mementoCard(padding: 12)
+                        FamilyTreeContent(rows: rows, dragEnabled: true) { name, generation in
+                            handleDrop(name: name, generation: generation)
+                        }
+                        .background(treeCanopyGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .mementoCard(padding: 10)
                     }
                     .padding()
                 }
@@ -235,7 +316,35 @@ struct MyFamilyTreeView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .confirmationDialog(
+                pendingMove.map { "How is \($0.person.name) related to you now?" } ?? "",
+                isPresented: Binding(
+                    get: { pendingMove != nil },
+                    set: { if !$0 { pendingMove = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingMove
+            ) { move in
+                ForEach(FamilyRelation.labels(forGeneration: move.generation), id: \.self) { label in
+                    Button(label) { apply(label: label, to: move.person) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         }
+    }
+
+    private func handleDrop(name: String, generation: Int) {
+        guard let person = people.first(where: {
+            $0.name.compare(name, options: .caseInsensitive) == .orderedSame
+        }) else { return }
+        guard FamilyRelation.generation(of: person.relationshipToUser) != generation else { return }
+        pendingMove = MoveRequest(person: person, generation: generation)
+    }
+
+    private func apply(label: String, to person: Person) {
+        person.relationshipToUser = label
+        try? context.save()
+        pendingMove = nil
     }
 }
 
@@ -263,15 +372,9 @@ struct PersonFamilySection: View {
         if !person.partnerName.trimmed.isEmpty {
             result.append(node(named: person.partnerName, relation: "Partner"))
         }
-
-        let separators = CharacterSet(charactersIn: ",&\n")
-        let children = person.childrenNames
-            .replacingOccurrences(of: " and ", with: ",")
-            .components(separatedBy: separators)
-        for child in children where !child.trimmed.isEmpty {
+        for child in childNames(of: person) {
             result.append(node(named: child, relation: "Child"))
         }
-
         for member in person.familyMembers where !member.name.trimmed.isEmpty {
             result.append(node(named: member.name, relation: member.relation))
         }
@@ -303,7 +406,13 @@ struct PersonFamilySection: View {
                     .foregroundStyle(Theme.bougainvillea)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Theme.bougainvillea.opacity(0.12), in: Capsule())
+                    .background(Theme.bougainvillea.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+
+            if let path = RelationshipPath.description(to: person, people: people) {
+                Label(path, systemImage: "arrow.triangle.branch")
+                    .font(.footnote.italic())
+                    .foregroundStyle(.secondary)
             }
 
             if nodes.count <= 1 {
@@ -320,7 +429,8 @@ struct PersonFamilySection: View {
             } else {
                 FamilyTreeContent(rows: buildTreeRows(nodes: nodes, subjectTitle: person.name))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .mementoCard(padding: 12)
+                    .background(treeCanopyGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .mementoCard(padding: 10)
 
                 Button(action: onEdit) {
                     Label("Edit Family", systemImage: "pencil")
@@ -330,4 +440,23 @@ struct PersonFamilySection: View {
             }
         }
     }
+}
+
+/// Names split out of the free-text children field.
+func childNames(of person: Person) -> [String] {
+    let separators = CharacterSet(charactersIn: ",&\n")
+    return person.childrenNames
+        .replacingOccurrences(of: " and ", with: ",")
+        .components(separatedBy: separators)
+        .map { $0.trimmed }
+        .filter { !$0.isEmpty }
+}
+
+
+/// Shared backdrop for tree cards: leaf canopy fading to earth.
+private var treeCanopyGradient: LinearGradient {
+    LinearGradient(
+        colors: [Theme.olive.opacity(0.13), Theme.bark.opacity(0.10)],
+        startPoint: .top, endPoint: .bottom
+    )
 }

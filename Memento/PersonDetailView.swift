@@ -104,7 +104,7 @@ struct PersonDetailView: View {
             .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
 
             Text(person.name)
-                .font(.system(.title2, design: .rounded, weight: .bold))
+                .font(.system(.title2, design: .serif, weight: .semibold))
                 .foregroundStyle(.white)
 
             HStack(spacing: 8) {
@@ -117,27 +117,23 @@ struct PersonDetailView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
+        .padding(.top, 24)
+        .padding(.bottom, 20)
         .background {
             ZStack {
                 LinearGradient(
-                    colors: [Theme.aegean, Theme.sky],
+                    colors: [Color(red: 0.09, green: 0.34, blue: 0.49), Theme.sky],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                Circle()
-                    .fill(.white.opacity(0.10))
-                    .frame(width: 190, height: 190)
-                    .offset(x: 130, y: -70)
-                Circle()
-                    .fill(.white.opacity(0.08))
-                    .frame(width: 130, height: 130)
-                    .offset(x: -140, y: 60)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .inset(by: 10)
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
             }
             .saturation(person.isDeceased ? 0 : 1)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .shadow(color: Theme.aegean.opacity(person.isDeceased ? 0.12 : 0.28), radius: 14, y: 6)
+        .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
     }
 
     private func headerChip(_ text: String, icon: String) -> some View {
@@ -145,7 +141,7 @@ struct PersonDetailView: View {
             .font(.caption.weight(.medium))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.white.opacity(0.22), in: Capsule())
+            .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .foregroundStyle(.white)
     }
 }

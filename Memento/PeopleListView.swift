@@ -98,6 +98,7 @@ struct PeopleListView: View {
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
         .toolbar {
             ToolbarItemGroup(placement: .topBarLeading) {
+                LogoMark(size: 27)
                 Button {
                     showingSettings = true
                 } label: {
@@ -155,7 +156,11 @@ struct PeopleListView: View {
 
     private var detailPlaceholder: some View {
         ContentUnavailableView {
-            Label("Pick Someone", systemImage: "person.2")
+            VStack(spacing: 14) {
+                LogoMark(size: 56)
+                Text("Pick Someone")
+                    .font(.system(.title3, design: .serif, weight: .semibold))
+            }
         } description: {
             Text("Choose a person to see their details, family tree and notes.")
         }
@@ -191,7 +196,7 @@ struct PersonRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(person.name)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(person.isDeceased ? .secondary : .primary)
                     if person.isDeceased {
                         Image(systemName: "leaf")
@@ -215,7 +220,7 @@ struct PersonRow: View {
                     .foregroundStyle(Theme.bougainvillea)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Theme.bougainvillea.opacity(0.15), in: Capsule())
+                    .background(Theme.bougainvillea.opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
         .padding(.vertical, 3)
