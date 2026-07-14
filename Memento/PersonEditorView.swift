@@ -389,20 +389,26 @@ struct PersonEditorView: View {
         func find(_ name: String) -> Person? {
             let trimmed = name.trimmed
             guard !trimmed.isEmpty else { return nil }
-            return everyone.first {
+            let matches = everyone.filter {
                 $0.persistentModelID != target.persistentModelID &&
                 $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
             }
+            // Only auto-link on an unambiguous match — guessing among
+            // several people sharing a name risks writing a fabricated
+            // family member onto the wrong profile.
+            return matches.count == 1 ? matches.first : nil
         }
         for member in target.familyMembersArray {
             guard let other = find(member.name) else { continue }
-            let alreadyLinked = other.familyMembersArray.contains {
+            let inverse = FamilyRelation.inverse(of: member.relation)
+            if let existing = other.familyMembersArray.first(where: {
                 $0.name.compare(target.name, options: .caseInsensitive) == .orderedSame
-            }
-            if !alreadyLinked {
-                other.familyMembersArray.append(
-                    FamilyMember(name: target.name, relation: FamilyRelation.inverse(of: member.relation))
-                )
+            }) {
+                // Keep the reciprocal relation in sync if it was already
+                // linked but the relation type changed since.
+                existing.relation = inverse
+            } else {
+                other.familyMembersArray.append(FamilyMember(name: target.name, relation: inverse))
             }
         }
         if let other = find(target.partnerName), other.partnerName.trimmed.isEmpty {

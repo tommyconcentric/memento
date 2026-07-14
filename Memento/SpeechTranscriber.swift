@@ -109,17 +109,26 @@ final class SpeechTranscriber {
 
     @MainActor
     private func process(result: SFSpeechRecognitionResult?, error: Error?) {
+        // A final result and an error can arrive in the same callback (e.g.
+        // at the ~1 minute recognition limit). Track whether the result
+        // branch already started the next segment so the error branch below
+        // doesn't start a second one on top of it, orphaning a task.
+        var alreadyRestarted = false
+
         if let result {
             consecutiveErrors = 0
             let partial = result.bestTranscription.formattedString
             transcript = finalizedText + partial
             if result.isFinal {
                 finalizedText = transcript.isEmpty ? "" : transcript + " "
-                if isRecording { startRecognitionSegment() }
+                if isRecording {
+                    startRecognitionSegment()
+                    alreadyRestarted = true
+                }
             }
         }
 
-        if error != nil, isRecording {
+        if error != nil, isRecording, !alreadyRestarted {
             consecutiveErrors += 1
             finalizedText = transcript.isEmpty ? "" : transcript + " "
             if consecutiveErrors < 3 {

@@ -63,7 +63,11 @@ struct RootView: View {
         for (index, name) in names.enumerated() {
             context.insert(PersonGroup(name: name, sortOrder: index, isBuiltIn: true))
         }
-        didSeedDefaultGroups = true
-        try? context.save()
+        // Only latch the flag once the insert is durably saved, so a failed
+        // save (e.g. a CloudKit hiccup on first launch) retries next launch
+        // instead of permanently skipping the starter folders.
+        if (try? context.save()) != nil {
+            didSeedDefaultGroups = true
+        }
     }
 }

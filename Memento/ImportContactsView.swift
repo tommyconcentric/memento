@@ -224,10 +224,13 @@ struct ImportContactsView: View {
             if contact.isKeyAvailable(CNContactBirthdayKey),
                let comps = contact.birthday,
                let month = comps.month, let day = comps.day {
-                // Contacts can store a birthday without a year; 1900 keeps
-                // the month/day working while the age display stays hidden.
+                // Contacts can store a birthday without a year; 1904 keeps
+                // the month/day working while the age display stays hidden
+                // (QuickInfoView only shows age < 120). Unlike 1900, 1904 is
+                // a leap year, so a Feb 29 birthday still constructs a valid
+                // date instead of silently failing.
                 candidate.birthday = Calendar.current.date(
-                    from: DateComponents(year: comps.year ?? 1900, month: month, day: day)
+                    from: DateComponents(year: comps.year ?? 1904, month: month, day: day)
                 )
             }
             if contact.isKeyAvailable(CNContactImageDataKey), let data = contact.imageData {
@@ -292,12 +295,12 @@ struct ImportContactsView: View {
     }
 
     private func parseCSV(_ text: String) {
-        let lines = text.split(whereSeparator: \.isNewline).map(String.init)
-        guard lines.count > 1 else {
+        let rows = parseCSVRows(text)
+        guard rows.count > 1 else {
             errorMessage = "That CSV needs a header row and at least one contact."
             return
         }
-        let headers = splitCSVLine(lines[0]).map { $0.lowercased() }
+        let headers = rows[0].map { $0.lowercased() }
         func columnIndex(matching options: [String]) -> Int? {
             headers.firstIndex { header in options.contains { header.contains($0) } }
         }
@@ -311,8 +314,7 @@ struct ImportContactsView: View {
         let addressIndex = columnIndex(matching: ["address"])
 
         var results: [ImportCandidate] = []
-        for line in lines.dropFirst() {
-            let fields = splitCSVLine(line)
+        for fields in rows.dropFirst() {
             func value(_ index: Int?) -> String {
                 guard let index, index < fields.count else { return "" }
                 return fields[index]
@@ -333,22 +335,61 @@ struct ImportContactsView: View {
         setCandidates(results)
     }
 
-    private func splitCSVLine(_ line: String) -> [String] {
+    /// Parses the whole file as one quote-aware stream (rather than
+    /// splitting into lines first), so a quoted field containing an
+    /// embedded newline — legal CSV, common in exported addresses — isn't
+    /// torn in half. Also collapses a doubled `""` into a literal `"`
+    /// instead of dropping both quote characters.
+    private func parseCSVRows(_ text: String) -> [[String]] {
+        var rows: [[String]] = []
         var fields: [String] = []
         var current = ""
         var insideQuotes = false
-        for character in line {
-            if character == "\"" {
-                insideQuotes.toggle()
-            } else if character == "," && !insideQuotes {
-                fields.append(current)
-                current = ""
+
+        func endField() {
+            fields.append(current.trimmed)
+            current = ""
+        }
+        func endRow() {
+            endField()
+            if !(fields.count == 1 && fields[0].isEmpty) {
+                rows.append(fields)
+            }
+            fields = []
+        }
+
+        let characters = Array(text)
+        var i = 0
+        while i < characters.count {
+            let character = characters[i]
+            if insideQuotes {
+                if character == "\"" {
+                    if i + 1 < characters.count, characters[i + 1] == "\"" {
+                        current.append("\"")
+                        i += 1
+                    } else {
+                        insideQuotes = false
+                    }
+                } else {
+                    current.append(character)
+                }
+            } else if character == "\"" {
+                insideQuotes = true
+            } else if character == "," {
+                endField()
+            } else if character == "\r" {
+                // No-op; a following "\n" (if present) ends the row.
+            } else if character == "\n" {
+                endRow()
             } else {
                 current.append(character)
             }
+            i += 1
         }
-        fields.append(current)
-        return fields.map { $0.trimmed }
+        if !current.isEmpty || !fields.isEmpty {
+            endRow()
+        }
+        return rows
     }
 
     private func parseBirthday(_ string: String) -> Date? {

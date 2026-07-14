@@ -161,11 +161,17 @@ struct CalendarView: View {
     private var eventsByDay: [Int: [DayEvent]] {
         var map: [Int: [DayEvent]] = [:]
         let month = calendar.component(.month, from: displayedMonth)
+        // A Feb 29 anniversary's stored day-of-month doesn't exist in the
+        // displayed month/year when it isn't a leap year; clamp to the last
+        // real day of that month instead of bucketing into a grid cell that
+        // was never rendered (dropping the event from the calendar).
+        let daysInDisplayedMonth = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 31
+
         for person in people {
             if let birthday = person.birthday {
                 let comps = calendar.dateComponents([.month, .day, .year], from: birthday)
                 if comps.month == month, let day = comps.day {
-                    map[day, default: []].append(DayEvent(
+                    map[min(day, daysInDisplayedMonth), default: []].append(DayEvent(
                         person: person,
                         title: "Birthday",
                         isBirthday: true,
@@ -176,7 +182,7 @@ struct CalendarView: View {
             for item in person.importantDatesArray {
                 let comps = calendar.dateComponents([.month, .day, .year], from: item.date)
                 if comps.month == month, let day = comps.day {
-                    map[day, default: []].append(DayEvent(
+                    map[min(day, daysInDisplayedMonth), default: []].append(DayEvent(
                         person: person,
                         title: item.label,
                         isBirthday: false,

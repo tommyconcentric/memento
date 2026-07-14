@@ -13,8 +13,12 @@ enum AppLock {
         KeychainHelper.read(pinKeychainKey)
     }
 
-    static func savePIN(_ pin: String) {
+    /// Returns true only once the PIN is verified to have actually landed in
+    /// the Keychain — callers must not enable the lock on a false positive.
+    @discardableResult
+    static func savePIN(_ pin: String) -> Bool {
         KeychainHelper.save(pin, for: pinKeychainKey)
+        return storedPIN == pin
     }
 
     static func clearPIN() {

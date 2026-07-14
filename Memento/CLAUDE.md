@@ -56,6 +56,12 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - `Person`/`PersonGroup` are `@Model` classes — compare with `persistentModelID`, not `==` on properties.
 - Xcode owns the `.pbxproj`; when adding new source files, add them to the Memento target.
 
+## Git identity in Claude Code sessions
+
+Claude Code's remote execution environment defaults every commit to `Claude <noreply@anthropic.com>` via a platform-level global gitconfig that's reapplied fresh each session — it can't be fixed by editing this repo's git config (and editing global git config isn't something a session should do anyway). Any commit made through a Claude Code session in this repo should override identity per-invocation instead, e.g.:
+`git -c user.name="Tommy Le" -c user.email="tommy@concentric.health" commit ...`
+The actual durable fix is setting `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` as environment variables on the Claude Code environment configuration — git honors those over the global config for every commit in every future session on that environment.
+
 ## No tests yet
 
 Manual verification on iPhone + iPad simulators and a Catalyst build. If adding tests, prefer exercising `FamilyRelation.generation` and CSV parsing in `ImportContactsView` first.

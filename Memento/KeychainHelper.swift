@@ -4,7 +4,8 @@ import Security
 /// Minimal Keychain wrapper for small secrets (the app-lock PIN). Never move
 /// anything stored here to UserDefaults, and never log or echo the values.
 enum KeychainHelper {
-    static func save(_ value: String, for key: String) {
+    @discardableResult
+    static func save(_ value: String, for key: String) -> Bool {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -15,7 +16,7 @@ enum KeychainHelper {
         var attributes = query
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(attributes as CFDictionary, nil)
+        return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
     }
 
     static func read(_ key: String) -> String? {
