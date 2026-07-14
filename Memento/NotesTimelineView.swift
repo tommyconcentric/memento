@@ -8,29 +8,18 @@ struct NotesTimelineView: View {
 
     @Environment(\.modelContext) private var context
     @State private var showingComposer = false
-    @State private var showingSmartCapture = false
     @State private var noteBeingEdited: NoteEntry?
     @State private var viewerPhoto: EventPhoto?
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Button {
-                    showingComposer = true
-                } label: {
-                    Label("Add a Note", systemImage: "square.and.pencil")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    showingSmartCapture = true
-                } label: {
-                    Label("Smart Capture", systemImage: "waveform")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
+            Button {
+                showingComposer = true
+            } label: {
+                Label("Add a Note", systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
 
             if person.notes.isEmpty {
                 ContentUnavailableView {
@@ -53,9 +42,6 @@ struct NotesTimelineView: View {
         }
         .sheet(isPresented: $showingComposer) {
             NoteComposerView(person: person, note: nil)
-        }
-        .sheet(isPresented: $showingSmartCapture) {
-            SmartCaptureView(person: person)
         }
         .sheet(item: $noteBeingEdited) { note in
             NoteComposerView(person: person, note: note)
