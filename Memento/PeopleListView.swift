@@ -17,6 +17,12 @@ struct PeopleListView: View {
     @State private var showingTree = false
     @State private var showingCalendar = false
     @State private var showingImport = false
+    @State private var showingAbout = false
+    @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
+
+    private var logoColorScheme: LogoColorScheme {
+        LogoColorScheme(rawValue: storedColorScheme) ?? .default
+    }
 
     private var filteredPeople: [Person] {
         guard !searchText.trimmed.isEmpty else { return people }
@@ -58,6 +64,9 @@ struct PeopleListView: View {
         .sheet(isPresented: $showingImport) {
             ImportContactsView()
         }
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
+        }
     }
 
     // MARK: - Sidebar (people list)
@@ -98,7 +107,12 @@ struct PeopleListView: View {
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
         .toolbar {
             ToolbarItemGroup(placement: .topBarLeading) {
-                LogoMark(size: 27)
+                Button {
+                    showingAbout = true
+                } label: {
+                    LogoMark(size: 27, colorScheme: logoColorScheme)
+                }
+                .accessibilityLabel("About Memento")
                 Button {
                     showingSettings = true
                 } label: {
@@ -157,7 +171,7 @@ struct PeopleListView: View {
     private var detailPlaceholder: some View {
         ContentUnavailableView {
             VStack(spacing: 14) {
-                LogoMark(size: 56)
+                LogoMark(size: 56, colorScheme: logoColorScheme)
                 Text("Pick Someone")
                     .font(.system(.title3, design: .serif, weight: .semibold))
             }

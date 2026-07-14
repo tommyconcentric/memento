@@ -17,12 +17,16 @@ Built with SwiftUI + SwiftData. No third-party dependencies. Records sync across
 - **Dictation** — tap the mic in the note editor and speak.
 - **In Memoriam** — mark someone as deceased; their profile grays and birthday countdowns/reminders pause.
 - **iCloud sync** — your people, notes and photos sync automatically across your own iPhone, iPad and Mac via CloudKit.
+- **App Lock** — an optional 4-digit PIN (Settings → App Lock), with Face ID/Touch ID as a faster unlock on top of it. The PIN is the source of truth so there's no way to get locked out with a working PIN; forgetting it just means reinstalling — your data restores from iCloud.
+- **About & app icon color** — tap the logo (top-left) for version info and a pick of 8 Home Screen icon colors (plus a matching in-app logo tint): Default, Red, Purple, Orange, Yellow, Green, Navy Blue, Monochrome.
 - **Made for iPhone, iPad and Mac** — the layout adapts: a stack on iPhone, a split view (people list beside the open profile) on iPad and Mac. Soft continuous-corner cards, a pill tab bar, rounded display type and a sun-motif header keep the UI clean and modern.
 - **Mamma Mia palette** — Aegean blues, whitewash, bougainvillea, olive, terracotta and gold; deep night-sea dark mode.
 
 ## Logo & app icon
 
 The mark is a small tree whose canopy is three connected people-nodes — family tree meets relationship graph — with the crown node in island gold. `AppLogo.swift` draws it in-app (sidebar, empty states); `AppIcon-1024.png` is the ready-made icon (open Assets.xcassets → AppIcon and drop it in the 1024 slot); `memento-logo.svg` is the source for anything else.
+
+Seven more colors live alongside the default as alternate Home Screen icons — `Assets.xcassets/AppIcon-<Name>.appiconset` for each, picked from the About screen via `UIApplication.setAlternateIconName`. `Scripts/generate_icons.swift` renders all of them from the same tree-of-people geometry (run with `swift Scripts/generate_icons.swift`); `LogoColorScheme` in `AppLogo.swift` holds the matching in-app tint for each one, so the sidebar logo always agrees with whatever's on the Home Screen.
 
 The design language got a refresh too: New York serif display type, a clean rectangular hero panel, circular portraits with a matching circular crop, underline tabs, hairline cards, journal-style date rails on notes, and a hand-drawn line icon set instead of emoji.
 
@@ -73,14 +77,17 @@ The interface is adaptive out of the box — no extra code needed, just destinat
 | `NotesTimelineView.swift` | Notes timeline, photo grid, viewer |
 | `NoteComposerView.swift` | Note editor: date, location, text, dictation, photos |
 | `SpeechTranscriber.swift` | Live speech-to-text engine |
-| `SettingsView.swift` | Reminders toggle and explainer |
+| `SettingsView.swift` | Reminders toggle, App Lock setup |
+| `AppLockView.swift` | PIN pad, Face ID/Touch ID, lock screen |
+| `KeychainHelper.swift` | Secure PIN storage |
+| `AboutView.swift` | Version info, app icon color picker |
 | `PersonEditorView.swift` | Add/edit person: photo, folder, relationship, family members, all fields |
 | `GroupsManagerView.swift` | Folder management |
 | `Utilities.swift` | Avatar view, info rows, image compression, date helpers |
 
 ## Using the app
 
-- **＋ menu** adds a person or imports contacts; **tree** opens your family tree; **calendar** shows everyone's dates; **folder** manages folders; **gear** opens Settings.
+- **＋ menu** adds a person or imports contacts; **tree** opens your family tree; **calendar** shows everyone's dates; **folder** manages folders; **gear** opens Settings; the **logo** opens About and the app icon color picker.
 - On a person: **Quick Info** for details, **Family** for their tree, **Notes** for the timeline.
 - Set *Relationship to You* in Edit Person to grow your own tree; add named family members to grow theirs.
 
