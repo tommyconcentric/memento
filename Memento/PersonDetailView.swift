@@ -65,6 +65,7 @@ struct PersonDetailView: View {
                     ) {
                         person.isDeceased.toggle()
                         try? context.save()
+                        NotificationManager.refreshFromContext(context)
                     }
                     Button("Delete Person", systemImage: "trash", role: .destructive) {
                         showingDeleteConfirm = true
@@ -85,6 +86,7 @@ struct PersonDetailView: View {
             Button("Delete", role: .destructive) {
                 context.delete(person)
                 try? context.save()
+                NotificationManager.refreshFromContext(context)
                 dismiss()
             }
         } message: {

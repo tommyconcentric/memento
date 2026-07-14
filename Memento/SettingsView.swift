@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
     @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
     @State private var showingPINSetup = false
+    @State private var pinSaveFailed = false
 
     var body: some View {
         NavigationStack {
@@ -46,8 +47,15 @@ struct SettingsView: View {
             .sheet(isPresented: $showingPINSetup) {
                 PINSetupView(
                     onComplete: { pin in
-                        AppLock.savePIN(pin)
-                        appLockEnabled = true
+                        // Only trust the Keychain write if it's verified to have
+                        // landed — never enable the lock on a false positive,
+                        // or the PIN becomes the only key and it doesn't exist.
+                        if AppLock.savePIN(pin) {
+                            appLockEnabled = true
+                        } else {
+                            pinSaveFailed = true
+                            if AppLock.storedPIN == nil { appLockEnabled = false }
+                        }
                         showingPINSetup = false
                     },
                     onCancel: {
@@ -56,6 +64,11 @@ struct SettingsView: View {
                         showingPINSetup = false
                     }
                 )
+            }
+            .alert("Couldn't Save PIN", isPresented: $pinSaveFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your PIN wasn't saved. App Lock has been left off — please try again.")
             }
             .onChange(of: remindersEnabled) { _, isOn in
                 Task { @MainActor in

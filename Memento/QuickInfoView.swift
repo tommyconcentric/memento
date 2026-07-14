@@ -106,7 +106,7 @@ struct QuickInfoView: View {
 
     private func dateText(_ date: Date) -> String {
         var value = date.formatted(date: .abbreviated, time: .omitted)
-        if let days = Date.daysUntilNextOccurrence(of: date), days <= 60 {
+        if !person.isDeceased, let days = Date.daysUntilNextOccurrence(of: date), days <= 60 {
             value += days == 0 ? " · today" : " · in \(days)d"
         }
         return value
