@@ -3,12 +3,8 @@ import SwiftData
 
 @main
 struct MementoApp: App {
-    var body: some Scene {
-        WindowGroup {
-            RootView()
-                .tint(Theme.aegean)
-        }
-        .modelContainer(for: [
+    let container: ModelContainer = {
+        let schema = Schema([
             Person.self,
             PersonGroup.self,
             NoteEntry.self,
@@ -16,6 +12,20 @@ struct MementoApp: App {
             ImportantDate.self,
             FamilyMember.self
         ])
+        let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
+    }()
+
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .tint(Theme.aegean)
+        }
+        .modelContainer(container)
     }
 }
 

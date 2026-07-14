@@ -126,7 +126,7 @@ struct NoteCard: View {
                     onPhotoTap(photo)
                 } label: {
                     VStack(spacing: 4) {
-                        if let uiImage = UIImage(data: photo.imageData) {
+                        if let data = photo.imageData, let uiImage = UIImage(data: data) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
@@ -158,7 +158,7 @@ struct PhotoViewerSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                if let uiImage = UIImage(data: photo.imageData) {
+                if let data = photo.imageData, let uiImage = UIImage(data: data) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFit()

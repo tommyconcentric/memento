@@ -136,8 +136,11 @@ struct NoteComposerView: View {
         text = note.text
         eventDate = note.eventDate
         location = note.location
-        drafts = note.sortedPhotos.map {
-            DraftPhoto(data: $0.imageData, caption: $0.caption, existingID: $0.persistentModelID)
+        drafts = note.sortedPhotos.compactMap { photo in
+            // A photo whose bytes haven't synced down from another device yet
+            // has nil imageData; skip it rather than showing a broken draft.
+            guard let data = photo.imageData else { return nil }
+            return DraftPhoto(data: data, caption: photo.caption, existingID: photo.persistentModelID)
         }
     }
 

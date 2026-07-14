@@ -5,9 +5,9 @@ import SwiftData
 
 @Model
 final class PersonGroup {
-    var name: String
-    var sortOrder: Int
-    var isBuiltIn: Bool
+    var name: String = ""
+    var sortOrder: Int = 0
+    var isBuiltIn: Bool = false
 
     @Relationship(deleteRule: .nullify, inverse: \Person.group)
     var people: [Person] = []
@@ -23,27 +23,27 @@ final class PersonGroup {
 
 @Model
 final class Person {
-    var name: String
+    var name: String = ""
     @Attribute(.externalStorage) var profilePhotoData: Data?
     var group: PersonGroup?
-    var createdAt: Date
+    var createdAt: Date = Date.now
     var isDeceased: Bool = false
     var relationshipToUser: String = ""   // e.g. "Mother" — places them on your family tree
     var address: String = ""
 
     // Quick-reference details — kept separate from the running notes
     var birthday: Date?
-    var partnerName: String
-    var childrenNames: String
-    var otherFamily: String
-    var jobTitle: String
-    var company: String
-    var hobbies: String
-    var hometown: String
-    var howWeMet: String
-    var foodPreferences: String
-    var phoneNumber: String
-    var email: String
+    var partnerName: String = ""
+    var childrenNames: String = ""
+    var otherFamily: String = ""
+    var jobTitle: String = ""
+    var company: String = ""
+    var hobbies: String = ""
+    var hometown: String = ""
+    var howWeMet: String = ""
+    var foodPreferences: String = ""
+    var phoneNumber: String = ""
+    var email: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \NoteEntry.person)
     var notes: [NoteEntry] = []
@@ -111,8 +111,8 @@ extension Person {
 
 @Model
 final class ImportantDate {
-    var label: String
-    var date: Date
+    var label: String = ""
+    var date: Date = Date.now
     var person: Person?
 
     init(label: String, date: Date) {
@@ -125,10 +125,10 @@ final class ImportantDate {
 
 @Model
 final class NoteEntry {
-    var text: String
-    var eventDate: Date
-    var location: String
-    var createdAt: Date
+    var text: String = ""
+    var eventDate: Date = Date.now
+    var location: String = ""
+    var createdAt: Date = Date.now
     var person: Person?
 
     @Relationship(deleteRule: .cascade, inverse: \EventPhoto.note)
@@ -152,12 +152,12 @@ extension NoteEntry {
 
 @Model
 final class EventPhoto {
-    @Attribute(.externalStorage) var imageData: Data
-    var caption: String
-    var sortOrder: Int
+    @Attribute(.externalStorage) var imageData: Data?
+    var caption: String = ""
+    var sortOrder: Int = 0
     var note: NoteEntry?
 
-    init(imageData: Data, caption: String = "", sortOrder: Int = 0) {
+    init(imageData: Data?, caption: String = "", sortOrder: Int = 0) {
         self.imageData = imageData
         self.caption = caption
         self.sortOrder = sortOrder
@@ -168,8 +168,8 @@ final class EventPhoto {
 
 @Model
 final class FamilyMember {
-    var name: String
-    var relation: String   // relation to the person this belongs to, e.g. "Mother"
+    var name: String = ""
+    var relation: String = ""   // relation to the person this belongs to, e.g. "Mother"
     var person: Person?
 
     init(name: String, relation: String) {
