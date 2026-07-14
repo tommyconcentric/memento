@@ -20,10 +20,27 @@ struct MementoApp: App {
         }
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
+    @State private var isLocked = UserDefaults.standard.bool(forKey: AppLock.enabledKey)
+
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .tint(Theme.aegean)
+            ZStack {
+                RootView()
+                    .tint(Theme.aegean)
+                if isLocked {
+                    AppLockView(onUnlock: { isLocked = false })
+                        .transition(.opacity)
+                }
+            }
+            // Lock on any departure from .active, not just .background, so an
+            // app-switcher snapshot never shows real notes unlocked.
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase != .active && appLockEnabled {
+                    isLocked = true
+                }
+            }
         }
         .modelContainer(container)
     }

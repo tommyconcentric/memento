@@ -303,10 +303,10 @@ struct PersonEditorView: View {
         email = person.email
         address = person.address
         relationshipToUser = person.relationshipToUser
-        draftFamilyMembers = person.familyMembers.map {
+        draftFamilyMembers = person.familyMembersArray.map {
             DraftFamilyMember(name: $0.name, relation: $0.relation)
         }
-        draftDates = person.importantDates
+        draftDates = person.importantDatesArray
             .sorted { $0.date < $1.date }
             .map { DraftDate(label: $0.label, date: $0.date) }
     }
@@ -356,22 +356,22 @@ struct PersonEditorView: View {
         target.relationshipToUser = relationshipToUser
 
         // Replace important dates with the edited set.
-        let oldDates = target.importantDates
+        let oldDates = target.importantDatesArray
         for old in oldDates {
             context.delete(old)
         }
         for draft in draftDates {
             let label = draft.label.trimmed.isEmpty ? "Important date" : draft.label.trimmed
-            target.importantDates.append(ImportantDate(label: label, date: draft.date))
+            target.importantDatesArray.append(ImportantDate(label: label, date: draft.date))
         }
 
         // Replace family members with the edited set.
-        let oldMembers = target.familyMembers
+        let oldMembers = target.familyMembersArray
         for old in oldMembers {
             context.delete(old)
         }
         for member in draftFamilyMembers where !member.name.trimmed.isEmpty {
-            target.familyMembers.append(FamilyMember(name: member.name.trimmed, relation: member.relation))
+            target.familyMembersArray.append(FamilyMember(name: member.name.trimmed, relation: member.relation))
         }
 
         applyReciprocalLinks(around: target)
@@ -394,13 +394,13 @@ struct PersonEditorView: View {
                 $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
             }
         }
-        for member in target.familyMembers {
+        for member in target.familyMembersArray {
             guard let other = find(member.name) else { continue }
-            let alreadyLinked = other.familyMembers.contains {
+            let alreadyLinked = other.familyMembersArray.contains {
                 $0.name.compare(target.name, options: .caseInsensitive) == .orderedSame
             }
             if !alreadyLinked {
-                other.familyMembers.append(
+                other.familyMembersArray.append(
                     FamilyMember(name: target.name, relation: FamilyRelation.inverse(of: member.relation))
                 )
             }

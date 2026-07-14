@@ -9,13 +9,22 @@ final class PersonGroup {
     var sortOrder: Int = 0
     var isBuiltIn: Bool = false
 
+    // CloudKit requires to-many relationships to be Optional; `peopleArray`
+    // is the non-optional accessor everything else in the app should use.
     @Relationship(deleteRule: .nullify, inverse: \Person.group)
-    var people: [Person] = []
+    var people: [Person]?
 
     init(name: String, sortOrder: Int = 0, isBuiltIn: Bool = false) {
         self.name = name
         self.sortOrder = sortOrder
         self.isBuiltIn = isBuiltIn
+    }
+}
+
+extension PersonGroup {
+    var peopleArray: [Person] {
+        get { people ?? [] }
+        set { people = newValue }
     }
 }
 
@@ -45,14 +54,16 @@ final class Person {
     var phoneNumber: String = ""
     var email: String = ""
 
+    // CloudKit requires to-many relationships to be Optional; use the
+    // `notesArray`/`importantDatesArray`/`familyMembersArray` accessors below.
     @Relationship(deleteRule: .cascade, inverse: \NoteEntry.person)
-    var notes: [NoteEntry] = []
+    var notes: [NoteEntry]?
 
     @Relationship(deleteRule: .cascade, inverse: \ImportantDate.person)
-    var importantDates: [ImportantDate] = []
+    var importantDates: [ImportantDate]?
 
     @Relationship(deleteRule: .cascade, inverse: \FamilyMember.person)
-    var familyMembers: [FamilyMember] = []
+    var familyMembers: [FamilyMember]?
 
     init(name: String, group: PersonGroup? = nil) {
         self.name = name
@@ -82,12 +93,27 @@ extension Person {
         return ""
     }
 
+    var notesArray: [NoteEntry] {
+        get { notes ?? [] }
+        set { notes = newValue }
+    }
+
+    var importantDatesArray: [ImportantDate] {
+        get { importantDates ?? [] }
+        set { importantDates = newValue }
+    }
+
+    var familyMembersArray: [FamilyMember] {
+        get { familyMembers ?? [] }
+        set { familyMembers = newValue }
+    }
+
     var sortedNotes: [NoteEntry] {
-        notes.sorted { $0.eventDate > $1.eventDate }
+        notesArray.sorted { $0.eventDate > $1.eventDate }
     }
 
     var hasAnyQuickInfo: Bool {
-        if birthday != nil || !importantDates.isEmpty { return true }
+        if birthday != nil || !importantDatesArray.isEmpty { return true }
         let fields = [partnerName, childrenNames, otherFamily, jobTitle, company,
                       hobbies, hometown, howWeMet, foodPreferences, phoneNumber, email,
                       address, relationshipToUser]
@@ -131,8 +157,9 @@ final class NoteEntry {
     var createdAt: Date = Date.now
     var person: Person?
 
+    // CloudKit requires to-many relationships to be Optional; use `photosArray`.
     @Relationship(deleteRule: .cascade, inverse: \EventPhoto.note)
-    var photos: [EventPhoto] = []
+    var photos: [EventPhoto]?
 
     init(text: String = "", eventDate: Date = .now, location: String = "") {
         self.text = text
@@ -143,8 +170,13 @@ final class NoteEntry {
 }
 
 extension NoteEntry {
+    var photosArray: [EventPhoto] {
+        get { photos ?? [] }
+        set { photos = newValue }
+    }
+
     var sortedPhotos: [EventPhoto] {
-        photos.sorted { $0.sortOrder < $1.sortOrder }
+        photosArray.sorted { $0.sortOrder < $1.sortOrder }
     }
 }
 

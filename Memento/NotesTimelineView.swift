@@ -21,7 +21,7 @@ struct NotesTimelineView: View {
             }
             .buttonStyle(.borderedProminent)
 
-            if person.notes.isEmpty {
+            if person.notesArray.isEmpty {
                 ContentUnavailableView {
                     Label("No Notes Yet", systemImage: "text.book.closed")
                 } description: {
@@ -94,7 +94,7 @@ struct NoteCard: View {
                     .font(.body)
             }
 
-            if !note.photos.isEmpty {
+            if !note.photosArray.isEmpty {
                 photoGrid
             }
         }

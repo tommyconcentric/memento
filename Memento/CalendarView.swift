@@ -173,7 +173,7 @@ struct CalendarView: View {
                     ))
                 }
             }
-            for item in person.importantDates {
+            for item in person.importantDatesArray {
                 let comps = calendar.dateComponents([.month, .day, .year], from: item.date)
                 if comps.month == month, let day = comps.day {
                     map[day, default: []].append(DayEvent(

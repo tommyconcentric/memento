@@ -53,7 +53,7 @@ enum RelationshipPath {
             for child in childNames(of: p) where exists(child) {
                 edges.append((key(child), "child"))
             }
-            for member in p.familyMembers where exists(member.name) {
+            for member in p.familyMembersArray where exists(member.name) {
                 edges.append((key(member.name), member.relation.lowercased()))
             }
             if !edges.isEmpty { adjacency[key(p.name), default: []].append(contentsOf: edges) }

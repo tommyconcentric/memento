@@ -84,7 +84,7 @@ struct QuickInfoView: View {
         if !person.address.isEmpty {
             InfoRow(icon: "mappin", label: "Address", value: person.address)
         }
-        ForEach(person.importantDates.sorted { $0.date < $1.date }) { item in
+        ForEach(person.importantDatesArray.sorted { $0.date < $1.date }) { item in
             InfoRow(icon: "calendar.badge.clock", label: item.label, value: dateText(item.date))
         }
     }

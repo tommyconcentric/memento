@@ -32,7 +32,7 @@ struct GroupsManagerView: View {
                                     Image(systemName: "folder")
                                 }
                                 Spacer()
-                                Text("\(group.people.count)")
+                                Text("\(group.peopleArray.count)")
                                     .foregroundStyle(.secondary)
                             }
                         }

@@ -1,11 +1,16 @@
 import SwiftUI
 import SwiftData
+import LocalAuthentication
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @AppStorage(NotificationManager.enabledKey) private var remindersEnabled = false
     @State private var reminderNote: String?
+
+    @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
+    @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
+    @State private var showingPINSetup = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +28,34 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                Section {
+                    Toggle("Require a PIN to open Memento", isOn: appLockToggleBinding)
+                    if appLockEnabled {
+                        if AppLock.biometryType != .none {
+                            Toggle("Unlock with \(AppLock.biometryName)", isOn: $useBiometrics)
+                        }
+                        Button("Change PIN") { showingPINSetup = true }
+                    }
+                } header: {
+                    Text("App Lock")
+                } footer: {
+                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") whenever you leave the app. If you ever forget the PIN, delete and reinstall Memento — your data is safe and restores automatically from iCloud once you sign back in.")
+                }
+            }
+            .sheet(isPresented: $showingPINSetup) {
+                PINSetupView(
+                    onComplete: { pin in
+                        AppLock.savePIN(pin)
+                        appLockEnabled = true
+                        showingPINSetup = false
+                    },
+                    onCancel: {
+                        // Cancelling a first-time setup leaves nothing to protect with.
+                        if AppLock.storedPIN == nil { appLockEnabled = false }
+                        showingPINSetup = false
+                    }
+                )
             }
             .onChange(of: remindersEnabled) { _, isOn in
                 Task { @MainActor in
@@ -47,5 +80,22 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// Turning the lock on requires setting a PIN first; turning it off
+    /// clears the PIN entirely so nothing stale is left in the Keychain.
+    private var appLockToggleBinding: Binding<Bool> {
+        Binding(
+            get: { appLockEnabled },
+            set: { newValue in
+                if newValue {
+                    showingPINSetup = true
+                } else {
+                    appLockEnabled = false
+                    useBiometrics = false
+                    AppLock.clearPIN()
+                }
+            }
+        )
     }
 }

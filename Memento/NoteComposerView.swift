@@ -172,7 +172,7 @@ struct NoteComposerView: View {
             target = note
         } else {
             let newNote = NoteEntry()
-            person.notes.append(newNote)
+            person.notesArray.append(newNote)
             target = newNote
         }
 
@@ -181,7 +181,7 @@ struct NoteComposerView: View {
         target.location = location.trimmed
 
         // Remove photos that were deleted in the editor.
-        let existing = target.photos
+        let existing = target.photosArray
         let keptIDs = Set(drafts.compactMap(\.existingID))
         for photo in existing where !keptIDs.contains(photo.persistentModelID) {
             context.delete(photo)
@@ -200,7 +200,7 @@ struct NoteComposerView: View {
                     caption: draft.caption.trimmed,
                     sortOrder: index
                 )
-                target.photos.append(photo)
+                target.photosArray.append(photo)
             }
         }
 

@@ -40,7 +40,7 @@ enum NotificationManager {
                     daysAway: Date.daysUntilNextOccurrence(of: birthday) ?? Int.max
                 ))
             }
-            for item in person.importantDates {
+            for item in person.importantDatesArray {
                 events.append(PendingEvent(
                     title: "📅 \(item.label)",
                     body: "\(item.label) for \(person.name) is today.",

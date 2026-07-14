@@ -375,7 +375,7 @@ struct PersonFamilySection: View {
         for child in childNames(of: person) {
             result.append(node(named: child, relation: "Child"))
         }
-        for member in person.familyMembers where !member.name.trimmed.isEmpty {
+        for member in person.familyMembersArray where !member.name.trimmed.isEmpty {
             result.append(node(named: member.name, relation: member.relation))
         }
         return result
