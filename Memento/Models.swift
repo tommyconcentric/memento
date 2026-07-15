@@ -153,6 +153,7 @@ final class ImportantDate {
 
 @Model
 final class NoteEntry {
+    var title: String = ""
     var text: String = ""
     var eventDate: Date = Date.now
     var location: String = ""
