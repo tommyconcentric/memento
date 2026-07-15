@@ -80,13 +80,13 @@ struct Variant {
 }
 
 let sunshine = Color(red: 0.949, green: 0.757, blue: 0.306)
-let deepAegean = Color(red: 0.09, green: 0.34, blue: 0.49)
+let bougainvillea = Color(red: 0.851, green: 0.310, blue: 0.557)
 
 let variants: [Variant] = [
     Variant(name: "Red", bg1: Color(red: 0.35, green: 0.07, blue: 0.09), bg2: Color(red: 0.80, green: 0.20, blue: 0.18), crown: sunshine),
     Variant(name: "Purple", bg1: Color(red: 0.19, green: 0.10, blue: 0.27), bg2: Color(red: 0.55, green: 0.35, blue: 0.72), crown: sunshine),
     Variant(name: "Orange", bg1: Color(red: 0.35, green: 0.16, blue: 0.05), bg2: Color(red: 0.85, green: 0.45, blue: 0.15), crown: sunshine),
-    Variant(name: "Yellow", bg1: Color(red: 0.35, green: 0.27, blue: 0.05), bg2: sunshine, crown: deepAegean),
+    Variant(name: "Pink", bg1: Color(red: 0.36, green: 0.10, blue: 0.28), bg2: bougainvillea, crown: sunshine),
     Variant(name: "Green", bg1: Color(red: 0.12, green: 0.19, blue: 0.09), bg2: Color(red: 0.35, green: 0.62, blue: 0.28), crown: sunshine),
     Variant(name: "Navy", bg1: Color(red: 0.02, green: 0.05, blue: 0.12), bg2: Color(red: 0.09, green: 0.16, blue: 0.30), crown: sunshine),
     Variant(name: "Monochrome", bg1: Color(red: 0.14, green: 0.14, blue: 0.15), bg2: Color(red: 0.55, green: 0.55, blue: 0.57), crown: Color(white: 0.85)),
