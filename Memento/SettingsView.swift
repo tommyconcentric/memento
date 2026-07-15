@@ -8,6 +8,9 @@ struct SettingsView: View {
     @AppStorage(NotificationManager.enabledKey) private var remindersEnabled = false
     @State private var reminderNote: String?
 
+    @AppStorage(CalendarSyncManager.enabledKey) private var calendarSyncEnabled = false
+    @State private var calendarSyncNote: String?
+
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
     @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
     @State private var showingPINSetup = false
@@ -22,9 +25,23 @@ struct SettingsView: View {
                     Text("Reminders")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("A 9 AM notification on birthdays and important dates. Reminders skip people marked in memoriam, and iOS allows up to 60 scheduled dates — the nearest ones are kept.")
+                        Text("A 9 AM notification on birthdays and important dates. Reminders skip people marked in memoriam and any date you've turned off from its Quick Info tab, and iOS allows up to 60 scheduled dates — the nearest ones are kept.")
                         if let reminderNote {
                             Text(reminderNote)
+                                .foregroundStyle(Theme.terracotta)
+                        }
+                    }
+                }
+
+                Section {
+                    Toggle("Sync with Apple Calendar", isOn: $calendarSyncEnabled)
+                } header: {
+                    Text("Apple Calendar")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Adds a “Memento” calendar with everyone's birthdays and important dates, so you can show or hide it in the Calendar app just like Birthdays or Holidays. Every date appears here, even ones you've turned reminders off for.")
+                        if let calendarSyncNote {
+                            Text(calendarSyncNote)
                                 .foregroundStyle(Theme.terracotta)
                         }
                     }
@@ -83,6 +100,23 @@ struct SettingsView: View {
                         reminderNote = nil
                     }
                     NotificationManager.refreshFromContext(context)
+                }
+            }
+            .onChange(of: calendarSyncEnabled) { _, isOn in
+                Task { @MainActor in
+                    if isOn {
+                        let granted = await CalendarSyncManager.requestAccess()
+                        if !granted {
+                            calendarSyncEnabled = false
+                            calendarSyncNote = "Calendar access is turned off for Memento — enable it in the iOS Settings app, then try again."
+                            return
+                        }
+                        calendarSyncNote = nil
+                        CalendarSyncManager.refreshFromContext(context)
+                    } else {
+                        calendarSyncNote = nil
+                        CalendarSyncManager.removeCalendar()
+                    }
                 }
             }
             .navigationTitle("Settings")

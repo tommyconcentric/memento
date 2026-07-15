@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// The at-a-glance card of preset details (birthday, family, hobbies…).
 /// Deliberately separate from the running notes timeline.
@@ -6,10 +7,18 @@ struct QuickInfoView: View {
     let person: Person
     var onEdit: () -> Void
 
+    @Environment(\.modelContext) private var context
+
     var body: some View {
         VStack(spacing: 16) {
             if person.hasAnyQuickInfo {
                 infoCard
+
+                if person.birthday != nil || !person.importantDatesArray.isEmpty {
+                    Text("Toggle a date to turn its reminder on or off — every date still shows on the Memento calendar either way.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
 
                 Button(action: onEdit) {
                     Label("Edit Details", systemImage: "pencil")
@@ -45,7 +54,13 @@ struct QuickInfoView: View {
             InfoRow(icon: "person", label: "Relationship", value: "Your \(person.relationshipToUser.lowercased())")
         }
         if let birthday = person.birthday {
-            InfoRow(icon: "gift", label: "Birthday", value: birthdayText(birthday))
+            dateRow(
+                icon: "gift", label: "Birthday", value: birthdayText(birthday),
+                isOn: Binding(
+                    get: { person.birthdayReminderEnabled },
+                    set: { person.birthdayReminderEnabled = $0; saveDateChange() }
+                )
+            )
         }
         if !person.partnerName.isEmpty {
             InfoRow(icon: "heart", label: "Partner", value: person.partnerName)
@@ -85,8 +100,48 @@ struct QuickInfoView: View {
             InfoRow(icon: "mappin", label: "Address", value: person.address)
         }
         ForEach(person.importantDatesArray.sorted { $0.date < $1.date }) { item in
-            InfoRow(icon: "calendar.badge.clock", label: item.label, value: dateText(item.date))
+            dateRow(
+                icon: "calendar.badge.clock", label: item.label, value: dateText(item.date),
+                isOn: Binding(
+                    get: { item.remindersEnabled },
+                    set: { item.remindersEnabled = $0; saveDateChange() }
+                )
+            )
         }
+    }
+
+    /// Same layout as `InfoRow`, plus a trailing reminder toggle. Mutating
+    /// the toggle writes straight through to the live model (like
+    /// PersonDetailView's "Mark as Deceased" toggle) rather than going
+    /// through the cancel-safe editor draft flow — it's a single boolean
+    /// flip with nothing to lose by committing immediately.
+    private func dateRow(icon: String, label: String, value: String, isOn: Binding<Bool>) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.body)
+            }
+            Spacer(minLength: 0)
+            Toggle(isOn: isOn) {
+                EmptyView()
+            }
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .accessibilityLabel("Remind me for \(label)")
+        }
+    }
+
+    private func saveDateChange() {
+        try? context.save()
+        NotificationManager.refreshFromContext(context)
+        CalendarSyncManager.refreshFromContext(context)
     }
 
     private func birthdayText(_ birthday: Date) -> String {

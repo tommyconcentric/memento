@@ -189,6 +189,7 @@ struct PeopleListView: View {
         context.delete(person)
         try? context.save()
         NotificationManager.refreshFromContext(context)
+        CalendarSyncManager.refreshFromContext(context)
     }
 }
 

@@ -32,7 +32,7 @@ enum NotificationManager {
 
         var events: [PendingEvent] = []
         for person in people where !person.isDeceased {
-            if let birthday = person.birthday {
+            if let birthday = person.birthday, person.birthdayReminderEnabled {
                 events.append(PendingEvent(
                     title: "🎂 \(person.name)'s birthday",
                     body: "It's \(person.name)'s birthday today — send them a message!",
@@ -40,7 +40,7 @@ enum NotificationManager {
                     daysAway: Date.daysUntilNextOccurrence(of: birthday) ?? Int.max
                 ))
             }
-            for item in person.importantDatesArray {
+            for item in person.importantDatesArray where item.remindersEnabled {
                 events.append(PendingEvent(
                     title: "📅 \(item.label)",
                     body: "\(item.label) for \(person.name) is today.",
