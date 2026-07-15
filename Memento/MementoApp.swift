@@ -10,7 +10,8 @@ struct MementoApp: App {
             NoteEntry.self,
             EventPhoto.self,
             ImportantDate.self,
-            FamilyMember.self
+            FamilyMember.self,
+            ContactField.self
         ])
         let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
         do {
