@@ -317,7 +317,9 @@ struct MyFamilyTreeView: View {
                 }
             }
             .confirmationDialog(
-                pendingMove.map { "How is \($0.person.name) related to you now?" } ?? "",
+                pendingMove.map { move in
+                    "Move \(move.person.name) to \(FamilyRelation.rowTitle(for: move.generation, subject: "You").lowercased())?"
+                } ?? "",
                 isPresented: Binding(
                     get: { pendingMove != nil },
                     set: { if !$0 { pendingMove = nil } }
@@ -329,6 +331,8 @@ struct MyFamilyTreeView: View {
                     Button(label) { apply(label: label, to: move.person) }
                 }
                 Button("Cancel", role: .cancel) {}
+            } message: { move in
+                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong in that row are offered.")
             }
         }
     }
