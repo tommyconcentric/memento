@@ -18,7 +18,7 @@ Built with SwiftUI + SwiftData. No third-party dependencies. Records sync across
 - **In Memoriam** — mark someone as deceased; their profile grays and birthday countdowns/reminders pause.
 - **iCloud sync** — your people, notes and photos sync automatically across your own iPhone, iPad and Mac via CloudKit.
 - **App Lock** — an optional 4-digit PIN (Settings → App Lock), with Face ID/Touch ID as a faster unlock on top of it. The PIN is the source of truth so there's no way to get locked out with a working PIN; forgetting it just means reinstalling — your data restores from iCloud.
-- **About & app icon color** — tap the logo (top-left) for version info and a pick of 8 Home Screen icon colors (plus a matching in-app logo tint): Default, Red, Purple, Orange, Yellow, Green, Navy Blue, Monochrome.
+- **About & app icon color** — tap the logo (top-left) for version info and a pick of 8 Home Screen icon colors (plus a matching in-app logo tint): Default, Red, Purple, Orange, Pink, Green, Navy Blue, Monochrome.
 - **Made for iPhone, iPad and Mac** — the layout adapts: a stack on iPhone, a split view (people list beside the open profile) on iPad and Mac. Soft continuous-corner cards, a pill tab bar, rounded display type and a sun-motif header keep the UI clean and modern.
 - **Mamma Mia palette** — Aegean blues, whitewash, bougainvillea, olive, terracotta and gold; deep night-sea dark mode.
 

@@ -6,7 +6,7 @@ import SwiftUI
 /// it directly. Colors here match `generate_icons.swift`'s renders so the
 /// in-app logo and the Home Screen icon never disagree.
 enum LogoColorScheme: String, CaseIterable, Identifiable {
-    case `default`, red, purple, orange, yellow, green, navy, monochrome
+    case `default`, red, purple, orange, pink, green, navy, monochrome
 
     var id: String { rawValue }
 
@@ -16,7 +16,7 @@ enum LogoColorScheme: String, CaseIterable, Identifiable {
         case .red: return "Red"
         case .purple: return "Purple"
         case .orange: return "Orange"
-        case .yellow: return "Yellow"
+        case .pink: return "Pink"
         case .green: return "Green"
         case .navy: return "Navy Blue"
         case .monochrome: return "Monochrome"
@@ -31,7 +31,7 @@ enum LogoColorScheme: String, CaseIterable, Identifiable {
         case .red: return "AppIcon-Red"
         case .purple: return "AppIcon-Purple"
         case .orange: return "AppIcon-Orange"
-        case .yellow: return "AppIcon-Yellow"
+        case .pink: return "AppIcon-Pink"
         case .green: return "AppIcon-Green"
         case .navy: return "AppIcon-Navy"
         case .monochrome: return "AppIcon-Monochrome"
@@ -44,7 +44,7 @@ enum LogoColorScheme: String, CaseIterable, Identifiable {
         case .red: return Color(red: 0.35, green: 0.07, blue: 0.09)
         case .purple: return Color(red: 0.19, green: 0.10, blue: 0.27)
         case .orange: return Color(red: 0.35, green: 0.16, blue: 0.05)
-        case .yellow: return Color(red: 0.35, green: 0.27, blue: 0.05)
+        case .pink: return Color(red: 0.36, green: 0.10, blue: 0.28)
         case .green: return Color(red: 0.12, green: 0.19, blue: 0.09)
         case .navy: return Color(red: 0.02, green: 0.05, blue: 0.12)
         case .monochrome: return Color(red: 0.14, green: 0.14, blue: 0.15)
@@ -57,7 +57,7 @@ enum LogoColorScheme: String, CaseIterable, Identifiable {
         case .red: return Color(red: 0.80, green: 0.20, blue: 0.18)
         case .purple: return Color(red: 0.55, green: 0.35, blue: 0.72)
         case .orange: return Color(red: 0.85, green: 0.45, blue: 0.15)
-        case .yellow: return Theme.sunshine
+        case .pink: return Theme.bougainvillea
         case .green: return Color(red: 0.35, green: 0.62, blue: 0.28)
         case .navy: return Color(red: 0.09, green: 0.16, blue: 0.30)
         case .monochrome: return Color(red: 0.55, green: 0.55, blue: 0.57)
@@ -66,7 +66,6 @@ enum LogoColorScheme: String, CaseIterable, Identifiable {
 
     var crown: Color {
         switch self {
-        case .yellow: return Color(red: 0.09, green: 0.34, blue: 0.49)
         case .monochrome: return Color(white: 0.85)
         default: return Theme.sunshine
         }
