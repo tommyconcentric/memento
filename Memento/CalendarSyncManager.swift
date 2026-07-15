@@ -91,9 +91,46 @@ enum CalendarSyncManager {
         event.title = title
         event.calendar = calendar
         event.isAllDay = true
-        event.startDate = Calendar.current.startOfDay(for: date)
+        event.startDate = recentAnchor(for: date)
         event.endDate = event.startDate
         event.recurrenceRules = [EKRecurrenceRule(recurrenceWith: .yearly, interval: 1, end: nil)]
         try? store.save(event, span: .futureEvents, commit: false)
+    }
+
+    /// A recurring event's DTSTART only ever generates occurrences on or
+    /// after itself, so anchoring at the literal stored year (e.g. a 1990
+    /// birthday) puts decades of past occurrences outside
+    /// `removeAllEvents`'s one-year lookback window. On every later
+    /// refresh, that old series survives untouched while a brand-new one is
+    /// created alongside it, leaking a duplicate on each date that already
+    /// occurred before the window's start. Anchoring at the most recent
+    /// occurrence (this year's if it's already passed, else last year's)
+    /// keeps the anchor inside the lookback window on every future refresh,
+    /// so the old series is always found and replaced instead of leaking.
+    private static func recentAnchor(for date: Date) -> Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let components = calendar.dateComponents([.month, .day], from: date)
+        guard let month = components.month, let day = components.day else {
+            return calendar.startOfDay(for: date)
+        }
+        let todayYear = calendar.component(.year, from: today)
+
+        // Feb 29 anniversaries have no exact match in non-leap years, so
+        // fall back to Feb 28 that year rather than skipping to the next
+        // leap year — matches Date.daysUntilNextOccurrence's convention.
+        func occurrence(inYear year: Int) -> Date? {
+            var comps = DateComponents(year: year, month: month, day: day)
+            if month == 2, day == 29,
+               let feb1 = calendar.date(from: DateComponents(year: year, month: 2, day: 1)),
+               calendar.range(of: .day, in: .month, for: feb1)?.count != 29 {
+                comps.day = 28
+            }
+            return calendar.date(from: comps)
+        }
+
+        guard let thisYear = occurrence(inYear: todayYear) else { return calendar.startOfDay(for: date) }
+        let mostRecent = thisYear <= today ? thisYear : (occurrence(inYear: todayYear - 1) ?? thisYear)
+        return calendar.startOfDay(for: mostRecent)
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// The at-a-glance card of preset details (birthday, family, hobbies…).
 /// Deliberately separate from the running notes timeline.
