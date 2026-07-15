@@ -9,7 +9,7 @@ enum FamilyRelation {
     static let presets: [String] = [
         "Mother", "Father", "Parent", "Stepmother", "Stepfather",
         "Grandmother", "Grandfather", "Grandparent",
-        "Wife", "Husband", "Partner",
+        "Wife", "Husband", "Fiancée", "Fiancé", "Partner", "Girlfriend", "Boyfriend",
         "Sister", "Brother", "Sibling", "Stepsister", "Stepbrother", "Cousin",
         "Aunt", "Uncle", "Aunt/Uncle",
         "Daughter", "Son", "Child", "Stepdaughter", "Stepson",
@@ -17,7 +17,13 @@ enum FamilyRelation {
         "Granddaughter", "Grandson", "Grandchild",
         "Mother-in-law", "Father-in-law", "Parent-in-law",
         "Sister-in-law", "Brother-in-law", "Sibling-in-law",
-        "Daughter-in-law", "Son-in-law", "Child-in-law"
+        "Daughter-in-law", "Son-in-law", "Child-in-law",
+        // Less common relations, kept at the bottom of the picker.
+        "Half-sister", "Half-brother", "Half-sibling",
+        "Great-grandmother", "Great-grandfather", "Great-grandparent",
+        "Great-granddaughter", "Great-grandson", "Great-grandchild",
+        "Godmother", "Godfather", "Goddaughter", "Godson",
+        "Ex-wife", "Ex-husband", "Ex-girlfriend", "Ex-boyfriend", "Ex-partner"
     ]
 
     /// Generation offset relative to the tree's focus person.
