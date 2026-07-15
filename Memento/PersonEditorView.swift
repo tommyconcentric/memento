@@ -87,9 +87,9 @@ struct PersonEditorView: View {
                         }
                     }
                 } header: {
-                    Text("Relationship to You")
+                    Text("Family Relationship to You")
                 } footer: {
-                    Text("Places them on your family tree, which builds itself from these labels.")
+                    Text("Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family.")
                 }
 
                 Section("Birthday") {
