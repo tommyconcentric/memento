@@ -419,6 +419,8 @@ struct ImportContactsView: View {
     }
 
     private func importSelected() {
+        // Imports join whichever workspace is currently open.
+        let isBusiness = UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
         for candidate in candidates where candidate.include {
             let person = Person(name: candidate.name.trimmed, group: selectedGroup)
             person.phoneNumber = candidate.phone.trimmed
@@ -426,6 +428,7 @@ struct ImportContactsView: View {
             person.address = candidate.address.trimmed
             person.birthday = candidate.birthday
             person.profilePhotoData = candidate.photoData
+            person.isBusiness = isBusiness
             context.insert(person)
         }
         try? context.save()

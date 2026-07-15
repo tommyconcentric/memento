@@ -19,6 +19,8 @@ struct PersonEditorView: View {
     @State private var pickerTarget: PickTarget?
     @State private var selectedGroup: PersonGroup?
     @State private var isDeceased = false
+    @State private var isBusiness = false
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
     // Quick info
     @State private var hasBirthday = false
@@ -77,6 +79,17 @@ struct PersonEditorView: View {
                             Text(group.name).tag(Optional(group))
                         }
                     }
+                }
+
+                Section {
+                    Picker("Shown in", selection: $isBusiness) {
+                        Text("Memento Personal").tag(false)
+                        Text("Memento Business").tag(true)
+                    }
+                } header: {
+                    Text("Workspace")
+                } footer: {
+                    Text("Business contacts live in Memento Business — switch workspaces from the badge next to the logo.")
                 }
 
                 Section {
@@ -280,7 +293,12 @@ struct PersonEditorView: View {
     private func loadInitial() {
         guard !loadedInitial else { return }
         loadedInitial = true
-        guard let person else { return }
+        guard let person else {
+            // New people join whichever workspace is currently open.
+            isBusiness = storedWorkspace == Workspace.business.rawValue
+            return
+        }
+        isBusiness = person.isBusiness
 
         name = person.name
         photoData = person.profilePhotoData
@@ -340,6 +358,7 @@ struct PersonEditorView: View {
         target.profilePhotoData = photoData
         target.group = selectedGroup
         target.isDeceased = isDeceased
+        target.isBusiness = isBusiness
         target.birthday = hasBirthday ? birthday : nil
         target.partnerName = partnerName.trimmed
         target.childrenNames = childrenNames.trimmed
