@@ -42,6 +42,7 @@ final class Person {
 
     // Quick-reference details — kept separate from the running notes
     var birthday: Date?
+    var birthdayReminderEnabled: Bool = true
     var partnerName: String = ""
     var childrenNames: String = ""
     var otherFamily: String = ""
@@ -139,6 +140,7 @@ extension Person {
 final class ImportantDate {
     var label: String = ""
     var date: Date = Date.now
+    var remindersEnabled: Bool = true
     var person: Person?
 
     init(label: String, date: Date) {

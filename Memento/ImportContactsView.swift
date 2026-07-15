@@ -430,6 +430,7 @@ struct ImportContactsView: View {
         }
         try? context.save()
         NotificationManager.refreshFromContext(context)
+        CalendarSyncManager.refreshFromContext(context)
         dismiss()
     }
 }

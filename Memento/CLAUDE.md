@@ -8,20 +8,21 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - Data syncs across devices via CloudKit (`Memento.entitlements`, container `iCloud.brickcedar.Memento`); building/running needs a Team selected under Signing & Capabilities with the iCloud and Background Modes (Remote notifications) capabilities enabled.
 - Alternate app icons need `ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES` (Build Settings) — without it Xcode only compiles the primary `AppIcon` set into `Assets.car` and every alternate silently 404s at runtime.
 - These sources drop into a standard Xcode iOS App project named **Memento** (delete the template `MementoApp.swift`/`ContentView.swift` first). Project settings live in Xcode, not in this folder.
-- Required Info.plist keys: `Privacy - Microphone Usage Description`, `Privacy - Speech Recognition Usage Description`. Contacts picker and local notifications need no plist entries.
+- Required Info.plist keys: `Privacy - Microphone Usage Description`, `Privacy - Speech Recognition Usage Description`, `Privacy - Calendars Full Access Usage Description` (for `CalendarSyncManager`'s Apple Calendar sync). Contacts picker and local notifications need no plist entries.
 - Root layout is `NavigationSplitView` (sidebar people list + detail); collapses to a stack on iPhone.
 
 ## File map
 
 - `MementoApp.swift` — entry point, SwiftData container (register every new `@Model` here), seeds starter folders once (`didSeedDefaultGroups` in UserDefaults).
-- `Models.swift` — `Person`, `PersonGroup` (folders), `NoteEntry`, `EventPhoto`, `ImportantDate`, `FamilyMember` + helper extensions.
+- `Models.swift` — `Person`, `PersonGroup` (folders), `NoteEntry`, `EventPhoto`, `ImportantDate`, `FamilyMember` + helper extensions. `Person.birthdayReminderEnabled` and `ImportantDate.remindersEnabled` (both default `true`) gate NotificationManager scheduling per-date; they don't affect CalendarView or CalendarSyncManager, which always show/sync every date.
 - `Theme.swift` — Mamma Mia palette (aegean, sky, bougainvillea, sunshine, olive, terracotta, gold; dynamic `background`/`card`).
 - `Utilities.swift` — `AvatarView`, `InfoRow`, `.mementoCard()` modifier, `PillPicker`, `UIImage.compressedData`, `String.trimmed`/`personInitials`, `Date.daysUntilNextOccurrence`.
 - `PeopleListView.swift` — split view, sidebar list with selection, toolbar (settings/folders/tree/calendar/add-import menu).
 - `PersonDetailView.swift` — gradient header, `PillPicker` tabs: Quick Info / Family / Notes.
 - `QuickInfoView.swift`, `FamilyTreeView.swift`, `CalendarView.swift`, `NotesTimelineView.swift`, `NoteComposerView.swift`, `ImportContactsView.swift`, `PersonEditorView.swift`, `GroupsManagerView.swift`, `SettingsView.swift`.
 - `SpeechTranscriber.swift` — segmented `SFSpeechRecognizer` engine (auto-restarts for long recordings; on-device when supported).
-- `NotificationManager.swift` — yearly 9 AM reminders; keeps nearest 60 (iOS 64-pending cap).
+- `NotificationManager.swift` — yearly 9 AM reminders; keeps nearest 60 (iOS 64-pending cap); skips deceased people and any date with its reminder toggle off.
+- `CalendarSyncManager.swift` — mirrors every birthday/important date (deceased people excluded, reminder toggle ignored) into a dedicated "Memento" `EKCalendar` so it can be shown/hidden in the Calendar app like Birthdays or Holidays. Full rebuild on every `refresh` rather than diffing — no EventKit identifiers persisted back into SwiftData.
 - `AppLockView.swift` — `AppLock` enum (Keychain-backed PIN, `LogoColorScheme`-independent), `AppLockView` (lock screen), `PINSetupView`.
 - `KeychainHelper.swift` — generic Keychain read/save/delete, currently only used for the app-lock PIN.
 - `AboutView.swift` — version info + the app icon color picker (`LogoColorScheme.allCases`, in `AppLogo.swift`).
@@ -37,7 +38,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - **Avatars:** always `AvatarView` (initials fallback, `desaturated:` for deceased). Compress images with `compressedData` before storing.
 - **Editors are cancel-safe:** copy model → local `@State` drafts in `loadInitial()` (guarded by `loadedInitial`), write back only in `save()`. To-many collections (`importantDates`, `familyMembers`, note photos) are replaced wholesale on save.
 - **Deceased (`Person.isDeceased`):** desaturate avatars, hide birthday countdowns and skip reminders, leaf/“In Memoriam” markers, no age math.
-- **After any save that can change birthdays/important dates** (person editor, import, deletes): call `NotificationManager.refreshFromContext(context)`.
+- **After any save that can change birthdays/important dates** (person editor, import, deletes): call both `NotificationManager.refreshFromContext(context)` and `CalendarSyncManager.refreshFromContext(context)`.
 - **Photo cropping:** new profile photos route through `PhotoCropperView` (pan/pinch, darkened outside the circle) before storage; keep any new photo entry points on that path.
 - **Two-way links:** family/partner fields can reference existing profiles (picker or exact name match). `applyReciprocalLinks` in the editor writes the inverse (`FamilyRelation.inverse(of:)`) onto the other person at save. Links are name-based — renames don't propagate.
 - **Deep relations:** `RelationshipPath.description` BFSes label/partner/children edges from "you" and renders chains like "Your father's brother's daughter" on the Family tab.
@@ -55,6 +56,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - Speech recognition is flaky on the Simulator; test dictation on hardware.
 - `Person`/`PersonGroup` are `@Model` classes — compare with `persistentModelID`, not `==` on properties.
 - Xcode owns the `.pbxproj`; when adding new source files, add them to the Memento target.
+- `CalendarSyncManager` was written without access to an iOS runtime — the EventKit calls (permission flow, `EKCalendar` creation/source selection, recurrence rules, the full-rebuild-on-refresh logic) are unverified. Test the whole flow on-device before shipping: enabling the toggle prompts for Calendar access, a "Memento" calendar appears and is toggleable in the Calendar app, dates match, and turning sync off removes the calendar.
 
 ## Git identity in Claude Code sessions
 
