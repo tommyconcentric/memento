@@ -1,10 +1,20 @@
 import SwiftUI
 import SwiftData
 import LocalAuthentication
+import StoreKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.requestReview) private var requestReview
+    @Environment(\.openURL) private var openURL
+
+    /// Fill in once Memento has an App Store listing — enables the direct
+    /// write-review deep link (works for both the iOS and Mac App Store).
+    /// While empty, the Rate button falls back to the system's in-app
+    /// review prompt instead.
+    private static let appStoreID = ""
+    private static let feedbackAddress = "tommy@concentric.health"
     @AppStorage(NotificationManager.enabledKey) private var remindersEnabled = false
     @State private var reminderNote: String?
 
@@ -59,6 +69,23 @@ struct SettingsView: View {
                     Text("App Lock")
                 } footer: {
                     Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") whenever you leave the app. If you ever forget the PIN, delete and reinstall Memento — your data is safe and restores automatically from iCloud once you sign back in.")
+                }
+
+                Section {
+                    Button {
+                        rateMemento()
+                    } label: {
+                        Label("Rate Memento", systemImage: "star")
+                    }
+                    Button {
+                        sendFeedback()
+                    } label: {
+                        Label("Send Feedback & Suggestions", systemImage: "envelope")
+                    }
+                } header: {
+                    Text("Help & Feedback")
+                } footer: {
+                    Text("Reviews help other people find Memento, and feedback goes straight to the developer.")
                 }
             }
             .sheet(isPresented: $showingPINSetup) {
@@ -126,6 +153,31 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+
+    /// Deep-links to the App Store's write-review page when the app has a
+    /// listing; otherwise asks StoreKit for the in-app rating prompt (which
+    /// the system may rate-limit).
+    private func rateMemento() {
+        if Self.appStoreID.isEmpty {
+            requestReview()
+        } else if let url = URL(string: "https://apps.apple.com/app/id\(Self.appStoreID)?action=write-review") {
+            openURL(url)
+        }
+    }
+
+    private func sendFeedback() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = Self.feedbackAddress
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "Memento feedback"),
+            URLQueryItem(name: "body", value: "\n\n—\nMemento \(version)")
+        ]
+        if let url = components.url {
+            openURL(url)
         }
     }
 
