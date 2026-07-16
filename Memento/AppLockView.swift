@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import LocalAuthentication
 
 /// App-lock settings and state. The PIN is the source of truth — Face ID/Touch
@@ -45,6 +46,36 @@ enum AppLock {
         case .touchID: return "touchid"
         default: return "lock"
         }
+    }
+}
+
+// MARK: - Lock window
+
+/// Hosts AppLockView in its own high-level UIWindow. SwiftUI sheets are
+/// separate UIKit presentations that render above the window's root view
+/// hierarchy, so an in-hierarchy overlay leaves an open sheet (calendar,
+/// settings, an editor mid-edit) visible and interactive while "locked".
+/// A dedicated window above the alert level covers everything — including
+/// the app-switcher snapshot — and keeps the sheets' state intact for
+/// after the unlock.
+@MainActor
+enum LockScreenPresenter {
+    private static var window: UIWindow?
+
+    static func show(onUnlock: @escaping () -> Void) {
+        guard window == nil else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState != .unattached }) ?? scenes.first else { return }
+        let lockWindow = UIWindow(windowScene: scene)
+        lockWindow.rootViewController = UIHostingController(rootView: AppLockView(onUnlock: onUnlock))
+        lockWindow.windowLevel = .alert + 1
+        lockWindow.makeKeyAndVisible()
+        window = lockWindow
+    }
+
+    static func hide() {
+        window?.isHidden = true
+        window = nil
     }
 }
 
