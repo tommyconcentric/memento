@@ -10,6 +10,7 @@ struct NoteComposerView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
+    @State private var title = ""
     @State private var text = ""
     @State private var eventDate = Date.now
     @State private var location = ""
@@ -33,7 +34,7 @@ struct NoteComposerView: View {
     }
 
     private var canSave: Bool {
-        !text.trimmed.isEmpty || !location.trimmed.isEmpty || !drafts.isEmpty
+        !title.trimmed.isEmpty || !text.trimmed.isEmpty || !location.trimmed.isEmpty || !drafts.isEmpty
     }
 
     var body: some View {
@@ -45,6 +46,8 @@ struct NoteComposerView: View {
                 }
 
                 Section {
+                    TextField("Title (optional)", text: $title)
+                        .font(.headline)
                     TextField(
                         "What happened? What did you talk about?",
                         text: $text,
@@ -138,6 +141,7 @@ struct NoteComposerView: View {
         guard !loadedInitial else { return }
         loadedInitial = true
         guard let note else { return }
+        title = note.title
         text = note.text
         eventDate = note.eventDate
         location = note.location
@@ -189,6 +193,7 @@ struct NoteComposerView: View {
             target = newNote
         }
 
+        target.title = title.trimmed
         target.text = text.trimmed
         target.eventDate = eventDate
         target.location = location.trimmed

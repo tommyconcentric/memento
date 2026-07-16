@@ -9,6 +9,7 @@ struct NotesTimelineView: View {
     @Environment(\.modelContext) private var context
     @State private var showingComposer = false
     @State private var noteBeingEdited: NoteEntry?
+    @State private var noteBeingRead: NoteEntry?
     @State private var viewerPhoto: EventPhoto?
 
     var body: some View {
@@ -34,6 +35,7 @@ struct NotesTimelineView: View {
                     NoteCard(
                         note: note,
                         onPhotoTap: { viewerPhoto = $0 },
+                        onOpen: { noteBeingRead = note },
                         onEdit: { noteBeingEdited = note },
                         onDelete: { delete(note) }
                     )
@@ -45,6 +47,12 @@ struct NotesTimelineView: View {
         }
         .sheet(item: $noteBeingEdited) { note in
             NoteComposerView(person: person, note: note)
+        }
+        .sheet(item: $noteBeingRead) { note in
+            NoteDetailSheet(note: note) {
+                noteBeingRead = nil
+                noteBeingEdited = note
+            }
         }
         .sheet(item: $viewerPhoto) { photo in
             PhotoViewerSheet(photo: photo)
@@ -62,6 +70,7 @@ struct NotesTimelineView: View {
 struct NoteCard: View {
     let note: NoteEntry
     var onPhotoTap: (EventPhoto) -> Void
+    var onOpen: () -> Void
     var onEdit: () -> Void
     var onDelete: () -> Void
 
@@ -89,15 +98,25 @@ struct NoteCard: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            if !note.title.isEmpty {
+                Text(note.title)
+                    .font(.headline)
+            }
+
             if !note.text.isEmpty {
+                // The timeline shows a preview; the full note lives one
+                // tap away in the reading sheet.
                 Text(note.text)
                     .font(.body)
+                    .lineLimit(5)
             }
 
             if !note.photosArray.isEmpty {
                 photoGrid
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onOpen)
         .mementoCard()
         .contextMenu {
             Button("Edit Note", systemImage: "pencil", action: onEdit)
@@ -130,6 +149,94 @@ struct NoteCard: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+// MARK: - Note reading sheet
+
+/// The full note, opened by tapping its card in the timeline — title,
+/// date, place, complete text and photos without the preview truncation.
+struct NoteDetailSheet: View {
+    let note: NoteEntry
+    var onEdit: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var viewerPhoto: EventPhoto?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if !note.title.isEmpty {
+                        Text(note.title)
+                            .font(.system(.title2, design: .serif).weight(.semibold))
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(
+                            note.eventDate.formatted(date: .long, time: .omitted),
+                            systemImage: "calendar"
+                        )
+                        if !note.location.isEmpty {
+                            Label(note.location, systemImage: "mappin.and.ellipse")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                    if !note.text.isEmpty {
+                        Text(note.text)
+                            .font(.body)
+                            .textSelection(.enabled)
+                    }
+
+                    if !note.photosArray.isEmpty {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                            ForEach(note.sortedPhotos) { photo in
+                                Button {
+                                    viewerPhoto = photo
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        if let data = photo.imageData, let uiImage = UIImage(data: data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 120)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        if !photo.caption.isEmpty {
+                                            Text(photo.caption)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+            }
+            .background(Theme.background)
+            .navigationTitle("Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Edit", action: onEdit)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .sheet(item: $viewerPhoto) { photo in
+                PhotoViewerSheet(photo: photo)
             }
         }
     }
