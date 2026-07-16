@@ -366,7 +366,7 @@ struct MyFamilyTreeView: View {
             }
             .confirmationDialog(
                 pendingMove.map { move in
-                    "Move \(move.person.name) to \(FamilyRelation.rowTitle(for: move.generation, subject: "You").lowercased())?"
+                    "Move \(move.person.name) to \(destinationName(for: move.generation))?"
                 } ?? "",
                 isPresented: Binding(
                     get: { pendingMove != nil },
@@ -385,10 +385,24 @@ struct MyFamilyTreeView: View {
         }
     }
 
+    /// The lane name as the dialog should say it — the generation-0 lane is
+    /// labeled "You & your generation", not rowTitle's "You & their
+    /// generation".
+    private func destinationName(for generation: Int) -> String {
+        generation == 0
+            ? "your generation"
+            : FamilyRelation.rowTitle(for: generation, subject: "You").lowercased()
+    }
+
     private func handleDrop(name: String, generation: Int) {
-        guard let person = people.first(where: {
+        // The drag payload is a display name, so resolve it only among the
+        // people this tree actually renders, and refuse ambiguous duplicates
+        // — same convention as applyReciprocalLinks; guessing risks
+        // rewriting the relationship of the wrong person.
+        let matches = labeled.filter {
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
-        }) else { return }
+        }
+        guard matches.count == 1, let person = matches.first else { return }
         guard FamilyRelation.generation(of: person.relationshipToUser) != generation else { return }
         pendingMove = MoveRequest(person: person, generation: generation)
     }
