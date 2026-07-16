@@ -89,6 +89,17 @@ struct NoteComposerView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             TextField("Caption (optional)", text: $draft.caption)
+                            // Click-reachable removal: swipe-to-delete is
+                            // the only other affordance, and a Mac mouse
+                            // can't perform it.
+                            Button(role: .destructive) {
+                                drafts.removeAll { $0.id == draft.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(Theme.terracotta)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove this photo")
                         }
                     }
                     .onDelete { drafts.remove(atOffsets: $0) }
@@ -106,7 +117,7 @@ struct NoteComposerView: View {
                 } header: {
                     Text("Event Photos")
                 } footer: {
-                    Text("Photos are saved with this note's date and location. Swipe left on a photo to remove it.")
+                    Text("Photos are saved with this note's date and location. Use the ⊖ button to remove one.")
                 }
             }
             .navigationTitle(note == nil ? "New Note" : "Edit Note")
