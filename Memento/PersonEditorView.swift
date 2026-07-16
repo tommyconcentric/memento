@@ -55,6 +55,9 @@ struct PersonEditorView: View {
         let id = UUID()
         var label = ""
         var date = Date.now
+        // Carried through the save's delete-and-recreate so an edit doesn't
+        // silently reset the per-date reminder toggle from Quick Info.
+        var remindersEnabled = true
     }
 
     struct DraftContact: Identifiable {
@@ -387,7 +390,7 @@ struct PersonEditorView: View {
         }
         draftDates = person.importantDatesArray
             .sorted { $0.date < $1.date }
-            .map { DraftDate(label: $0.label, date: $0.date) }
+            .map { DraftDate(label: $0.label, date: $0.date, remindersEnabled: $0.remindersEnabled) }
         draftContacts = person.contactFieldsArray
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value) }
@@ -445,7 +448,9 @@ struct PersonEditorView: View {
         }
         for draft in draftDates {
             let label = draft.label.trimmed.isEmpty ? "Important date" : draft.label.trimmed
-            target.importantDatesArray.append(ImportantDate(label: label, date: draft.date))
+            let date = ImportantDate(label: label, date: draft.date)
+            date.remindersEnabled = draft.remindersEnabled
+            target.importantDatesArray.append(date)
         }
 
         // Replace family members with the edited set.
