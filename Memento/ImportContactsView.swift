@@ -37,6 +37,16 @@ struct ImportContactsView: View {
         candidates.filter(\.include).count
     }
 
+    private var allSelected: Bool {
+        !candidates.isEmpty && candidates.allSatisfy(\.include)
+    }
+
+    private func setAllIncluded(_ included: Bool) {
+        for index in candidates.indices {
+            candidates[index].include = included
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -175,7 +185,18 @@ struct ImportContactsView: View {
                     }
                 }
             } header: {
-                Text("\(candidates.count) found · \(selectedCount) selected")
+                HStack {
+                    Text("\(candidates.count) found · \(selectedCount) selected")
+                    Spacer()
+                    // Flip everyone at once. When anything is unticked the
+                    // action selects all; once everything's on it becomes
+                    // Deselect All.
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        setAllIncluded(!allSelected)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .textCase(nil)
+                }
             }
             .listRowBackground(Theme.card)
 
