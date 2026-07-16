@@ -12,6 +12,7 @@ enum CalendarSyncManager {
     static let enabledKey = "appleCalendarSyncEnabled"
     static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
     static let lastSyncKey = "appleCalendarLastSync"
+    private static let calendarIdentifierKey = "appleCalendarIdentifier"
     private static let calendarTitle = "Memento"
     private static let store = EKEventStore()
 
@@ -57,15 +58,31 @@ enum CalendarSyncManager {
         UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: lastSyncKey)
     }
 
-    /// Deletes the "Memento" calendar and everything in it — call when the
-    /// user turns the sync toggle off.
+    /// Deletes the app-created "Memento" calendar and everything in it —
+    /// call when the user turns the sync toggle off. Only ever removes the
+    /// calendar whose identifier this app stored; deleting by title could
+    /// destroy a user's own calendar that happens to share the name.
     static func removeCalendar() {
         guard let calendar = existingCalendar() else { return }
         try? store.removeCalendar(calendar, commit: true)
+        UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
     }
 
+    /// Resolves the app's calendar by its persisted identifier. Falls back
+    /// to a one-time title match only when a previous version already
+    /// synced (lastSync > 0) before identifiers were stored — for those
+    /// installs the same-titled calendar is the one this app created. A
+    /// fresh setup never adopts a same-titled calendar it didn't create.
     private static func existingCalendar() -> EKCalendar? {
-        store.calendars(for: .event).first { $0.title == calendarTitle }
+        let defaults = UserDefaults.standard
+        if let identifier = defaults.string(forKey: calendarIdentifierKey) {
+            return store.calendar(withIdentifier: identifier)
+        }
+        guard defaults.double(forKey: lastSyncKey) > 0,
+              let legacy = store.calendars(for: .event).first(where: { $0.title == calendarTitle })
+        else { return nil }
+        defaults.set(legacy.calendarIdentifier, forKey: calendarIdentifierKey)
+        return legacy
     }
 
     private static func findOrCreateCalendar() -> EKCalendar? {
@@ -86,6 +103,7 @@ enum CalendarSyncManager {
 
         do {
             try store.saveCalendar(calendar, commit: true)
+            UserDefaults.standard.set(calendar.calendarIdentifier, forKey: calendarIdentifierKey)
             return calendar
         } catch {
             return nil
@@ -104,6 +122,22 @@ enum CalendarSyncManager {
     }
 
     private static func addYearlyEvent(title: String, date: Date, calendar: EKCalendar) {
+        let components = Calendar.current.dateComponents([.month, .day], from: date)
+        if components.month == 2, components.day == 29 {
+            // A single yearly series can't render Feb 29 dates correctly:
+            // anchored on Feb 29 it skips non-leap years entirely, and
+            // anchored on a Feb 28 fallback it stays on Feb 28 forever,
+            // including leap years where the real date exists. Emit one
+            // concrete event per year across the rebuild window instead
+            // (Feb 29 in leap years, Feb 28 otherwise), refreshed on every
+            // sync like everything else.
+            let thisYear = Calendar.current.component(.year, from: .now)
+            for year in (thisYear - 1)...(thisYear + 4) {
+                guard let day = occurrence(month: 2, day: 29, inYear: year) else { continue }
+                addSingleEvent(title: title, on: day, calendar: calendar)
+            }
+            return
+        }
         let event = EKEvent(eventStore: store)
         event.title = title
         event.calendar = calendar
@@ -112,6 +146,29 @@ enum CalendarSyncManager {
         event.endDate = event.startDate
         event.recurrenceRules = [EKRecurrenceRule(recurrenceWith: .yearly, interval: 1, end: nil)]
         try? store.save(event, span: .futureEvents, commit: false)
+    }
+
+    private static func addSingleEvent(title: String, on date: Date, calendar: EKCalendar) {
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.calendar = calendar
+        event.isAllDay = true
+        event.startDate = Calendar.current.startOfDay(for: date)
+        event.endDate = event.startDate
+        try? store.save(event, span: .thisEvent, commit: false)
+    }
+
+    /// The concrete date of a month/day in a given year; Feb 29 falls back
+    /// to Feb 28 in non-leap years, matching Date.daysUntilNextOccurrence.
+    private static func occurrence(month: Int, day: Int, inYear year: Int) -> Date? {
+        let calendar = Calendar.current
+        var comps = DateComponents(year: year, month: month, day: day)
+        if month == 2, day == 29,
+           let feb1 = calendar.date(from: DateComponents(year: year, month: 2, day: 1)),
+           calendar.range(of: .day, in: .month, for: feb1)?.count != 29 {
+            comps.day = 28
+        }
+        return calendar.date(from: comps)
     }
 
     /// A recurring event's DTSTART only ever generates occurrences on or
@@ -133,21 +190,12 @@ enum CalendarSyncManager {
         }
         let todayYear = calendar.component(.year, from: today)
 
-        // Feb 29 anniversaries have no exact match in non-leap years, so
-        // fall back to Feb 28 that year rather than skipping to the next
-        // leap year — matches Date.daysUntilNextOccurrence's convention.
-        func occurrence(inYear year: Int) -> Date? {
-            var comps = DateComponents(year: year, month: month, day: day)
-            if month == 2, day == 29,
-               let feb1 = calendar.date(from: DateComponents(year: year, month: 2, day: 1)),
-               calendar.range(of: .day, in: .month, for: feb1)?.count != 29 {
-                comps.day = 28
-            }
-            return calendar.date(from: comps)
+        guard let thisYear = occurrence(month: month, day: day, inYear: todayYear) else {
+            return calendar.startOfDay(for: date)
         }
-
-        guard let thisYear = occurrence(inYear: todayYear) else { return calendar.startOfDay(for: date) }
-        let mostRecent = thisYear <= today ? thisYear : (occurrence(inYear: todayYear - 1) ?? thisYear)
+        let mostRecent = thisYear <= today
+            ? thisYear
+            : (occurrence(month: month, day: day, inYear: todayYear - 1) ?? thisYear)
         return calendar.startOfDay(for: mostRecent)
     }
 }
