@@ -37,12 +37,19 @@ struct ImportContactsView: View {
         candidates.filter(\.include).count
     }
 
+    // "All" means everyone not already in Memento — those default to
+    // unticked precisely to avoid duplicate imports, and Select All
+    // shouldn't quietly undo that. They can still be ticked by hand.
     private var allSelected: Bool {
-        !candidates.isEmpty && candidates.allSatisfy(\.include)
+        let newCandidates = candidates.filter { !$0.alreadyExists }
+        // With nothing new to select, deselecting is the only useful
+        // action, so offer it whenever anything is ticked.
+        guard !newCandidates.isEmpty else { return candidates.contains(where: \.include) }
+        return newCandidates.allSatisfy(\.include)
     }
 
     private func setAllIncluded(_ included: Bool) {
-        for index in candidates.indices {
+        for index in candidates.indices where !included || !candidates[index].alreadyExists {
             candidates[index].include = included
         }
     }
