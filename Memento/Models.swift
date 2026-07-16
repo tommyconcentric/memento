@@ -132,7 +132,7 @@ extension Person {
     }
 
     var hasAnyQuickInfo: Bool {
-        if birthday != nil || !importantDatesArray.isEmpty { return true }
+        if birthday != nil || !importantDatesArray.isEmpty || !contactFieldsArray.isEmpty { return true }
         let fields = [partnerName, childrenNames, otherFamily, jobTitle, company,
                       hobbies, hometown, howWeMet, foodPreferences, phoneNumber, email,
                       address, relationshipToUser]
