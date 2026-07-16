@@ -15,6 +15,11 @@ struct SettingsView: View {
     /// review prompt instead.
     private static let appStoreID = ""
     private static let feedbackAddress = "tommy@concentric.health"
+    /// Where permission recovery actually lives: there is no "iOS Settings
+    /// app" when the app runs on a Mac — pointing users there is misleading
+    /// exactly when they need unblocking.
+    private static let systemSettingsName =
+        ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"
     @AppStorage(NotificationManager.enabledKey) private var remindersEnabled = false
     @State private var reminderNote: String?
 
@@ -139,7 +144,7 @@ struct SettingsView: View {
                         let granted = await NotificationManager.requestPermission()
                         if !granted {
                             remindersEnabled = false
-                            reminderNote = "Notifications are turned off for Memento — enable them in the iOS Settings app, then try again."
+                            reminderNote = "Notifications are turned off for Memento — enable them in \(Self.systemSettingsName), then try again."
                             NotificationManager.refreshFromContext(context)
                             return
                         }
@@ -154,7 +159,7 @@ struct SettingsView: View {
                         let granted = await CalendarSyncManager.requestAccess()
                         if !granted {
                             calendarSyncEnabled = false
-                            calendarSyncNote = "Calendar access is turned off for Memento — enable it in the iOS Settings app, then try again."
+                            calendarSyncNote = "Calendar access is turned off for Memento — enable it in \(Self.systemSettingsName), then try again."
                             return
                         }
                         calendarSyncNote = nil

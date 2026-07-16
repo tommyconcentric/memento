@@ -217,7 +217,7 @@ struct CalendarView: View {
                     .mementoCard(padding: 12)
                 }
             } else {
-                Text("Tap a day to see its birthdays and important dates.")
+                Text("Select a day to see its birthdays and important dates.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
