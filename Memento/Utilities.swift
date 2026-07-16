@@ -18,18 +18,26 @@ extension String {
 // MARK: - Date helpers
 
 extension Date {
-    /// Days from today until the next occurrence of this date's month/day.
-    /// Returns 0 when the occurrence is today.
-    static func daysUntilNextOccurrence(of date: Date) -> Int? {
+    /// The sentinel year contact import stores when the source birthday has
+    /// no year (1904 is a leap year, so Feb 29 still constructs). Displays
+    /// must hide it — the user never entered it.
+    static let placeholderYear = 1904
+
+    var hasPlaceholderYear: Bool {
+        Calendar.current.component(.year, from: self) == Self.placeholderYear
+    }
+
+    /// The next occurrence of this date's month/day, today included.
+    /// Feb 29 anniversaries have no exact match in non-leap years, so they
+    /// fall back to Feb 28 that year rather than skipping to the next
+    /// leap year.
+    static func nextOccurrence(of date: Date) -> Date? {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
         let components = calendar.dateComponents([.month, .day], from: date)
         guard let month = components.month, let day = components.day else { return nil }
         let todayYear = calendar.component(.year, from: today)
 
-        // Feb 29 anniversaries have no exact match in non-leap years, so
-        // fall back to Feb 28 that year rather than skipping to the next
-        // leap year.
         func occurrence(inYear year: Int) -> Date? {
             var comps = DateComponents(year: year, month: month, day: day)
             if month == 2, day == 29,
@@ -42,7 +50,15 @@ extension Date {
 
         guard let thisYear = occurrence(inYear: todayYear) else { return nil }
         let next = thisYear >= today ? thisYear : (occurrence(inYear: todayYear + 1) ?? thisYear)
-        return calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: next)).day
+        return calendar.startOfDay(for: next)
+    }
+
+    /// Days from today until the next occurrence of this date's month/day.
+    /// Returns 0 when the occurrence is today.
+    static func daysUntilNextOccurrence(of date: Date) -> Int? {
+        guard let next = nextOccurrence(of: date) else { return nil }
+        let today = Calendar.current.startOfDay(for: .now)
+        return Calendar.current.dateComponents([.day], from: today, to: next).day
     }
 }
 

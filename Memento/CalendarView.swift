@@ -269,7 +269,11 @@ struct CalendarView: View {
     private func eventDetail(_ event: DayEvent) -> String {
         var detail = event.title
         if event.isBirthday, !event.person.isDeceased,
-           let year = event.sourceYear {
+           let year = event.sourceYear,
+           // Year-less imported birthdays carry a placeholder year — any
+           // "turns N" from it would be fabricated (e.g. "turns 119" when
+           // browsing past months).
+           year != Date.placeholderYear {
             let turns = calendar.component(.year, from: displayedMonth) - year
             if turns > 0 && turns < 120 {
                 detail += " · turns \(turns)"

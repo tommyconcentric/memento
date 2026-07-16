@@ -180,10 +180,15 @@ struct QuickInfoView: View {
     }
 
     private func birthdayText(_ birthday: Date) -> String {
+        // Year-less birthdays from contact import carry a placeholder year
+        // the user never entered — show only the month and day.
+        let dateText = birthday.hasPlaceholderYear
+            ? birthday.formatted(.dateTime.month(.abbreviated).day())
+            : birthday.formatted(date: .abbreviated, time: .omitted)
         if person.isDeceased {
-            return birthday.formatted(date: .abbreviated, time: .omitted)
+            return dateText
         }
-        var parts = [birthday.formatted(date: .abbreviated, time: .omitted)]
+        var parts = [dateText]
         if let age = person.age, age > 0, age < 120 {
             parts.append("age \(age)")
         }
