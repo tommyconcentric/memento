@@ -19,6 +19,8 @@ struct PersonEditorView: View {
     @State private var pickerTarget: PickTarget?
     @State private var selectedGroup: PersonGroup?
     @State private var isDeceased = false
+    @State private var isBusiness = false
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
     // Quick info
     @State private var hasBirthday = false
@@ -38,13 +40,27 @@ struct PersonEditorView: View {
     @State private var relationshipToUser = ""
     @State private var draftFamilyMembers: [DraftFamilyMember] = []
     @State private var draftDates: [DraftDate] = []
+    @State private var draftContacts: [DraftContact] = []
 
     @State private var loadedInitial = false
+
+    // Legacy free-text family fields are only shown when they already
+    // hold data from an earlier version — new profiles record family
+    // through named members instead. Captured once at load so a field
+    // doesn't vanish mid-edit the moment it's cleared.
+    @State private var showsLegacyChildren = false
+    @State private var showsLegacyOtherFamily = false
 
     struct DraftDate: Identifiable {
         let id = UUID()
         var label = ""
         var date = Date.now
+    }
+
+    struct DraftContact: Identifiable {
+        let id = UUID()
+        var kind: ContactField.Kind = .phone
+        var value = ""
     }
 
     struct DraftFamilyMember: Identifiable {
@@ -80,6 +96,17 @@ struct PersonEditorView: View {
                 }
 
                 Section {
+                    Picker("Shown in", selection: $isBusiness) {
+                        Text("Memento Personal").tag(false)
+                        Text("Memento Business").tag(true)
+                    }
+                } header: {
+                    Text("Workspace")
+                } footer: {
+                    Text("Business contacts live in Memento Business — switch workspaces from the badge next to the logo.")
+                }
+
+                Section {
                     Picker("They're your…", selection: $relationshipToUser) {
                         Text("Not set").tag("")
                         ForEach(FamilyRelation.presets, id: \.self) { label in
@@ -87,9 +114,9 @@ struct PersonEditorView: View {
                         }
                     }
                 } header: {
-                    Text("Relationship to You")
+                    Text("Family Relationship to You")
                 } footer: {
-                    Text("Places them on your family tree, which builds itself from these labels.")
+                    Text("Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family.")
                 }
 
                 Section("Birthday") {
@@ -112,8 +139,6 @@ struct PersonEditorView: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel("Link an existing person as partner")
                     }
-                    TextField("Children", text: $childrenNames, axis: .vertical)
-                    TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
                     ForEach(draftFamilyMembers.indices, id: \.self) { index in
                         HStack {
                             TextField("Name", text: $draftFamilyMembers[index].name)
@@ -139,10 +164,16 @@ struct PersonEditorView: View {
                     } label: {
                         Label("Add Family Member", systemImage: "plus.circle")
                     }
+                    if showsLegacyChildren {
+                        TextField("Children", text: $childrenNames, axis: .vertical)
+                    }
+                    if showsLegacyOtherFamily {
+                        TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
+                    }
                 } header: {
                     Text("Family")
                 } footer: {
-                    Text("Named members (with their relation to this person) build their family tree; partner and children join automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
+                    Text("Partner and named members (with their relation to this person) build their family tree automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
                 }
 
                 Section("Work") {
@@ -163,7 +194,7 @@ struct PersonEditorView: View {
                     TextField("Favourites, allergies, coffee order…", text: $foodPreferences, axis: .vertical)
                 }
 
-                Section("Contact") {
+                Section {
                     TextField("Phone", text: $phoneNumber)
                         .keyboardType(.phonePad)
                     TextField("Email", text: $email)
@@ -171,6 +202,39 @@ struct PersonEditorView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     TextField("Address", text: $address, axis: .vertical)
+
+                    ForEach($draftContacts) { $draft in
+                        HStack {
+                            Picker("", selection: $draft.kind) {
+                                ForEach(ContactField.Kind.allCases, id: \.self) { kind in
+                                    Image(systemName: kind.icon).tag(kind)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            TextField(draft.kind.label, text: $draft.value, axis: draft.kind == .address ? .vertical : .horizontal)
+                                .keyboardType(keyboard(for: draft.kind))
+                                .textInputAutocapitalization(draft.kind == .email ? .never : .sentences)
+                                .autocorrectionDisabled(draft.kind == .email)
+                        }
+                    }
+                    .onDelete { draftContacts.remove(atOffsets: $0) }
+
+                    Menu {
+                        ForEach(ContactField.Kind.allCases, id: \.self) { kind in
+                            Button {
+                                draftContacts.append(DraftContact(kind: kind))
+                            } label: {
+                                Label("Add \(kind.label)", systemImage: kind.icon)
+                            }
+                        }
+                    } label: {
+                        Label("Add Phone, Email or Address", systemImage: "plus.circle")
+                    }
+                } header: {
+                    Text("Contact")
+                } footer: {
+                    Text("The first phone, email and address show at the top of Quick Info. Add as many extra numbers, emails or addresses as you like below.")
                 }
 
                 importantDatesSection
@@ -253,6 +317,14 @@ struct PersonEditorView: View {
         .listRowBackground(Color.clear)
     }
 
+    private func keyboard(for kind: ContactField.Kind) -> UIKeyboardType {
+        switch kind {
+        case .phone: return .phonePad
+        case .email: return .emailAddress
+        case .address: return .default
+        }
+    }
+
     private var importantDatesSection: some View {
         Section {
             ForEach($draftDates) { $draft in
@@ -280,7 +352,12 @@ struct PersonEditorView: View {
     private func loadInitial() {
         guard !loadedInitial else { return }
         loadedInitial = true
-        guard let person else { return }
+        guard let person else {
+            // New people join whichever workspace is currently open.
+            isBusiness = storedWorkspace == Workspace.business.rawValue
+            return
+        }
+        isBusiness = person.isBusiness
 
         name = person.name
         photoData = person.profilePhotoData
@@ -293,6 +370,8 @@ struct PersonEditorView: View {
         partnerName = person.partnerName
         childrenNames = person.childrenNames
         otherFamily = person.otherFamily
+        showsLegacyChildren = !person.childrenNames.trimmed.isEmpty
+        showsLegacyOtherFamily = !person.otherFamily.trimmed.isEmpty
         jobTitle = person.jobTitle
         company = person.company
         hobbies = person.hobbies
@@ -309,6 +388,9 @@ struct PersonEditorView: View {
         draftDates = person.importantDatesArray
             .sorted { $0.date < $1.date }
             .map { DraftDate(label: $0.label, date: $0.date) }
+        draftContacts = person.contactFieldsArray
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value) }
     }
 
     // MARK: - Photo loading
@@ -340,6 +422,7 @@ struct PersonEditorView: View {
         target.profilePhotoData = photoData
         target.group = selectedGroup
         target.isDeceased = isDeceased
+        target.isBusiness = isBusiness
         target.birthday = hasBirthday ? birthday : nil
         target.partnerName = partnerName.trimmed
         target.childrenNames = childrenNames.trimmed
@@ -372,6 +455,15 @@ struct PersonEditorView: View {
         }
         for member in draftFamilyMembers where !member.name.trimmed.isEmpty {
             target.familyMembersArray.append(FamilyMember(name: member.name.trimmed, relation: member.relation))
+        }
+
+        // Replace extra contact fields with the edited set (blank ones dropped).
+        let oldContacts = target.contactFieldsArray
+        for old in oldContacts {
+            context.delete(old)
+        }
+        for (index, draft) in draftContacts.enumerated() where !draft.value.trimmed.isEmpty {
+            target.contactFieldsArray.append(ContactField(kind: draft.kind, value: draft.value.trimmed, sortOrder: index))
         }
 
         applyReciprocalLinks(around: target)

@@ -1,14 +1,26 @@
 import SwiftUI
 import SwiftData
 import LocalAuthentication
+import StoreKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.requestReview) private var requestReview
+    @Environment(\.openURL) private var openURL
+
+    /// Fill in once Memento has an App Store listing — enables the direct
+    /// write-review deep link (works for both the iOS and Mac App Store).
+    /// While empty, the Rate button falls back to the system's in-app
+    /// review prompt instead.
+    private static let appStoreID = ""
+    private static let feedbackAddress = "tommy@concentric.health"
     @AppStorage(NotificationManager.enabledKey) private var remindersEnabled = false
     @State private var reminderNote: String?
 
     @AppStorage(CalendarSyncManager.enabledKey) private var calendarSyncEnabled = false
+    @AppStorage(CalendarSyncManager.manualSyncOnlyKey) private var manualSyncOnly = false
+    @AppStorage(CalendarSyncManager.lastSyncKey) private var lastSyncTimestamp = 0.0
     @State private var calendarSyncNote: String?
 
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
@@ -35,11 +47,28 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Sync with Apple Calendar", isOn: $calendarSyncEnabled)
+                    if calendarSyncEnabled {
+                        Picker("Keep up to date", selection: $manualSyncOnly) {
+                            Text("Automatically").tag(false)
+                            Text("Manually").tag(true)
+                        }
+                        Button {
+                            CalendarSyncManager.syncNow(context)
+                        } label: {
+                            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
                 } header: {
                     Text("Apple Calendar")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Adds a “Memento” calendar with everyone's birthdays and important dates, so you can show or hide it in the Calendar app just like Birthdays or Holidays. Every date appears here, even ones you've turned reminders off for.")
+                        if calendarSyncEnabled {
+                            if manualSyncOnly {
+                                Text("Changes you make in Memento only reach Apple Calendar when you tap Sync Now.")
+                            }
+                            Text(lastSyncedText)
+                        }
                         if let calendarSyncNote {
                             Text(calendarSyncNote)
                                 .foregroundStyle(Theme.terracotta)
@@ -59,6 +88,23 @@ struct SettingsView: View {
                     Text("App Lock")
                 } footer: {
                     Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") whenever you leave the app. If you ever forget the PIN, delete and reinstall Memento — your data is safe and restores automatically from iCloud once you sign back in.")
+                }
+
+                Section {
+                    Button {
+                        rateMemento()
+                    } label: {
+                        Label("Rate Memento", systemImage: "star")
+                    }
+                    Button {
+                        sendFeedback()
+                    } label: {
+                        Label("Send Feedback & Suggestions", systemImage: "envelope")
+                    }
+                } header: {
+                    Text("Help & Feedback")
+                } footer: {
+                    Text("Reviews help other people find Memento, and feedback goes straight to the developer.")
                 }
             }
             .sheet(isPresented: $showingPINSetup) {
@@ -112,10 +158,14 @@ struct SettingsView: View {
                             return
                         }
                         calendarSyncNote = nil
-                        CalendarSyncManager.refreshFromContext(context)
+                        // Populate immediately even in manual mode — an
+                        // empty calendar until the first Sync Now would
+                        // read as broken.
+                        CalendarSyncManager.syncNow(context)
                     } else {
                         calendarSyncNote = nil
                         CalendarSyncManager.removeCalendar()
+                        lastSyncTimestamp = 0
                     }
                 }
             }
@@ -127,6 +177,37 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// Deep-links to the App Store's write-review page when the app has a
+    /// listing; otherwise asks StoreKit for the in-app rating prompt (which
+    /// the system may rate-limit).
+    private func rateMemento() {
+        if Self.appStoreID.isEmpty {
+            requestReview()
+        } else if let url = URL(string: "https://apps.apple.com/app/id\(Self.appStoreID)?action=write-review") {
+            openURL(url)
+        }
+    }
+
+    private func sendFeedback() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = Self.feedbackAddress
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "Memento feedback"),
+            URLQueryItem(name: "body", value: "\n\n—\nMemento \(version)")
+        ]
+        if let url = components.url {
+            openURL(url)
+        }
+    }
+
+    private var lastSyncedText: String {
+        guard lastSyncTimestamp > 0 else { return "Not synced yet." }
+        let date = Date(timeIntervalSince1970: lastSyncTimestamp)
+        return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))."
     }
 
     /// Turning the lock on requires setting a PIN first; turning it off

@@ -19,14 +19,23 @@ struct PeopleListView: View {
     @State private var showingImport = false
     @State private var showingAbout = false
     @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
     private var logoColorScheme: LogoColorScheme {
         LogoColorScheme(rawValue: storedColorScheme) ?? .default
     }
 
+    private var workspace: Workspace {
+        Workspace(rawValue: storedWorkspace) ?? .personal
+    }
+
+    private var workspacePeople: [Person] {
+        people.filter { $0.isBusiness == (workspace == .business) }
+    }
+
     private var filteredPeople: [Person] {
-        guard !searchText.trimmed.isEmpty else { return people }
-        return people.filter {
+        guard !searchText.trimmed.isEmpty else { return workspacePeople }
+        return workspacePeople.filter {
             $0.name.localizedCaseInsensitiveContains(searchText)
             || $0.company.localizedCaseInsensitiveContains(searchText)
             || $0.jobTitle.localizedCaseInsensitiveContains(searchText)
@@ -127,6 +136,35 @@ struct PeopleListView: View {
                     LogoMark(size: 27, colorScheme: logoColorScheme)
                 }
                 .accessibilityLabel("About Memento")
+                Menu {
+                    ForEach(Workspace.allCases, id: \.self) { option in
+                        Button {
+                            storedWorkspace = option.rawValue
+                            selectedPerson = nil
+                        } label: {
+                            if option == workspace {
+                                Label("Memento \(option.title)", systemImage: "checkmark")
+                            } else {
+                                Label("Memento \(option.title)", systemImage: option.icon)
+                            }
+                        }
+                    }
+                } label: {
+                    // HStack rather than Label: toolbars collapse Labels
+                    // to their icon, and the whole point of this badge is
+                    // the word next to the logo.
+                    HStack(spacing: 4) {
+                        Image(systemName: workspace.icon)
+                        Text(workspace.title)
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(workspace.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(workspace.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .accessibilityLabel("Switch between Memento Personal and Memento Business")
                 Button {
                     showingSettings = true
                 } label: {
@@ -167,11 +205,16 @@ struct PeopleListView: View {
             }
         }
         .overlay {
-            if people.isEmpty {
+            if workspacePeople.isEmpty {
                 ContentUnavailableView {
-                    Label("No People Yet", systemImage: "person.2")
+                    Label(
+                        workspace == .business ? "No Business Contacts Yet" : "No People Yet",
+                        systemImage: workspace.icon
+                    )
                 } description: {
-                    Text("Add your first person to start keeping notes about the people in your life.")
+                    Text(workspace == .business
+                        ? "Add the people you meet through work — clients, colleagues, networking contacts — and keep notes on them just like everyone else."
+                        : "Add your first person to start keeping notes about the people in your life.")
                 } actions: {
                     Button("Add Person") { showingAddPerson = true }
                         .buttonStyle(.borderedProminent)

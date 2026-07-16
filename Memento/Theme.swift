@@ -13,6 +13,10 @@ enum Theme {
     static let gold = Color(red: 0.753, green: 0.541, blue: 0.176)          // #C08A2D
     static let bark = Color(red: 0.478, green: 0.333, blue: 0.224)          // #7A5539 — tree trunks
 
+    // Business workspace: boardroom slate in place of holiday blues.
+    static let graphite = Color(red: 0.239, green: 0.290, blue: 0.361)      // #3D4A5C
+    static let steel = Color(red: 0.475, green: 0.565, blue: 0.663)         // #7990A9
+
     /// Warm whitewash by day, deep night sea in dark mode.
     static let background = dynamic(
         light: UIColor(red: 0.980, green: 0.965, blue: 0.937, alpha: 1),    // #FAF6EF
@@ -28,4 +32,20 @@ enum Theme {
     private static func dynamic(light: UIColor, dark: UIColor) -> Color {
         Color(UIColor { $0.userInterfaceStyle == .dark ? dark : light })
     }
+}
+
+// MARK: - Workspace (Memento Personal vs Memento Business)
+
+/// Two side-by-side contact books in one app: friends and family in
+/// Personal, networking/business contacts in Business. The active
+/// workspace filters the people list and tags newly created people.
+enum Workspace: String, CaseIterable {
+    case personal
+    case business
+
+    static let storageKey = "workspaceMode"
+
+    var title: String { self == .personal ? "Personal" : "Business" }
+    var icon: String { self == .personal ? "person.2" : "briefcase" }
+    var accent: Color { self == .personal ? Theme.aegean : Theme.graphite }
 }

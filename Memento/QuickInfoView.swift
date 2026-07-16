@@ -93,11 +93,20 @@ struct QuickInfoView: View {
         if !person.phoneNumber.isEmpty {
             InfoRow(icon: "phone", label: "Phone", value: person.phoneNumber)
         }
+        ForEach(person.additionalContacts(.phone)) { field in
+            InfoRow(icon: "phone", label: "Phone", value: field.value)
+        }
         if !person.email.isEmpty {
             InfoRow(icon: "envelope", label: "Email", value: person.email)
         }
+        ForEach(person.additionalContacts(.email)) { field in
+            InfoRow(icon: "envelope", label: "Email", value: field.value)
+        }
         if !person.address.isEmpty {
             InfoRow(icon: "mappin", label: "Address", value: person.address)
+        }
+        ForEach(person.additionalContacts(.address)) { field in
+            InfoRow(icon: "mappin", label: "Address", value: field.value)
         }
         ForEach(person.importantDatesArray.sorted { $0.date < $1.date }) { item in
             dateRow(
