@@ -23,7 +23,12 @@ struct MementoApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
+    // Only lock when a PIN actually exists to unlock with. The enabled flag
+    // lives in UserDefaults (restored onto a new device by backup/migration)
+    // but the PIN is ThisDeviceOnly in the Keychain (not restored) — locking
+    // on the flag alone would brick the app until a delete-and-reinstall.
     @State private var isLocked = UserDefaults.standard.bool(forKey: AppLock.enabledKey)
+        && AppLock.storedPIN != nil
 
     var body: some Scene {
         WindowGroup {
@@ -38,7 +43,7 @@ struct MementoApp: App {
             // Lock on any departure from .active, not just .background, so an
             // app-switcher snapshot never shows real notes unlocked.
             .onChange(of: scenePhase) { _, newPhase in
-                if newPhase != .active && appLockEnabled {
+                if newPhase != .active && appLockEnabled && AppLock.storedPIN != nil {
                     isLocked = true
                 }
             }
