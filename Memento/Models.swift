@@ -37,6 +37,7 @@ final class Person {
     var group: PersonGroup?
     var createdAt: Date = Date.now
     var isDeceased: Bool = false
+    var isPinned: Bool = false            // held at the top of the people list until unpinned
     var isBusiness: Bool = false          // lives in the Business workspace instead of Personal
     var relationshipToUser: String = ""   // e.g. "Mother" — places them on your family tree
     var address: String = ""

@@ -82,14 +82,28 @@ struct PeopleListView: View {
 
     private var sidebar: some View {
         List(selection: $selectedPerson) {
+            // Pinned people ride at the very top, across every folder, until
+            // unpinned — handy for someone you're about to see.
+            let pinned = filteredPeople.filter(\.isPinned)
+            if !pinned.isEmpty {
+                Section {
+                    ForEach(pinned) { person in
+                        PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
+                            .tag(person)
+                    }
+                } header: {
+                    Label("Pinned", systemImage: "pin.fill")
+                }
+            }
+
             ForEach(groups) { group in
                 let members = filteredPeople.filter {
-                    $0.group?.persistentModelID == group.persistentModelID
+                    !$0.isPinned && $0.group?.persistentModelID == group.persistentModelID
                 }
                 if !members.isEmpty {
                     Section {
                         ForEach(members) { person in
-                            PersonRow(person: person) { delete(person) }
+                            PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
                                 .tag(person)
                         }
                     } header: {
@@ -98,11 +112,11 @@ struct PeopleListView: View {
                 }
             }
 
-            let ungrouped = filteredPeople.filter { $0.group == nil }
+            let ungrouped = filteredPeople.filter { !$0.isPinned && $0.group == nil }
             if !ungrouped.isEmpty {
                 Section("Ungrouped") {
                     ForEach(ungrouped) { person in
-                        PersonRow(person: person) { delete(person) }
+                        PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
                             .tag(person)
                     }
                 }
@@ -234,6 +248,11 @@ struct PeopleListView: View {
         NotificationManager.refreshFromContext(context)
         CalendarSyncManager.refreshFromContext(context)
     }
+
+    private func togglePin(_ person: Person) {
+        person.isPinned.toggle()
+        try? context.save()
+    }
 }
 
 // MARK: - Row
@@ -241,6 +260,7 @@ struct PeopleListView: View {
 struct PersonRow: View {
     let person: Person
     var onDelete: () -> Void
+    var onTogglePin: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -256,6 +276,11 @@ struct PersonRow: View {
                     Text(person.name)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(person.isDeceased ? .secondary : .primary)
+                    if person.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.gold)
+                    }
                     if person.isDeceased {
                         Image(systemName: "leaf")
                             .font(.caption2)
@@ -282,9 +307,20 @@ struct PersonRow: View {
             }
         }
         .padding(.vertical, 3)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button(action: onTogglePin) {
+                Label(person.isPinned ? "Unpin" : "Pin", systemImage: person.isPinned ? "pin.slash" : "pin")
+            }
+            .tint(Theme.gold)
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive, action: onDelete) {
                 Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(action: onTogglePin) {
+                Label(person.isPinned ? "Unpin" : "Pin to Top", systemImage: person.isPinned ? "pin.slash" : "pin")
             }
         }
         .listRowBackground(Theme.card)
