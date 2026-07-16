@@ -4,7 +4,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 
 ## Stack & targets
 
-- SwiftUI + SwiftData, **iOS/iPadOS 17.0+**, macOS via **Mac Catalyst**. No third-party dependencies.
+- SwiftUI + SwiftData, **iOS/iPadOS 17.0+**. On macOS it ships as the unmodified iOS app running natively on Apple Silicon (**"Designed for iPad"** — the project has no Mac Catalyst target). Mac-specific consequences: no alternate app icons (`supportsAlternateIcons` is false), row-swipe gestures need a trackpad (give destructive actions a click-reachable alternative), scene phases follow Mac window focus, and `ProcessInfo.processInfo.isiOSAppOnMac` is the branch point for Mac-specific behavior. No third-party dependencies.
 - Data syncs across devices via CloudKit (`Memento.entitlements`, container `iCloud.brickcedar.Memento`); building/running needs a Team selected under Signing & Capabilities with the iCloud and Background Modes (Remote notifications) capabilities enabled.
 - Alternate app icons need `ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES` (Build Settings) — without it Xcode only compiles the primary `AppIcon` set into `Assets.car` and every alternate silently 404s at runtime.
 - These sources drop into a standard Xcode iOS App project named **Memento** (delete the template `MementoApp.swift`/`ContentView.swift` first). Project settings live in Xcode, not in this folder.
@@ -66,4 +66,4 @@ The actual durable fix is setting `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMM
 
 ## No tests yet
 
-Manual verification on iPhone + iPad simulators and a Catalyst build. If adding tests, prefer exercising `FamilyRelation.generation` and CSV parsing in `ImportContactsView` first.
+Manual verification on iPhone + iPad simulators and the Mac ("Designed for iPad") build. If adding tests, prefer exercising `FamilyRelation.generation` and CSV parsing in `ImportContactsView` first.

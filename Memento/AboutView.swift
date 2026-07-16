@@ -51,7 +51,9 @@ struct AboutView: View {
                     Text("App Icon Color")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Changes both the Home Screen icon and the logo shown in Memento. iOS may ask you to confirm the change.")
+                        Text(supportsIconChange
+                            ? "Changes both the Home Screen icon and the logo shown in Memento. iOS may ask you to confirm the change."
+                            : "Changes the logo shown in Memento. The Dock icon can't be changed on Mac.")
                         if let iconChangeError {
                             Text(iconChangeError)
                                 .foregroundStyle(Theme.terracotta)
@@ -111,8 +113,18 @@ struct AboutView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    /// Alternate app icons aren't supported when the iOS app runs on a Mac
+    /// (Designed for iPad) — the Dock icon is fixed at install. Without this
+    /// guard every swatch pick surfaced a spurious error while the in-app
+    /// logo recolored fine.
+    private var supportsIconChange: Bool {
+        UIApplication.shared.supportsAlternateIcons
+    }
+
     private func select(_ scheme: LogoColorScheme) {
         storedColorScheme = scheme.rawValue
+        iconChangeError = nil
+        guard supportsIconChange else { return }
         UIApplication.shared.setAlternateIconName(scheme.iconAssetName) { error in
             guard let error else { return }
             Task { @MainActor in
