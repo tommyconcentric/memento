@@ -41,6 +41,13 @@ struct PersonEditorView: View {
 
     @State private var loadedInitial = false
 
+    // Legacy free-text family fields are only shown when they already
+    // hold data from an earlier version — new profiles record family
+    // through named members instead. Captured once at load so a field
+    // doesn't vanish mid-edit the moment it's cleared.
+    @State private var showsLegacyChildren = false
+    @State private var showsLegacyOtherFamily = false
+
     struct DraftDate: Identifiable {
         let id = UUID()
         var label = ""
@@ -112,8 +119,6 @@ struct PersonEditorView: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel("Link an existing person as partner")
                     }
-                    TextField("Children", text: $childrenNames, axis: .vertical)
-                    TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
                     ForEach(draftFamilyMembers.indices, id: \.self) { index in
                         HStack {
                             TextField("Name", text: $draftFamilyMembers[index].name)
@@ -139,10 +144,16 @@ struct PersonEditorView: View {
                     } label: {
                         Label("Add Family Member", systemImage: "plus.circle")
                     }
+                    if showsLegacyChildren {
+                        TextField("Children", text: $childrenNames, axis: .vertical)
+                    }
+                    if showsLegacyOtherFamily {
+                        TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
+                    }
                 } header: {
                     Text("Family")
                 } footer: {
-                    Text("Named members (with their relation to this person) build their family tree; partner and children join automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
+                    Text("Partner and named members (with their relation to this person) build their family tree automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
                 }
 
                 Section("Work") {
@@ -293,6 +304,8 @@ struct PersonEditorView: View {
         partnerName = person.partnerName
         childrenNames = person.childrenNames
         otherFamily = person.otherFamily
+        showsLegacyChildren = !person.childrenNames.trimmed.isEmpty
+        showsLegacyOtherFamily = !person.otherFamily.trimmed.isEmpty
         jobTitle = person.jobTitle
         company = person.company
         hobbies = person.hobbies
