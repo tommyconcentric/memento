@@ -163,7 +163,11 @@ struct SettingsView: View {
                         // read as broken.
                         CalendarSyncManager.syncNow(context)
                     } else {
-                        calendarSyncNote = nil
+                        // Don't clear calendarSyncNote here: the denial path
+                        // above flips the toggle off, which re-fires this
+                        // handler — clearing the note in that re-entrant pass
+                        // would erase the explanation the instant it was set.
+                        // (The granted path clears it on the next attempt.)
                         CalendarSyncManager.removeCalendar()
                         lastSyncTimestamp = 0
                     }
