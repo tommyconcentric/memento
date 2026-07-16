@@ -160,6 +160,11 @@ struct PersonEditorView: View {
                                 }
                             }
                             .labelsHidden()
+                            rowDeleteButton(label: "Remove this family member") {
+                                if draftFamilyMembers.indices.contains(index) {
+                                    draftFamilyMembers.remove(at: index)
+                                }
+                            }
                         }
                     }
                     .onDelete { draftFamilyMembers.remove(atOffsets: $0) }
@@ -230,6 +235,9 @@ struct PersonEditorView: View {
                             .accessibilityLabel(draft.starred
                                 ? "Remove preference from this \(draft.kind.label.lowercased())"
                                 : "Prefer this \(draft.kind.label.lowercased())")
+                            rowDeleteButton(label: "Remove this \(draft.kind.label.lowercased())") {
+                                draftContacts.removeAll { $0.id == draft.id }
+                            }
                         }
                     }
                     .onDelete { draftContacts.remove(atOffsets: $0) }
@@ -331,6 +339,18 @@ struct PersonEditorView: View {
         .listRowBackground(Color.clear)
     }
 
+    /// A click-reachable delete for repeating rows. Swipe-to-delete stays,
+    /// but it's the only affordance a Mac mouse can't perform (the editor
+    /// has no edit mode), which left rows unremovable on the Mac.
+    private func rowDeleteButton(label: String, action: @escaping () -> Void) -> some View {
+        Button(role: .destructive, action: action) {
+            Image(systemName: "minus.circle.fill")
+                .foregroundStyle(Theme.terracotta)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(label)
+    }
+
     /// One starred entry per kind: starring a row clears the star from its
     /// siblings of the same kind; tapping a starred row removes the star,
     /// falling back to the primary field as the preferred one.
@@ -357,9 +377,14 @@ struct PersonEditorView: View {
     private var importantDatesSection: some View {
         Section {
             ForEach($draftDates) { $draft in
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Label (e.g. Wedding anniversary)", text: $draft.label)
-                    DatePicker("Date", selection: $draft.date, displayedComponents: .date)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Label (e.g. Wedding anniversary)", text: $draft.label)
+                        DatePicker("Date", selection: $draft.date, displayedComponents: .date)
+                    }
+                    rowDeleteButton(label: "Remove this date") {
+                        draftDates.removeAll { $0.id == draft.id }
+                    }
                 }
             }
             .onDelete { draftDates.remove(atOffsets: $0) }
