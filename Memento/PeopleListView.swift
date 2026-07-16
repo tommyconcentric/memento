@@ -34,12 +34,15 @@ struct PeopleListView: View {
     }
 
     private var filteredPeople: [Person] {
-        guard !searchText.trimmed.isEmpty else { return workspacePeople }
+        // Match on the trimmed query too — a trailing space (easy via
+        // dictation or QuickType) would otherwise hide exact-name matches.
+        let query = searchText.trimmed
+        guard !query.isEmpty else { return workspacePeople }
         return workspacePeople.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText)
-            || $0.company.localizedCaseInsensitiveContains(searchText)
-            || $0.jobTitle.localizedCaseInsensitiveContains(searchText)
-            || $0.hobbies.localizedCaseInsensitiveContains(searchText)
+            $0.name.localizedCaseInsensitiveContains(query)
+            || $0.company.localizedCaseInsensitiveContains(query)
+            || $0.jobTitle.localizedCaseInsensitiveContains(query)
+            || $0.hobbies.localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -139,6 +142,9 @@ struct PeopleListView: View {
                 Menu {
                     ForEach(Workspace.allCases, id: \.self) { option in
                         Button {
+                            // Re-picking the active workspace is a no-op;
+                            // don't throw away the open person for it.
+                            guard option != workspace else { return }
                             storedWorkspace = option.rawValue
                             selectedPerson = nil
                         } label: {
