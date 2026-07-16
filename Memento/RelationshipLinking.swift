@@ -19,12 +19,26 @@ extension FamilyRelation {
             if l.contains("daughter") || l.contains("son") || l.contains("child") { return "Parent-in-law" }
             return "Sibling-in-law"
         }
+        // Godparents before the plain parent branch — "godmother" would
+        // otherwise match "mother" and invert to "Child".
+        if l.contains("god") {
+            if l.contains("mother") || l.contains("father") || l.contains("parent") { return "Godchild" }
+            return "Godparent"
+        }
+        // Exes before the partner branch — "ex-girlfriend" contains
+        // "girlfriend" and must not invert to a current "Partner".
+        if l.hasPrefix("ex-") || l.hasPrefix("ex ") { return "Ex-partner" }
+        // Halves before the sibling branch, so the qualifier survives the
+        // round trip.
+        if l.contains("half") { return "Half-sibling" }
+        if l.contains("fianc") { return "Fiancé(e)" }
         if l.contains("mother") || l.contains("father") || l.contains("parent") { return "Child" }
         if l.contains("aunt") || l.contains("uncle") { return "Niece/Nephew" }
         if l.contains("niece") || l.contains("nephew") { return "Aunt/Uncle" }
         if l.contains("brother") || l.contains("sister") || l.contains("sibling") { return "Sibling" }
         if l.contains("daughter") || l.contains("son") || l.contains("child") { return "Parent" }
-        if l.contains("wife") || l.contains("husband") || l.contains("partner") || l.contains("spouse") { return "Partner" }
+        if l.contains("wife") || l.contains("husband") || l.contains("partner") || l.contains("spouse")
+            || l.contains("girlfriend") || l.contains("boyfriend") { return "Partner" }
         if l.contains("cousin") { return "Cousin" }
         return "Family"
     }
