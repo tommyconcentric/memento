@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Memento collects nothing and tracks nothing: all data lives on
+	     device and in the user's own private iCloud database, which the
+	     developer cannot access. The only network traffic is CloudKit sync.
+	     Keep this manifest in step with that stance — adding any analytics,
+	     third-party SDK, or server call means revisiting every key here. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- UserDefaults (@AppStorage, UserDefaults.standard) stores
+			     app settings: reminder/sync/lock toggles, workspace mode,
+			     icon color, seed flags. CA92.1 = accessed only to read and
+			     write information available to the app itself. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
