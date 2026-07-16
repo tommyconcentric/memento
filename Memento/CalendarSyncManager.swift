@@ -10,6 +10,8 @@ import SwiftUI
 /// here regardless, matching the in-app Calendar tab.
 enum CalendarSyncManager {
     static let enabledKey = "appleCalendarSyncEnabled"
+    static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
+    static let lastSyncKey = "appleCalendarLastSync"
     private static let calendarTitle = "Memento"
     private static let store = EKEventStore()
 
@@ -17,7 +19,19 @@ enum CalendarSyncManager {
         (try? await store.requestFullAccessToEvents()) ?? false
     }
 
+    /// Called from every save site that can change birthdays/important
+    /// dates. Respects the user's update-mode choice: in manual-only mode
+    /// nothing happens here, and the calendar only changes via "Sync Now"
+    /// in Settings (`syncNow`).
     static func refreshFromContext(_ context: ModelContext) {
+        guard !UserDefaults.standard.bool(forKey: manualSyncOnlyKey) else { return }
+        syncNow(context)
+    }
+
+    /// Rebuilds the calendar regardless of the auto/manual choice — backs
+    /// the "Sync Now" button and the initial population when the sync
+    /// toggle is first turned on.
+    static func syncNow(_ context: ModelContext) {
         guard UserDefaults.standard.bool(forKey: enabledKey) else { return }
         let people = (try? context.fetch(FetchDescriptor<Person>())) ?? []
         refresh(people: people)
@@ -38,6 +52,9 @@ enum CalendarSyncManager {
             }
         }
         try? store.commit()
+        // Stored as an epoch interval so Settings can observe it live via
+        // @AppStorage (which has no Date overload).
+        UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: lastSyncKey)
     }
 
     /// Deletes the "Memento" calendar and everything in it — call when the

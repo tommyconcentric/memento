@@ -37,6 +37,7 @@ final class Person {
     var group: PersonGroup?
     var createdAt: Date = Date.now
     var isDeceased: Bool = false
+    var isBusiness: Bool = false          // lives in the Business workspace instead of Personal
     var relationshipToUser: String = ""   // e.g. "Mother" — places them on your family tree
     var address: String = ""
 
@@ -65,6 +66,10 @@ final class Person {
 
     @Relationship(deleteRule: .cascade, inverse: \FamilyMember.person)
     var familyMembers: [FamilyMember]?
+
+    // Extra phone numbers/emails/addresses beyond the primary ones above.
+    @Relationship(deleteRule: .cascade, inverse: \ContactField.person)
+    var contactFields: [ContactField]?
 
     init(name: String, group: PersonGroup? = nil) {
         self.name = name
@@ -107,6 +112,18 @@ extension Person {
     var familyMembersArray: [FamilyMember] {
         get { familyMembers ?? [] }
         set { familyMembers = newValue }
+    }
+
+    var contactFieldsArray: [ContactField] {
+        get { contactFields ?? [] }
+        set { contactFields = newValue }
+    }
+
+    /// Additional contact methods of one kind, in entry order.
+    func additionalContacts(_ kind: ContactField.Kind) -> [ContactField] {
+        contactFieldsArray
+            .filter { $0.kind == kind.rawValue && !$0.value.trimmed.isEmpty }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var sortedNotes: [NoteEntry] {
@@ -153,6 +170,7 @@ final class ImportantDate {
 
 @Model
 final class NoteEntry {
+    var title: String = ""
     var text: String = ""
     var eventDate: Date = Date.now
     var location: String = ""
@@ -194,6 +212,41 @@ final class EventPhoto {
     init(imageData: Data?, caption: String = "", sortOrder: Int = 0) {
         self.imageData = imageData
         self.caption = caption
+        self.sortOrder = sortOrder
+    }
+}
+
+// MARK: - Contact field (extra phone/email/address beyond the primary one)
+
+@Model
+final class ContactField {
+    var kind: String = ContactField.Kind.phone.rawValue
+    var value: String = ""
+    var sortOrder: Int = 0
+    var person: Person?
+
+    enum Kind: String, CaseIterable {
+        case phone, email, address
+
+        var label: String {
+            switch self {
+            case .phone: return "Phone"
+            case .email: return "Email"
+            case .address: return "Address"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .phone: return "phone"
+            case .email: return "envelope"
+            case .address: return "mappin"
+            }
+        }
+    }
+
+    init(kind: Kind, value: String = "", sortOrder: Int = 0) {
+        self.kind = kind.rawValue
+        self.value = value
         self.sortOrder = sortOrder
     }
 }
