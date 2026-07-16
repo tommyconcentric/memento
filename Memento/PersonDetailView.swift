@@ -112,6 +112,9 @@ struct PersonDetailView: View {
                 .foregroundStyle(.white)
 
             HStack(spacing: 8) {
+                if person.isBusiness {
+                    headerChip("Business", icon: "briefcase")
+                }
                 if let group = person.group {
                     headerChip(group.name, icon: "folder")
                 }
@@ -125,8 +128,12 @@ struct PersonDetailView: View {
         .padding(.bottom, 20)
         .background {
             ZStack {
+                // Boardroom slate for business contacts, holiday blues for
+                // everyone else.
                 LinearGradient(
-                    colors: [Color(red: 0.09, green: 0.34, blue: 0.49), Theme.sky],
+                    colors: person.isBusiness
+                        ? [Color(red: 0.13, green: 0.17, blue: 0.23), Theme.steel]
+                        : [Color(red: 0.09, green: 0.34, blue: 0.49), Theme.sky],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
