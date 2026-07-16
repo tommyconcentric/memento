@@ -255,13 +255,13 @@ struct ImportContactsView: View {
             if contact.isKeyAvailable(CNContactBirthdayKey),
                let comps = contact.birthday,
                let month = comps.month, let day = comps.day {
-                // Contacts can store a birthday without a year; 1904 keeps
-                // the month/day working while the age display stays hidden
-                // (QuickInfoView only shows age < 120). Unlike 1900, 1904 is
-                // a leap year, so a Feb 29 birthday still constructs a valid
-                // date instead of silently failing.
+                // Contacts can store a birthday without a year; the
+                // placeholder year keeps the month/day working while
+                // displays hide it (see Date.placeholderYear). It's a leap
+                // year, so a Feb 29 birthday still constructs a valid date
+                // instead of silently failing.
                 candidate.birthday = Calendar.current.date(
-                    from: DateComponents(year: comps.year ?? 1904, month: month, day: day)
+                    from: DateComponents(year: comps.year ?? Date.placeholderYear, month: month, day: day)
                 )
             }
             if contact.isKeyAvailable(CNContactImageDataKey), let data = contact.imageData {

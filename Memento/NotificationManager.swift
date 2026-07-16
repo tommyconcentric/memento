@@ -52,14 +52,21 @@ enum NotificationManager {
 
         for event in events.sorted(by: { $0.daysAway < $1.daysAway }).prefix(60) {
             var components = Calendar.current.dateComponents([.month, .day], from: event.date)
-            // A repeating trigger matches one fixed month/day forever, so a
-            // literal Feb 29 would only ever fire in leap years while still
-            // consuming one of the 60 scheduling slots every other year.
-            if components.month == 2, components.day == 29 {
-                components.day = 28
+            let trigger: UNCalendarNotificationTrigger
+            if components.month == 2, components.day == 29,
+               let next = Date.nextOccurrence(of: event.date) {
+                // A repeating trigger matches one fixed month/day forever:
+                // a literal Feb 29 would skip non-leap years, and a Feb 28
+                // remap would fire a day early in leap years. Aim a one-shot
+                // at the actual next occurrence (Feb 29 in leap years,
+                // Feb 28 otherwise) — the refresh on every save re-arms it.
+                var oneShot = Calendar.current.dateComponents([.year, .month, .day], from: next)
+                oneShot.hour = 9
+                trigger = UNCalendarNotificationTrigger(dateMatching: oneShot, repeats: false)
+            } else {
+                components.hour = 9
+                trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
             }
-            components.hour = 9
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
             let content = UNMutableNotificationContent()
             content.title = event.title
             content.body = event.body
