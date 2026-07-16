@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var reminderNote: String?
 
     @AppStorage(CalendarSyncManager.enabledKey) private var calendarSyncEnabled = false
+    @AppStorage(CalendarSyncManager.manualSyncOnlyKey) private var manualSyncOnly = false
+    @AppStorage(CalendarSyncManager.lastSyncKey) private var lastSyncTimestamp = 0.0
     @State private var calendarSyncNote: String?
 
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
@@ -35,11 +37,28 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Sync with Apple Calendar", isOn: $calendarSyncEnabled)
+                    if calendarSyncEnabled {
+                        Picker("Keep up to date", selection: $manualSyncOnly) {
+                            Text("Automatically").tag(false)
+                            Text("Manually").tag(true)
+                        }
+                        Button {
+                            CalendarSyncManager.syncNow(context)
+                        } label: {
+                            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
                 } header: {
                     Text("Apple Calendar")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Adds a “Memento” calendar with everyone's birthdays and important dates, so you can show or hide it in the Calendar app just like Birthdays or Holidays. Every date appears here, even ones you've turned reminders off for.")
+                        if calendarSyncEnabled {
+                            if manualSyncOnly {
+                                Text("Changes you make in Memento only reach Apple Calendar when you tap Sync Now.")
+                            }
+                            Text(lastSyncedText)
+                        }
                         if let calendarSyncNote {
                             Text(calendarSyncNote)
                                 .foregroundStyle(Theme.terracotta)
@@ -112,10 +131,14 @@ struct SettingsView: View {
                             return
                         }
                         calendarSyncNote = nil
-                        CalendarSyncManager.refreshFromContext(context)
+                        // Populate immediately even in manual mode — an
+                        // empty calendar until the first Sync Now would
+                        // read as broken.
+                        CalendarSyncManager.syncNow(context)
                     } else {
                         calendarSyncNote = nil
                         CalendarSyncManager.removeCalendar()
+                        lastSyncTimestamp = 0
                     }
                 }
             }
@@ -127,6 +150,12 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var lastSyncedText: String {
+        guard lastSyncTimestamp > 0 else { return "Not synced yet." }
+        let date = Date(timeIntervalSince1970: lastSyncTimestamp)
+        return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))."
     }
 
     /// Turning the lock on requires setting a PIN first; turning it off
