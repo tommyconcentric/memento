@@ -24,9 +24,11 @@ struct ImportContactsView: View {
     struct ImportCandidate: Identifiable {
         let id = UUID()
         var name: String
-        var phone = ""
-        var email = ""
-        var address = ""
+        // Every value comes along; the first of each kind becomes the
+        // primary field on the Person, the rest become extra ContactFields.
+        var phones: [String] = []
+        var emails: [String] = []
+        var addresses: [String] = []
         var birthday: Date?
         var photoData: Data?
         var include = true
@@ -98,7 +100,7 @@ struct ImportContactsView: View {
                 optionCard(
                     icon: "person.crop.circle.badge.plus",
                     title: "From iOS Contacts",
-                    subtitle: "Pick exactly who to import — names, photos, numbers, emails, addresses and birthdays come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
+                    subtitle: "Pick exactly who to import — names, photos, birthdays and every number, email and address come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
                 ) {
                     showingContactPicker = true
                 }
@@ -220,7 +222,9 @@ struct ImportContactsView: View {
 
     private func candidateDetails(_ candidate: ImportCandidate) -> String {
         var parts: [String] = []
-        if !candidate.phone.isEmpty { parts.append(candidate.phone) }
+        if let phone = candidate.phones.first {
+            parts.append(candidate.phones.count > 1 ? "\(phone) +\(candidate.phones.count - 1)" : phone)
+        }
         if let birthday = candidate.birthday {
             parts.append("🎂 " + birthday.formatted(.dateTime.day().month(.abbreviated)))
         }
@@ -235,19 +239,18 @@ struct ImportContactsView: View {
             var candidate = ImportCandidate(name: displayName(for: contact))
             guard !candidate.name.trimmed.isEmpty else { continue }
 
-            if contact.isKeyAvailable(CNContactPhoneNumbersKey),
-               let phone = contact.phoneNumbers.first {
-                candidate.phone = phone.value.stringValue
+            if contact.isKeyAvailable(CNContactPhoneNumbersKey) {
+                candidate.phones = uniqueValues(contact.phoneNumbers.map { $0.value.stringValue })
             }
-            if contact.isKeyAvailable(CNContactEmailAddressesKey),
-               let email = contact.emailAddresses.first {
-                candidate.email = email.value as String
+            if contact.isKeyAvailable(CNContactEmailAddressesKey) {
+                candidate.emails = uniqueValues(contact.emailAddresses.map { $0.value as String })
             }
-            if contact.isKeyAvailable(CNContactPostalAddressesKey),
-               let postal = contact.postalAddresses.first {
-                candidate.address = CNPostalAddressFormatter
-                    .string(from: postal.value, style: .mailingAddress)
-                    .replacingOccurrences(of: "\n", with: ", ")
+            if contact.isKeyAvailable(CNContactPostalAddressesKey) {
+                candidate.addresses = uniqueValues(contact.postalAddresses.map { postal in
+                    CNPostalAddressFormatter
+                        .string(from: postal.value, style: .mailingAddress)
+                        .replacingOccurrences(of: "\n", with: ", ")
+                })
             }
             if contact.isKeyAvailable(CNContactBirthdayKey),
                let comps = contact.birthday,
@@ -288,6 +291,13 @@ struct ImportContactsView: View {
 
     private func compressedPhoto(_ data: Data) -> Data {
         UIImage(data: data)?.compressedData(maxDimension: 900) ?? data
+    }
+
+    /// Contacts often repeat one value under several labels (e.g. the same
+    /// number as "mobile" and "iPhone") — drop exact repeats, keep order.
+    private func uniqueValues(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.map { $0.trimmed }.filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     // MARK: - Files (Facebook export / CSV)
@@ -350,9 +360,9 @@ struct ImportContactsView: View {
             let name = value(nameIndex)
             guard !name.isEmpty else { continue }
             var candidate = ImportCandidate(name: name)
-            candidate.phone = value(phoneIndex)
-            candidate.email = value(emailIndex)
-            candidate.address = value(addressIndex)
+            candidate.phones = uniqueValues([value(phoneIndex)])
+            candidate.emails = uniqueValues([value(emailIndex)])
+            candidate.addresses = uniqueValues([value(addressIndex)])
             candidate.birthday = parseBirthday(value(birthdayIndex))
             results.append(candidate)
         }
@@ -451,13 +461,27 @@ struct ImportContactsView: View {
         let isBusiness = UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
         for candidate in candidates where candidate.include {
             let person = Person(name: candidate.name.trimmed, group: selectedGroup)
-            person.phoneNumber = candidate.phone.trimmed
-            person.email = candidate.email.trimmed
-            person.address = candidate.address.trimmed
+            person.phoneNumber = candidate.phones.first ?? ""
+            person.email = candidate.emails.first ?? ""
+            person.address = candidate.addresses.first ?? ""
             person.birthday = candidate.birthday
             person.profilePhotoData = candidate.photoData
             person.isBusiness = isBusiness
             context.insert(person)
+
+            // Everything beyond the first of each kind lands as extra
+            // contact fields, same as adding them by hand in the editor.
+            var sortOrder = 0
+            for (kind, extras) in [
+                (ContactField.Kind.phone, candidate.phones.dropFirst()),
+                (.email, candidate.emails.dropFirst()),
+                (.address, candidate.addresses.dropFirst())
+            ] {
+                for extra in extras {
+                    person.contactFieldsArray.append(ContactField(kind: kind, value: extra, sortOrder: sortOrder))
+                    sortOrder += 1
+                }
+            }
         }
         try? context.save()
         NotificationManager.refreshFromContext(context)
