@@ -51,7 +51,7 @@ struct PhotoCropperView: View {
                     HStack {
                         Button("Cancel") { dismiss() }
                         Spacer()
-                        Text("Drag and pinch \u{00B7} double-tap resets")
+                        Text("Drag to position \u{00B7} double-tap resets")
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.75))
                         Spacer()
@@ -65,6 +65,19 @@ struct PhotoCropperView: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
                     Spacer()
+                    // A click-reachable zoom control: pinch works on touch
+                    // screens and trackpads, but a mouse on the Mac has no
+                    // pinch input at all — without this slider, Mac users
+                    // could never zoom past the minimum fit.
+                    HStack(spacing: 12) {
+                        Image(systemName: "minus.magnifyingglass")
+                        Slider(value: zoomBinding(base: base, side: side), in: 1...5)
+                        Image(systemName: "plus.magnifyingglass")
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 18)
+                    .frame(maxWidth: 420)
                 }
             }
             .contentShape(Rectangle())
@@ -98,6 +111,21 @@ struct PhotoCropperView: View {
         return CGSize(
             width: min(maxX, max(-maxX, proposed.width)),
             height: min(maxY, max(-maxY, proposed.height))
+        )
+    }
+
+    /// Slider writes mirror the pinch gesture's behavior, keeping the two
+    /// inputs interchangeable: update both live and steady zoom, and
+    /// re-clamp the offset so the image never drifts off the circle.
+    private func zoomBinding(base: CGSize, side: CGFloat) -> Binding<CGFloat> {
+        Binding(
+            get: { zoom },
+            set: { newValue in
+                zoom = min(5, max(1, newValue))
+                steadyZoom = zoom
+                steadyOffset = clamped(steadyOffset, base: base, side: side)
+                offset = steadyOffset
+            }
         )
     }
 
