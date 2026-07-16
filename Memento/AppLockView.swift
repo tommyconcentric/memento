@@ -60,22 +60,39 @@ enum AppLock {
 /// after the unlock.
 @MainActor
 enum LockScreenPresenter {
-    private static var window: UIWindow?
+    private static var windows: [UIWindow] = []
 
+    /// Covers EVERY connected window scene, not just one — on iPad and Mac
+    /// the user can open several windows, and any scene left uncovered
+    /// would show its content fully interactive while "locked". Safe to
+    /// call repeatedly: scenes that already have a lock window are skipped,
+    /// so each view's onAppear can re-invoke it as new windows open.
     static func show(onUnlock: @escaping () -> Void) {
-        guard window == nil else { return }
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState != .unattached }) ?? scenes.first else { return }
-        let lockWindow = UIWindow(windowScene: scene)
-        lockWindow.rootViewController = UIHostingController(rootView: AppLockView(onUnlock: onUnlock))
-        lockWindow.windowLevel = .alert + 1
-        lockWindow.makeKeyAndVisible()
-        window = lockWindow
+        // Windows whose Mac/iPad window was closed hold a dead scene;
+        // drop them so the array only tracks live coverage.
+        windows.removeAll { $0.windowScene == nil }
+
+        let covered = Set(windows.compactMap { $0.windowScene.map(ObjectIdentifier.init) })
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState != .unattached }
+
+        for scene in scenes where !covered.contains(ObjectIdentifier(scene)) {
+            // Only the first lock window auto-prompts biometrics — several
+            // windows racing to evaluate Face ID/Touch ID at once would
+            // stack prompts.
+            let lockView = AppLockView(autoAttemptsBiometrics: windows.isEmpty, onUnlock: onUnlock)
+            let lockWindow = UIWindow(windowScene: scene)
+            lockWindow.rootViewController = UIHostingController(rootView: lockView)
+            lockWindow.windowLevel = .alert + 1
+            lockWindow.makeKeyAndVisible()
+            windows.append(lockWindow)
+        }
     }
 
     static func hide() {
-        window?.isHidden = true
-        window = nil
+        windows.forEach { $0.isHidden = true }
+        windows.removeAll()
     }
 }
 
@@ -164,6 +181,9 @@ private struct NumberPad: View {
 // MARK: - Lock screen shown over the app
 
 struct AppLockView: View {
+    // With one lock window per scene, only one instance should auto-prompt
+    // biometrics on appear; the button still works on all of them.
+    var autoAttemptsBiometrics = true
     let onUnlock: () -> Void
 
     @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
@@ -208,7 +228,7 @@ struct AppLockView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
         .onAppear {
-            guard useBiometrics, !biometricAttempted else { return }
+            guard autoAttemptsBiometrics, useBiometrics, !biometricAttempted else { return }
             biometricAttempted = true
             attemptBiometricUnlock()
         }

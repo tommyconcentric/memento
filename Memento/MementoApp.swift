@@ -30,6 +30,12 @@ struct MementoApp: App {
     @State private var isLocked = UserDefaults.standard.bool(forKey: AppLock.enabledKey)
         && AppLock.storedPIN != nil
 
+    // Activation-driven refresh is throttled: on the Mac every window-focus
+    // change is an activation, and a full EventKit rebuild per focus would
+    // be constant churn. Save paths still refresh immediately.
+    private static var lastActivationRefresh = Date.distantPast
+    private static let activationRefreshInterval: TimeInterval = 15 * 60
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -50,14 +56,23 @@ struct MementoApp: App {
                         LockScreenPresenter.hide()
                     }
                 }
-                // Lock on any departure from .active, not just .background,
-                // so an app-switcher snapshot never shows real notes
-                // unlocked.
                 .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase != .active && appLockEnabled && AppLock.storedPIN != nil {
+                    // On iPhone/iPad, lock on any departure from .active so
+                    // an app-switcher snapshot never shows real notes. On
+                    // the Mac, .inactive fires every time another app's
+                    // window takes focus — locking there would demand the
+                    // PIN on every app switch, so lock only when the app is
+                    // actually hidden/minimized (.background); the Mac's own
+                    // session lock covers the rest.
+                    let shouldLock = ProcessInfo.processInfo.isiOSAppOnMac
+                        ? newPhase == .background
+                        : newPhase != .active
+                    if shouldLock && appLockEnabled && AppLock.storedPIN != nil {
                         isLocked = true
                     }
-                    if newPhase == .active {
+                    if newPhase == .active,
+                       Date.now.timeIntervalSince(Self.lastActivationRefresh) > Self.activationRefreshInterval {
+                        Self.lastActivationRefresh = .now
                         // Pending notifications and the synced calendar are
                         // device-local snapshots taken at the last local
                         // save — without this, edits synced from another
