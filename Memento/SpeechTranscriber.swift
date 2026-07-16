@@ -59,6 +59,16 @@ final class SpeechTranscriber {
 
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
+            // On Macs with no input device (Mac mini/Studio/Pro without a
+            // mic) this format comes back 0 Hz / 0 channels, and installTap
+            // raises an Objective-C exception that do/catch can't catch —
+            // the app would abort. Permissions don't guard this: macOS
+            // grants mic access independently of whether a mic exists.
+            guard format.sampleRate > 0, format.channelCount > 0 else {
+                errorMessage = "No microphone is available on this device — connect one and try again."
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                return
+            }
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
                 self?.request?.append(buffer)
