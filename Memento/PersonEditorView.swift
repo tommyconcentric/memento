@@ -64,6 +64,7 @@ struct PersonEditorView: View {
         let id = UUID()
         var kind: ContactField.Kind = .phone
         var value = ""
+        var starred = false
     }
 
     struct DraftFamilyMember: Identifiable {
@@ -219,6 +220,16 @@ struct PersonEditorView: View {
                                 .keyboardType(keyboard(for: draft.kind))
                                 .textInputAutocapitalization(draft.kind == .email ? .never : .sentences)
                                 .autocorrectionDisabled(draft.kind == .email)
+                            Button {
+                                toggleStar(draft.id)
+                            } label: {
+                                Image(systemName: draft.starred ? "star.fill" : "star")
+                                    .foregroundStyle(draft.starred ? Theme.gold : Color.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(draft.starred
+                                ? "Remove preference from this \(draft.kind.label.lowercased())"
+                                : "Prefer this \(draft.kind.label.lowercased())")
                         }
                     }
                     .onDelete { draftContacts.remove(atOffsets: $0) }
@@ -237,7 +248,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Contact")
                 } footer: {
-                    Text("The first phone, email and address show at the top of Quick Info. Add as many extra numbers, emails or addresses as you like below.")
+                    Text("The first phone, email and address show at the top of Quick Info. Add as many extra numbers, emails or addresses as you like below — tap ★ to prefer one over the primary, and it moves to the top.")
                 }
 
                 importantDatesSection
@@ -320,6 +331,21 @@ struct PersonEditorView: View {
         .listRowBackground(Color.clear)
     }
 
+    /// One starred entry per kind: starring a row clears the star from its
+    /// siblings of the same kind; tapping a starred row removes the star,
+    /// falling back to the primary field as the preferred one.
+    private func toggleStar(_ id: UUID) {
+        guard let index = draftContacts.firstIndex(where: { $0.id == id }) else { return }
+        let turningOn = !draftContacts[index].starred
+        if turningOn {
+            let kind = draftContacts[index].kind
+            for sibling in draftContacts.indices where draftContacts[sibling].kind == kind {
+                draftContacts[sibling].starred = false
+            }
+        }
+        draftContacts[index].starred = turningOn
+    }
+
     private func keyboard(for kind: ContactField.Kind) -> UIKeyboardType {
         switch kind {
         case .phone: return .phonePad
@@ -393,7 +419,7 @@ struct PersonEditorView: View {
             .map { DraftDate(label: $0.label, date: $0.date, remindersEnabled: $0.remindersEnabled) }
         draftContacts = person.contactFieldsArray
             .sorted { $0.sortOrder < $1.sortOrder }
-            .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value) }
+            .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value, starred: $0.isPreferred) }
     }
 
     // MARK: - Photo loading
@@ -467,8 +493,16 @@ struct PersonEditorView: View {
         for old in oldContacts {
             context.delete(old)
         }
+        // A row's kind can change after it was starred, so two same-kind
+        // stars are possible in the drafts — keep only the first per kind.
+        var starredKinds: Set<String> = []
         for (index, draft) in draftContacts.enumerated() where !draft.value.trimmed.isEmpty {
-            target.contactFieldsArray.append(ContactField(kind: draft.kind, value: draft.value.trimmed, sortOrder: index))
+            let field = ContactField(kind: draft.kind, value: draft.value.trimmed, sortOrder: index)
+            if draft.starred, !starredKinds.contains(draft.kind.rawValue) {
+                field.isPreferred = true
+                starredKinds.insert(draft.kind.rawValue)
+            }
+            target.contactFieldsArray.append(field)
         }
 
         applyReciprocalLinks(around: target)

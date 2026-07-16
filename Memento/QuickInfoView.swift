@@ -90,24 +90,9 @@ struct QuickInfoView: View {
         if !person.foodPreferences.isEmpty {
             InfoRow(icon: "fork.knife", label: "Food & Drink", value: person.foodPreferences)
         }
-        if !person.phoneNumber.isEmpty {
-            InfoRow(icon: "phone", label: "Phone", value: person.phoneNumber)
-        }
-        ForEach(person.additionalContacts(.phone)) { field in
-            InfoRow(icon: "phone", label: "Phone", value: field.value)
-        }
-        if !person.email.isEmpty {
-            InfoRow(icon: "envelope", label: "Email", value: person.email)
-        }
-        ForEach(person.additionalContacts(.email)) { field in
-            InfoRow(icon: "envelope", label: "Email", value: field.value)
-        }
-        if !person.address.isEmpty {
-            InfoRow(icon: "mappin", label: "Address", value: person.address)
-        }
-        ForEach(person.additionalContacts(.address)) { field in
-            InfoRow(icon: "mappin", label: "Address", value: field.value)
-        }
+        contactRows(.phone, primary: person.phoneNumber)
+        contactRows(.email, primary: person.email)
+        contactRows(.address, primary: person.address)
         ForEach(person.importantDatesArray.sorted { $0.date < $1.date }) { item in
             dateRow(
                 icon: "calendar.badge.clock", label: item.label, value: dateText(item.date),
@@ -116,6 +101,47 @@ struct QuickInfoView: View {
                     set: { item.remindersEnabled = $0; saveDateChange() }
                 )
             )
+        }
+    }
+
+    /// All values of one contact kind. A starred extra is the preferred one
+    /// and leads with a gold star; otherwise the primary field leads and
+    /// extras follow in entry order.
+    @ViewBuilder
+    private func contactRows(_ kind: ContactField.Kind, primary: String) -> some View {
+        let preferred = person.preferredContact(kind)
+        if let preferred {
+            preferredRow(icon: kind.icon, label: kind.label, value: preferred.value)
+        }
+        if !primary.isEmpty {
+            InfoRow(icon: kind.icon, label: kind.label, value: primary)
+        }
+        ForEach(person.additionalContacts(kind).filter {
+            $0.persistentModelID != preferred?.persistentModelID
+        }) { field in
+            InfoRow(icon: kind.icon, label: kind.label, value: field.value)
+        }
+    }
+
+    /// Same layout as `InfoRow`, plus the trailing star that marks the
+    /// user's preferred contact method of its kind.
+    private func preferredRow(icon: String, label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.body)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "star.fill")
+                .font(.caption)
+                .foregroundStyle(Theme.gold)
+                .accessibilityLabel("Preferred \(label.lowercased())")
         }
     }
 

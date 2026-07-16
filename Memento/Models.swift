@@ -127,6 +127,12 @@ extension Person {
             .sorted { $0.sortOrder < $1.sortOrder }
     }
 
+    /// The starred extra of one kind, if the user chose one — preferred over
+    /// the primary field and shown first on Quick Info.
+    func preferredContact(_ kind: ContactField.Kind) -> ContactField? {
+        additionalContacts(kind).first(where: \.isPreferred)
+    }
+
     var sortedNotes: [NoteEntry] {
         notesArray.sorted { $0.eventDate > $1.eventDate }
     }
@@ -224,6 +230,10 @@ final class ContactField {
     var kind: String = ContactField.Kind.phone.rawValue
     var value: String = ""
     var sortOrder: Int = 0
+    // Starred in the editor: preferred over the primary field of its kind,
+    // shown first on Quick Info. At most one per kind is expected; the
+    // editor and save path enforce it.
+    var isPreferred: Bool = false
     var person: Person?
 
     enum Kind: String, CaseIterable {
