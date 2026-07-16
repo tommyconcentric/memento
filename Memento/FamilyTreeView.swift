@@ -339,7 +339,7 @@ struct MyFamilyTreeView: View {
                     ContentUnavailableView {
                         Label("No Tree Yet", systemImage: "tree")
                     } description: {
-                        Text("Set \"Relationship to You\" on people in Edit Person — mother, brother, grandson — and your tree grows itself.")
+                        Text("Set \"Family Relationship to You\" on your relatives in Edit Person — mother, brother, grandson — and your tree grows itself. Friends and colleagues can be left unset.")
                     }
                     .padding(.top, 60)
                 } else {
