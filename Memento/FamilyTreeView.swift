@@ -117,19 +117,30 @@ struct FamilyTreeContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+            ForEach(rows) { row in
                 laneContainer(row)
                 if row.id != rows.last?.id {
-                    Capsule()
-                        .fill(LinearGradient(
-                            colors: [Theme.olive.opacity(0.85), Theme.bark],
-                            startPoint: .top, endPoint: .bottom
-                        ))
-                        .frame(width: 3 + CGFloat(index) * 1.8, height: 24)
-                        .frame(maxWidth: .infinity)
+                    generationJoin
                 }
             }
         }
+    }
+
+    /// The descent line between generations, drawn like the inked joins on
+    /// an old genealogical chart: a fine rule with a small gilt ornament.
+    private var generationJoin: some View {
+        VStack(spacing: 3) {
+            Rectangle()
+                .fill(Theme.bark.opacity(0.5))
+                .frame(width: 1, height: 7)
+            Image(systemName: "suit.diamond.fill")
+                .font(.system(size: 7))
+                .foregroundStyle(Theme.gold.opacity(0.85))
+            Rectangle()
+                .fill(Theme.bark.opacity(0.5))
+                .frame(width: 1, height: 7)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -152,13 +163,11 @@ struct FamilyTreeContent: View {
     }
 
     private func lane(_ row: TreeRow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(row.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .center, spacing: 8) {
+            laneTitle(row.title)
             if row.nodes.isEmpty {
                 Text(dragEnabled ? "Hold a person and drag them here" : " ")
-                    .font(.caption2)
+                    .font(.system(.caption2, design: .serif).italic())
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 10)
             } else {
@@ -172,6 +181,7 @@ struct FamilyTreeContent: View {
                         }
                     }
                     .padding(.horizontal, 2)
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -181,11 +191,35 @@ struct FamilyTreeContent: View {
         .padding(.vertical, 1)
     }
 
-    /// Canopy greens for older generations, warm root browns for younger.
+    /// Engraved-plate generation caption: letterspaced serif small caps
+    /// between two fine rules, the way old charts label each rank.
+    private func laneTitle(_ title: String) -> some View {
+        HStack(spacing: 8) {
+            titleRule
+            Text(title)
+                .font(.system(.caption2, design: .serif).weight(.semibold))
+                .textCase(.uppercase)
+                .kerning(1.2)
+                .foregroundStyle(Theme.bark.opacity(0.85))
+                .lineLimit(1)
+                .fixedSize()
+            titleRule
+        }
+    }
+
+    private var titleRule: some View {
+        Rectangle()
+            .fill(Theme.bark.opacity(0.3))
+            .frame(height: 0.5)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// Parchment bands: ancestors fade lighter toward the top of the
+    /// chart, descendants deepen toward the earth at the bottom.
     private func laneTint(_ generation: Int) -> Color {
-        if generation >= 1 { return Theme.olive.opacity(generation >= 2 ? 0.15 : 0.10) }
-        if generation == 0 { return Theme.olive.opacity(0.06) }
-        return Theme.bark.opacity(generation <= -2 ? 0.11 : 0.07)
+        if generation >= 1 { return Theme.gold.opacity(generation >= 2 ? 0.13 : 0.10) }
+        if generation == 0 { return Theme.gold.opacity(0.06) }
+        return Theme.bark.opacity(generation <= -2 ? 0.12 : 0.08)
     }
 }
 
@@ -219,6 +253,9 @@ struct FamilyNodeView: View {
 
     private var content: some View {
         VStack(spacing: 4) {
+            // Gilt portrait frame: a gold ring around the sitter with a
+            // fine bark rule floating just outside it, like the framed
+            // ovals on a Victorian genealogy chart.
             AvatarView(
                 data: node.photoData,
                 name: node.name,
@@ -226,19 +263,24 @@ struct FamilyNodeView: View {
                 desaturated: node.isDeceased
             )
             .overlay {
-                if node.isFocus {
-                    Circle().stroke(Theme.aegean, lineWidth: 3)
-                } else {
-                    Circle().stroke(Theme.olive.opacity(0.4), lineWidth: 1.5)
-                }
+                Circle().stroke(
+                    node.isFocus ? Theme.gold : Theme.gold.opacity(0.55),
+                    lineWidth: node.isFocus ? 2.5 : 1.5
+                )
             }
+            .overlay {
+                Circle()
+                    .stroke(Theme.bark.opacity(node.isFocus ? 0.6 : 0.35), lineWidth: 0.5)
+                    .padding(-3)
+            }
+            .padding(3)
             Text(node.name)
-                .font(.caption.weight(.medium))
+                .font(.system(.caption, design: .serif).weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
             if !node.relation.isEmpty {
                 Text(node.relation)
-                    .font(.caption2)
+                    .font(.system(.caption2, design: .serif).italic())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -302,7 +344,7 @@ struct MyFamilyTreeView: View {
                         FamilyTreeContent(rows: rows, dragEnabled: true) { name, generation in
                             handleDrop(name: name, generation: generation)
                         }
-                        .background(treeCanopyGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .historicalTreePlate()
                         .mementoCard(padding: 10)
                     }
                     .padding()
@@ -429,7 +471,7 @@ struct PersonFamilySection: View {
             } else {
                 FamilyTreeContent(rows: buildTreeRows(nodes: nodes, subjectTitle: person.name))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(treeCanopyGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .historicalTreePlate()
                     .mementoCard(padding: 10)
 
                 Button(action: onEdit) {
@@ -453,10 +495,30 @@ func childNames(of person: Person) -> [String] {
 }
 
 
-/// Shared backdrop for tree cards: leaf canopy fading to earth.
-private var treeCanopyGradient: LinearGradient {
+/// Shared backdrop for tree cards: aged parchment, faded at the top of the
+/// chart and warming toward the earth at the bottom.
+private var treeParchmentGradient: LinearGradient {
     LinearGradient(
-        colors: [Theme.olive.opacity(0.13), Theme.bark.opacity(0.10)],
+        colors: [Theme.gold.opacity(0.08), Theme.bark.opacity(0.12)],
         startPoint: .top, endPoint: .bottom
     )
+}
+
+/// Dresses a tree in its historical-chart plate: parchment fill plus the
+/// fine inner rule that gives engraved certificates their double border.
+private struct HistoricalPlate: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(treeParchmentGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Theme.bark.opacity(0.28), lineWidth: 0.5)
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
+    }
+}
+
+extension View {
+    func historicalTreePlate() -> some View { modifier(HistoricalPlate()) }
 }
