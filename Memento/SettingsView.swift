@@ -33,6 +33,9 @@ struct SettingsView: View {
     @State private var showingPINSetup = false
     @State private var pinSaveFailed = false
 
+    @State private var showingResetConfirm = false
+    @State private var resetNote: String?
+
     var body: some View {
         NavigationStack {
             Form {
@@ -111,6 +114,22 @@ struct SettingsView: View {
                 } footer: {
                     Text("Reviews help other people find Memento, and feedback goes straight to the developer.")
                 }
+
+                Section {
+                    Button(role: .destructive) {
+                        showingResetConfirm = true
+                    } label: {
+                        Label("Reset All Data…", systemImage: "trash")
+                    }
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Permanently deletes every profile and every note from Memento. Because your data syncs through iCloud, they are also removed from all devices signed into your account. Folders are kept, but emptied.")
+                        if let resetNote {
+                            Text(resetNote)
+                                .foregroundStyle(Theme.terracotta)
+                        }
+                    }
+                }
             }
             .sheet(isPresented: $showingPINSetup) {
                 PINSetupView(
@@ -132,6 +151,12 @@ struct SettingsView: View {
                         showingPINSetup = false
                     }
                 )
+            }
+            .alert("Reset All Data?", isPresented: $showingResetConfirm) {
+                Button("Delete Everything", role: .destructive) { resetAllData() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes all profiles and notes in Memento. The deletion syncs to every device signed into your iCloud account, and it cannot be undone.")
             }
             .alert("Couldn't Save PIN", isPresented: $pinSaveFailed) {
                 Button("OK", role: .cancel) {}
@@ -197,6 +222,31 @@ struct SettingsView: View {
         } else if let url = URL(string: "https://apps.apple.com/app/id\(Self.appStoreID)?action=write-review") {
             openURL(url)
         }
+    }
+
+    /// Deletes every profile and note. Objects are deleted one by one, not
+    /// with a batch delete: batch deletes skip relationship processing and
+    /// don't reliably reach the CloudKit mirror, and the whole point here is
+    /// that the wipe propagates to the user's other devices. People go first
+    /// (cascades take their notes, dates, family members, contact fields and
+    /// photos); the child types are then swept for orphans left behind by
+    /// older versions of the schema.
+    private func resetAllData() {
+        do {
+            for person in try context.fetch(FetchDescriptor<Person>()) { context.delete(person) }
+            for note in try context.fetch(FetchDescriptor<NoteEntry>()) { context.delete(note) }
+            for photo in try context.fetch(FetchDescriptor<EventPhoto>()) { context.delete(photo) }
+            for date in try context.fetch(FetchDescriptor<ImportantDate>()) { context.delete(date) }
+            for member in try context.fetch(FetchDescriptor<FamilyMember>()) { context.delete(member) }
+            for field in try context.fetch(FetchDescriptor<ContactField>()) { context.delete(field) }
+            try context.save()
+            resetNote = nil
+        } catch {
+            resetNote = "Something went wrong and your data was not deleted. Please try again."
+            return
+        }
+        NotificationManager.refreshFromContext(context)
+        CalendarSyncManager.refreshFromContext(context)
     }
 
     private func sendFeedback() {
