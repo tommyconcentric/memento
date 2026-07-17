@@ -169,39 +169,6 @@ struct PeopleListView: View {
                     LogoMark(size: 27, colorScheme: logoColorScheme)
                 }
                 .accessibilityLabel("About Memento")
-                Menu {
-                    ForEach(Workspace.allCases, id: \.self) { option in
-                        Button {
-                            // Re-picking the active workspace is a no-op;
-                            // don't throw away the open person for it.
-                            guard option != workspace else { return }
-                            storedWorkspace = option.rawValue
-                            selectedPerson = nil
-                            recentlyUnpinned.removeAll()
-                        } label: {
-                            if option == workspace {
-                                Label("Memento \(option.title)", systemImage: "checkmark")
-                            } else {
-                                Label("Memento \(option.title)", systemImage: option.icon)
-                            }
-                        }
-                    }
-                } label: {
-                    // HStack rather than Label: toolbars collapse Labels
-                    // to their icon, and the whole point of this badge is
-                    // the word next to the logo.
-                    HStack(spacing: 4) {
-                        Image(systemName: workspace.icon)
-                        Text(workspace.title)
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(workspace.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(workspace.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .accessibilityLabel("Switch between Memento Personal and Memento Business")
                 Button {
                     showingSettings = true
                 } label: {
@@ -260,6 +227,54 @@ struct PeopleListView: View {
                 ContentUnavailableView.search(text: searchText)
             }
         }
+        // Pinned above the list rather than a toolbar item: the toolbar
+        // collapses into an overflow "…" menu when space is tight (always
+        // on iPad and the Mac), which hid which workspace you were in.
+        // This bar makes the active mode readable at a glance and the
+        // switch a single visible tap, on every device.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            workspaceSwitcher
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
+                .background(Theme.background)
+        }
+    }
+
+    private var workspaceSwitcher: some View {
+        HStack(spacing: 4) {
+            ForEach(Workspace.allCases, id: \.self) { option in
+                let isActive = option == workspace
+                Button {
+                    // Re-picking the active workspace is a no-op; don't
+                    // throw away the open person for it.
+                    guard option != workspace else { return }
+                    storedWorkspace = option.rawValue
+                    selectedPerson = nil
+                    recentlyUnpinned.removeAll()
+                } label: {
+                    Label(option.title, systemImage: option.icon)
+                        .font(.system(.subheadline, design: .serif).weight(isActive ? .semibold : .regular))
+                        .foregroundStyle(isActive ? .white : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            isActive ? option.accent : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Memento \(option.title)")
+                .accessibilityAddTraits(isActive ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        )
     }
 
     private var detailPlaceholder: some View {
