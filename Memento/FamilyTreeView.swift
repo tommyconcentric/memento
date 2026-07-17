@@ -70,6 +70,50 @@ enum FamilyRelation {
     }
 }
 
+// MARK: - Business relationship vocabulary
+
+/// The Business workspace counterpart of `FamilyRelation`: working
+/// relationships and the ladder-level math that turns them into a
+/// corporate ladder (who reports to whom) instead of a family tree.
+enum BusinessRelation {
+    static let presets: [String] = [
+        "Colleague", "Teammate", "Manager", "Direct report",
+        "Client", "Customer", "Business partner", "Collaborator",
+        "Networking contact", "Mentor", "Mentee", "Advisor",
+        "Investor", "Supplier", "Recruiter", "Former colleague"
+    ]
+
+    /// Ladder level relative to you: people you answer to sit above,
+    /// people who answer to you sit below, and everyone you work
+    /// alongside — colleagues, clients, collaborators — shares your rung.
+    static func level(of label: String) -> Int {
+        let l = label.lowercased()
+        if l.contains("mentee") || l.contains("report") || l.contains("intern")
+            || l.contains("apprentice") {
+            return -1
+        }
+        if l.contains("manager") || l.contains("mentor") || l.contains("advisor")
+            || l.contains("investor") || l.contains("boss") {
+            return 1
+        }
+        return 0
+    }
+
+    /// Labels that belong to a ladder level (for the drag-to-move chooser).
+    static func labels(forLevel level: Int) -> [String] {
+        let matching = presets.filter { Self.level(of: $0) == level }
+        return matching.isEmpty ? ["Colleague"] : matching
+    }
+
+    static func rowTitle(for level: Int) -> String {
+        switch level {
+        case 1...: return "Managers, mentors & advisors"
+        case 0: return "You & the people you work with"
+        default: return "Reports & mentees"
+        }
+    }
+}
+
 // MARK: - Tree data
 
 struct TreeNode: Identifiable {
@@ -89,7 +133,8 @@ struct TreeRow: Identifiable {
     let nodes: [TreeNode]
 }
 
-func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: Set<Int> = []) -> [TreeRow] {
+func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: Set<Int> = [],
+                   titleFor: ((Int) -> String)? = nil) -> [TreeRow] {
     var byGeneration: [Int: [TreeNode]] = [:]
     for generation in ensureGenerations { byGeneration[generation] = [] }
     for node in nodes {
@@ -99,13 +144,15 @@ func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: S
         let sorted = byGeneration[generation, default: []].sorted {
             ($0.isFocus ? 0 : 1, $0.name) < ($1.isFocus ? 0 : 1, $1.name)
         }
-        return TreeRow(
-            id: generation,
-            title: generation == 0 && subjectTitle == "You"
-                ? "You & your generation"
-                : FamilyRelation.rowTitle(for: generation, subject: subjectTitle),
-            nodes: sorted
-        )
+        let title: String
+        if let titleFor {
+            title = titleFor(generation)
+        } else if generation == 0 && subjectTitle == "You" {
+            title = "You & your generation"
+        } else {
+            title = FamilyRelation.rowTitle(for: generation, subject: subjectTitle)
+        }
+        return TreeRow(id: generation, title: title, nodes: sorted)
     }
 }
 
@@ -117,9 +164,15 @@ func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: S
 struct FamilyTreeContent: View {
     let rows: [TreeRow]
     var dragEnabled = false
+    /// Corporate dressing for the Business ladder: slate lanes and steel
+    /// rules in place of the genealogy chart's parchment and gilt.
+    var corporate = false
     var onDropInGeneration: ((String, Int) -> Void)? = nil
 
     @State private var targetedGeneration: Int? = nil
+
+    private var ruleColor: Color { corporate ? Theme.graphite : Theme.bark }
+    private var ornamentColor: Color { corporate ? Theme.steel : Theme.gold }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -137,13 +190,13 @@ struct FamilyTreeContent: View {
     private var generationJoin: some View {
         VStack(spacing: 3) {
             Rectangle()
-                .fill(Theme.bark.opacity(0.5))
+                .fill(ruleColor.opacity(0.5))
                 .frame(width: 1, height: 7)
-            Image(systemName: "suit.diamond.fill")
-                .font(.system(size: 7))
-                .foregroundStyle(Theme.gold.opacity(0.85))
+            Image(systemName: corporate ? "square.fill" : "suit.diamond.fill")
+                .font(.system(size: corporate ? 5 : 7))
+                .foregroundStyle(ornamentColor.opacity(0.85))
             Rectangle()
-                .fill(Theme.bark.opacity(0.5))
+                .fill(ruleColor.opacity(0.5))
                 .frame(width: 1, height: 7)
         }
         .frame(maxWidth: .infinity)
@@ -155,7 +208,7 @@ struct FamilyTreeContent: View {
             lane(row)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Theme.aegean.opacity(targetedGeneration == row.id ? 0.6 : 0), lineWidth: 2)
+                        .strokeBorder((corporate ? Theme.steel : Theme.aegean).opacity(targetedGeneration == row.id ? 0.6 : 0), lineWidth: 2)
                 )
                 .dropDestination(for: String.self) { items, _ in
                     if let name = items.first { onDropInGeneration(name, row.id) }
@@ -185,7 +238,8 @@ struct FamilyTreeContent: View {
                         ForEach(row.nodes) { node in
                             FamilyNodeView(
                                 node: node,
-                                dragPayload: (dragEnabled && !node.isFocus) ? node.name : nil
+                                dragPayload: (dragEnabled && !node.isFocus) ? node.name : nil,
+                                corporate: corporate
                             )
                         }
                     }
@@ -207,10 +261,10 @@ struct FamilyTreeContent: View {
         HStack(spacing: 8) {
             titleRule
             Text(title)
-                .font(.system(.caption2, design: .serif).weight(.semibold))
+                .font(.system(.caption2, design: corporate ? .default : .serif).weight(.semibold))
                 .textCase(.uppercase)
                 .kerning(1.2)
-                .foregroundStyle(Theme.bark.opacity(0.85))
+                .foregroundStyle(ruleColor.opacity(0.85))
                 .lineLimit(1)
                 .fixedSize()
             titleRule
@@ -219,7 +273,7 @@ struct FamilyTreeContent: View {
 
     private var titleRule: some View {
         Rectangle()
-            .fill(Theme.bark.opacity(0.3))
+            .fill(ruleColor.opacity(0.3))
             .frame(height: 0.5)
             .frame(maxWidth: .infinity)
     }
@@ -227,6 +281,11 @@ struct FamilyTreeContent: View {
     /// Parchment bands: ancestors fade lighter toward the top of the
     /// chart, descendants deepen toward the earth at the bottom.
     private func laneTint(_ generation: Int) -> Color {
+        if corporate {
+            if generation >= 1 { return Theme.steel.opacity(0.16) }
+            if generation == 0 { return Theme.steel.opacity(0.08) }
+            return Theme.graphite.opacity(0.10)
+        }
         if generation >= 1 { return Theme.gold.opacity(generation >= 2 ? 0.13 : 0.10) }
         if generation == 0 { return Theme.gold.opacity(0.06) }
         return Theme.bark.opacity(generation <= -2 ? 0.12 : 0.08)
@@ -236,6 +295,10 @@ struct FamilyTreeContent: View {
 struct FamilyNodeView: View {
     let node: TreeNode
     var dragPayload: String? = nil
+    var corporate = false
+
+    private var ringColor: Color { corporate ? Theme.steel : Theme.gold }
+    private var frameColor: Color { corporate ? Theme.graphite : Theme.bark }
 
     var body: some View {
         if let person = node.linkedPerson {
@@ -274,23 +337,23 @@ struct FamilyNodeView: View {
             )
             .overlay {
                 Circle().stroke(
-                    node.isFocus ? Theme.gold : Theme.gold.opacity(0.55),
+                    node.isFocus ? ringColor : ringColor.opacity(0.55),
                     lineWidth: node.isFocus ? 2.5 : 1.5
                 )
             }
             .overlay {
                 Circle()
-                    .stroke(Theme.bark.opacity(node.isFocus ? 0.6 : 0.35), lineWidth: 0.5)
+                    .stroke(frameColor.opacity(node.isFocus ? 0.6 : 0.35), lineWidth: 0.5)
                     .padding(-3)
             }
             .padding(3)
             Text(node.name)
-                .font(.system(.caption, design: .serif).weight(.semibold))
+                .font(.system(.caption, design: corporate ? .default : .serif).weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
             if !node.relation.isEmpty {
                 Text(node.relation)
-                    .font(.system(.caption2, design: .serif).italic())
+                    .font(.system(.caption2, design: corporate ? .default : .serif).italic())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -305,6 +368,7 @@ struct MyFamilyTreeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
     struct MoveRequest: Identifiable {
         let id = UUID()
@@ -313,8 +377,23 @@ struct MyFamilyTreeView: View {
     }
     @State private var pendingMove: MoveRequest?
 
+    private var workspace: Workspace {
+        Workspace(rawValue: storedWorkspace) ?? .personal
+    }
+
+    /// In Business the same sheet renders a corporate ladder: business
+    /// contacts placed by working relationship (who reports to whom)
+    /// instead of relatives placed by generation.
+    private var isLadder: Bool { workspace == .business }
+
     private var labeled: [Person] {
-        people.filter { !$0.relationshipToUser.trimmed.isEmpty }
+        people.filter {
+            !$0.relationshipToUser.trimmed.isEmpty && $0.isBusiness == isLadder
+        }
+    }
+
+    private func placement(of label: String) -> Int {
+        isLadder ? BusinessRelation.level(of: label) : FamilyRelation.generation(of: label)
     }
 
     private var rows: [TreeRow] {
@@ -326,14 +405,19 @@ struct MyFamilyTreeView: View {
                 linkedPerson: person,
                 isDeceased: person.isDeceased,
                 isFocus: false,
-                generation: FamilyRelation.generation(of: person.relationshipToUser)
+                generation: placement(of: person.relationshipToUser)
             )
         }
         nodes.append(TreeNode(
             name: "You", relation: "", photoData: nil,
             linkedPerson: nil, isDeceased: false, isFocus: true, generation: 0
         ))
-        return buildTreeRows(nodes: nodes, subjectTitle: "You", ensureGenerations: [-2, -1, 0, 1, 2])
+        return buildTreeRows(
+            nodes: nodes,
+            subjectTitle: "You",
+            ensureGenerations: isLadder ? [-1, 0, 1] : [-2, -1, 0, 1, 2],
+            titleFor: isLadder ? { BusinessRelation.rowTitle(for: $0) } : nil
+        )
     }
 
     var body: some View {
@@ -341,27 +425,34 @@ struct MyFamilyTreeView: View {
             ScrollView {
                 if labeled.isEmpty {
                     ContentUnavailableView {
-                        Label("No Tree Yet", systemImage: "tree")
+                        Label(
+                            isLadder ? "No Ladder Yet" : "No Tree Yet",
+                            systemImage: isLadder ? "building.2" : "tree"
+                        )
                     } description: {
-                        Text("Set \"Family Relationship to You\" on your relatives in Edit Person — mother, brother, grandson — and your tree grows itself. Friends and colleagues can be left unset.")
+                        Text(isLadder
+                            ? "Set \"Working Relationship to You\" on your business contacts in Edit Person — manager, client, direct report — and your corporate ladder builds itself."
+                            : "Set \"Family Relationship to You\" on your relatives in Edit Person — mother, brother, grandson — and your tree grows itself. Friends and colleagues can be left unset.")
                     }
                     .padding(.top, 60)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Tap anyone to open their profile. Hold a person and drag them to another row to change how you're related.")
+                        Text(isLadder
+                            ? "Tap anyone to open their profile. Hold a person and drag them to another rung to change how you work together."
+                            : "Tap anyone to open their profile. Hold a person and drag them to another row to change how you're related.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        FamilyTreeContent(rows: rows, dragEnabled: true) { name, generation in
+                        FamilyTreeContent(rows: rows, dragEnabled: true, corporate: isLadder) { name, generation in
                             handleDrop(name: name, generation: generation)
                         }
-                        .historicalTreePlate()
+                        .historicalTreePlate(corporate: isLadder)
                         .mementoCard(padding: 10)
                     }
                     .padding()
                 }
             }
-            .background(Theme.background)
-            .navigationTitle("My Family Tree")
+            .background(workspace.background)
+            .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -379,12 +470,15 @@ struct MyFamilyTreeView: View {
                 titleVisibility: .visible,
                 presenting: pendingMove
             ) { move in
-                ForEach(FamilyRelation.labels(forGeneration: move.generation), id: \.self) { label in
+                let choices = isLadder
+                    ? BusinessRelation.labels(forLevel: move.generation)
+                    : FamilyRelation.labels(forGeneration: move.generation)
+                ForEach(choices, id: \.self) { label in
                     Button(label) { apply(label: label, to: move.person) }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { move in
-                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong in that row are offered.")
+                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong in that \(isLadder ? "rung" : "row") are offered.")
             }
         }
     }
@@ -393,7 +487,10 @@ struct MyFamilyTreeView: View {
     /// labeled "You & your generation", not rowTitle's "You & their
     /// generation".
     private func destinationName(for generation: Int) -> String {
-        generation == 0
+        if isLadder {
+            return generation == 0 ? "your rung" : BusinessRelation.rowTitle(for: generation).lowercased()
+        }
+        return generation == 0
             ? "your generation"
             : FamilyRelation.rowTitle(for: generation, subject: "You").lowercased()
     }
@@ -407,7 +504,7 @@ struct MyFamilyTreeView: View {
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
         guard matches.count == 1, let person = matches.first else { return }
-        guard FamilyRelation.generation(of: person.relationshipToUser) != generation else { return }
+        guard placement(of: person.relationshipToUser) != generation else { return }
         pendingMove = MoveRequest(person: person, generation: generation)
     }
 
@@ -535,18 +632,33 @@ private var treeParchmentGradient: LinearGradient {
 /// Dresses a tree in its historical-chart plate: parchment fill plus the
 /// fine inner rule that gives engraved certificates their double border.
 private struct HistoricalPlate: ViewModifier {
+    var corporate = false
+
     func body(content: Content) -> some View {
         content
-            .background(treeParchmentGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(
+                corporate ? corporateSlateGradient : treeParchmentGradient,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Theme.bark.opacity(0.28), lineWidth: 0.5)
+                    .strokeBorder((corporate ? Theme.graphite : Theme.bark).opacity(0.28), lineWidth: 0.5)
                     .padding(4)
                     .allowsHitTesting(false)
             }
     }
 }
 
+/// The ladder's backing: cool brushed slate instead of aged parchment.
+private var corporateSlateGradient: LinearGradient {
+    LinearGradient(
+        colors: [Theme.steel.opacity(0.10), Theme.graphite.opacity(0.14)],
+        startPoint: .top, endPoint: .bottom
+    )
+}
+
 extension View {
-    func historicalTreePlate() -> some View { modifier(HistoricalPlate()) }
+    func historicalTreePlate(corporate: Bool = false) -> some View {
+        modifier(HistoricalPlate(corporate: corporate))
+    }
 }

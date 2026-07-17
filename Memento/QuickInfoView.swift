@@ -51,7 +51,11 @@ struct QuickInfoView: View {
     @ViewBuilder
     private var rows: some View {
         if !person.relationshipToUser.isEmpty {
-            InfoRow(icon: "person", label: "Relationship", value: "Your \(person.relationshipToUser.lowercased())")
+            InfoRow(
+                icon: person.isBusiness ? "person.crop.rectangle" : "person",
+                label: person.isBusiness ? "Working Relationship" : "Relationship",
+                value: "Your \(person.relationshipToUser.lowercased())"
+            )
         }
         if let birthday = person.birthday {
             dateRow(
