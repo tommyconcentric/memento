@@ -204,6 +204,8 @@ extension View {
 struct PillPicker<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(Value, String)]
+    var accent: Color = Theme.aegean
+    var fontDesign: Font.Design = .serif
     @Namespace private var indicator
 
     var body: some View {
@@ -216,13 +218,13 @@ struct PillPicker<Value: Hashable>: View {
                 } label: {
                     VStack(spacing: 9) {
                         Text(label)
-                            .font(.system(.subheadline, design: .serif))
+                            .font(.system(.subheadline, design: fontDesign))
                             .fontWeight(selection == value ? .semibold : .regular)
-                            .foregroundStyle(selection == value ? Theme.aegean : Color.secondary)
+                            .foregroundStyle(selection == value ? accent : Color.secondary)
                         ZStack {
                             if selection == value {
                                 Rectangle()
-                                    .fill(Theme.aegean)
+                                    .fill(accent)
                                     .matchedGeometryEffect(id: "underline", in: indicator)
                             }
                         }
@@ -237,7 +239,7 @@ struct PillPicker<Value: Hashable>: View {
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Theme.aegean.opacity(0.15))
+                .fill(accent.opacity(0.15))
                 .frame(height: 1)
         }
     }

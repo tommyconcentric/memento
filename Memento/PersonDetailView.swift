@@ -34,7 +34,9 @@ struct PersonDetailView: View {
 
                 PillPicker(
                     selection: $tab,
-                    options: DetailTab.allCases.map { ($0, $0.rawValue) }
+                    options: DetailTab.allCases.map { ($0, $0.rawValue) },
+                    accent: person.workspace.accent,
+                    fontDesign: person.workspace.displayFontDesign
                 )
 
                 switch tab {
@@ -50,7 +52,7 @@ struct PersonDetailView: View {
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
-        .background(Theme.background)
+        .background(person.workspace.background)
         .navigationTitle(person.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -108,7 +110,7 @@ struct PersonDetailView: View {
             .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
 
             Text(person.name)
-                .font(.system(.title2, design: .serif, weight: .semibold))
+                .font(.system(.title2, design: person.workspace.displayFontDesign, weight: .semibold))
                 .foregroundStyle(.white)
 
             HStack(spacing: 8) {

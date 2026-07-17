@@ -153,7 +153,7 @@ struct PeopleListView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(Theme.background)
+        .background(workspace.background)
         .navigationTitle("Memento")
         .searchable(text: $searchText, prompt: "Search by name, company, hobby")
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
@@ -225,7 +225,7 @@ struct PeopleListView: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 10)
-            .background(Theme.background)
+            .background(workspace.background)
         }
     }
 
@@ -260,7 +260,7 @@ struct PeopleListView: View {
                     recentlyUnpinned.removeAll()
                 } label: {
                     Label(option.title, systemImage: option.icon)
-                        .font(.system(.subheadline, design: .serif).weight(isActive ? .semibold : .regular))
+                        .font(.system(.subheadline, design: option.displayFontDesign).weight(isActive ? .semibold : .regular))
                         .foregroundStyle(isActive ? .white : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -276,7 +276,7 @@ struct PeopleListView: View {
             }
         }
         .padding(3)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(workspace.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder(.quaternary, lineWidth: 0.5)
@@ -288,13 +288,13 @@ struct PeopleListView: View {
             VStack(spacing: 14) {
                 LogoMark(size: 56, colorScheme: logoColorScheme)
                 Text("Pick Someone")
-                    .font(.system(.title3, design: .serif, weight: .semibold))
+                    .font(.system(.title3, design: workspace.displayFontDesign, weight: .semibold))
             }
         } description: {
             Text("Choose a person to see their details, family tree and notes.")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.background)
+        .background(workspace.background)
     }
 
     private func delete(_ person: Person) {
@@ -422,6 +422,6 @@ struct PersonRow: View {
                 Label(person.isPinned ? "Unpin" : "Pin to Top", systemImage: person.isPinned ? "pin.slash" : "pin")
             }
         }
-        .listRowBackground(isSelected ? selectionAccent : Theme.card)
+        .listRowBackground(isSelected ? selectionAccent : person.workspace.card)
     }
 }

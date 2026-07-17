@@ -23,6 +23,7 @@ struct MementoApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLock.enabledKey) private var appLockEnabled = false
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
     // Only lock when a PIN actually exists to unlock with. The enabled flag
     // lives in UserDefaults (restored onto a new device by backup/migration)
     // but the PIN is ThisDeviceOnly in the Keychain (not restored) — locking
@@ -39,7 +40,9 @@ struct MementoApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .tint(Theme.aegean)
+                // Tint follows the active workspace so every control in
+                // the app speaks the current mode's accent.
+                .tint((Workspace(rawValue: storedWorkspace) ?? .personal).accent)
                 // The lock lives in its own UIWindow (LockScreenPresenter)
                 // rather than an in-hierarchy overlay: SwiftUI sheets are
                 // presented above the root view, so an overlay would leave
