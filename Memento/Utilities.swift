@@ -86,6 +86,17 @@ extension UIImage {
 
 // MARK: - Avatar
 
+/// Decoded-avatar cache: SwiftUI recreates rows constantly while
+/// scrolling, and re-decoding a ~200 KB JPEG per row per frame is what
+/// makes a several-hundred-person list stutter. Keyed by the photo Data
+/// (NSData hashing is far cheaper than a decode); capped so photo-heavy
+/// stores don't balloon memory.
+private let avatarImageCache: NSCache<NSData, UIImage> = {
+    let cache = NSCache<NSData, UIImage>()
+    cache.countLimit = 300
+    return cache
+}()
+
 /// Circular profile photo, or gradient initials when no photo is set.
 struct AvatarView: View {
     let data: Data?
@@ -93,9 +104,17 @@ struct AvatarView: View {
     var size: CGFloat = 44
     var desaturated: Bool = false
 
+    private func decodedImage(_ data: Data) -> UIImage? {
+        let key = data as NSData
+        if let cached = avatarImageCache.object(forKey: key) { return cached }
+        guard let image = UIImage(data: data) else { return nil }
+        avatarImageCache.setObject(image, forKey: key)
+        return image
+    }
+
     var body: some View {
         Group {
-            if let data, let uiImage = UIImage(data: data) {
+            if let data, let uiImage = decodedImage(data) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
