@@ -36,6 +36,8 @@ struct SettingsView: View {
     @State private var showingResetConfirm = false
     @State private var resetNote: String?
 
+    @State private var showingImport = false
+
     var body: some View {
         NavigationStack {
             Form {
@@ -85,6 +87,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Label("Import from Contacts…", systemImage: "square.and.arrow.down")
+                    }
+                } header: {
+                    Text("Contacts")
+                } footer: {
+                    Text("Pick people from your contacts — names, photos, birthdays and every number, email and address come along.")
+                }
+
+                Section {
                     Toggle("Require a PIN to open Memento", isOn: appLockToggleBinding)
                     if appLockEnabled {
                         if AppLock.biometryType != .none {
@@ -130,6 +144,9 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showingImport) {
+                ImportContactsView()
             }
             .sheet(isPresented: $showingPINSetup) {
                 PINSetupView(
