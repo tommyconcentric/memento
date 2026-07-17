@@ -177,7 +177,10 @@ struct FamilyTreeContent: View {
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 10)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
+                // A crowded generation overflows its lane sideways; the
+                // visible indicator is what makes that scrollable at all
+                // with a mouse on the Mac, where there's no swipe.
+                ScrollView(.horizontal, showsIndicators: true) {
                     HStack(spacing: 12) {
                         ForEach(row.nodes) { node in
                             FamilyNodeView(
@@ -189,6 +192,7 @@ struct FamilyTreeContent: View {
                     .padding(.horizontal, 2)
                     .frame(maxWidth: .infinity)
                 }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
         }
         .padding(.vertical, 10)
