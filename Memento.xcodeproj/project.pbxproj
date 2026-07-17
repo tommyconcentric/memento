@@ -272,6 +272,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Memento/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Memento;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Memento adds a calendar of everyone's birthdays and important dates so you can see them in the Calendar app.";
@@ -316,6 +317,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Memento/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Memento;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Memento adds a calendar of everyone's birthdays and important dates so you can see them in the Calendar app.";

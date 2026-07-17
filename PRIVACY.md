@@ -37,4 +37,4 @@ If Memento's privacy practices ever change (for example, if a future feature req
 
 ## Contact
 
-Questions or concerns: **tommy@concentric.health**
+Questions or concerns: **tommyle@outlook.com**
