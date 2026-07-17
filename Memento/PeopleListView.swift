@@ -11,6 +11,10 @@ struct PeopleListView: View {
 
     @State private var selectedPerson: Person?
     @State private var searchText = ""
+    // People unpinned from the list stay in the Pinned section until the
+    // user leaves the list, so a stray tap on the pin is easy to undo in
+    // place instead of the row instantly jumping back to its folder.
+    @State private var recentlyUnpinned: Set<PersistentIdentifier> = []
     @State private var showingAddPerson = false
     @State private var showingFolders = false
     @State private var showingSettings = false
@@ -31,6 +35,17 @@ struct PeopleListView: View {
 
     private var workspacePeople: [Person] {
         people.filter { $0.isBusiness == (workspace == .business) }
+    }
+
+    /// True while any sheet covers the list — the moment the user has
+    /// "navigated away" and pending unpins can settle into their folders.
+    private var isCoveredBySheet: Bool {
+        showingAddPerson || showingFolders || showingSettings || showingTree
+            || showingCalendar || showingImport || showingAbout
+    }
+
+    private func showsInPinnedSection(_ person: Person) -> Bool {
+        person.isPinned || recentlyUnpinned.contains(person.persistentModelID)
     }
 
     private var filteredPeople: [Person] {
@@ -79,6 +94,21 @@ struct PeopleListView: View {
         .sheet(isPresented: $showingAbout) {
             AboutView()
         }
+        .onChange(of: isCoveredBySheet) { _, covered in
+            if covered {
+                recentlyUnpinned.removeAll()
+            }
+        }
+    }
+
+    private func row(for person: Person) -> some View {
+        PersonRow(
+            person: person,
+            isSelected: selectedPerson?.persistentModelID == person.persistentModelID,
+            onDelete: { delete(person) },
+            onTogglePin: { togglePin(person) }
+        )
+        .tag(person)
     }
 
     // MARK: - Sidebar (people list)
@@ -87,12 +117,11 @@ struct PeopleListView: View {
         List(selection: $selectedPerson) {
             // Pinned people ride at the very top, across every folder, until
             // unpinned — handy for someone you're about to see.
-            let pinned = filteredPeople.filter(\.isPinned)
+            let pinned = filteredPeople.filter { showsInPinnedSection($0) }
             if !pinned.isEmpty {
                 Section {
                     ForEach(pinned) { person in
-                        PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
-                            .tag(person)
+                        row(for: person)
                     }
                 } header: {
                     Label("Pinned", systemImage: "pin.fill")
@@ -101,13 +130,12 @@ struct PeopleListView: View {
 
             ForEach(groups) { group in
                 let members = filteredPeople.filter {
-                    !$0.isPinned && $0.group?.persistentModelID == group.persistentModelID
+                    !showsInPinnedSection($0) && $0.group?.persistentModelID == group.persistentModelID
                 }
                 if !members.isEmpty {
                     Section {
                         ForEach(members) { person in
-                            PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
-                                .tag(person)
+                            row(for: person)
                         }
                     } header: {
                         Text("\(group.name) · \(members.count)")
@@ -115,15 +143,17 @@ struct PeopleListView: View {
                 }
             }
 
-            let ungrouped = filteredPeople.filter { !$0.isPinned && $0.group == nil }
+            let ungrouped = filteredPeople.filter { !showsInPinnedSection($0) && $0.group == nil }
             if !ungrouped.isEmpty {
                 Section("Ungrouped") {
                     ForEach(ungrouped) { person in
-                        PersonRow(person: person, onDelete: { delete(person) }, onTogglePin: { togglePin(person) })
-                            .tag(person)
+                        row(for: person)
                     }
                 }
             }
+        }
+        .onDisappear {
+            recentlyUnpinned.removeAll()
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -147,6 +177,7 @@ struct PeopleListView: View {
                             guard option != workspace else { return }
                             storedWorkspace = option.rawValue
                             selectedPerson = nil
+                            recentlyUnpinned.removeAll()
                         } label: {
                             if option == workspace {
                                 Label("Memento \(option.title)", systemImage: "checkmark")
@@ -256,7 +287,13 @@ struct PeopleListView: View {
     }
 
     private func togglePin(_ person: Person) {
-        person.isPinned.toggle()
+        if person.isPinned {
+            person.isPinned = false
+            recentlyUnpinned.insert(person.persistentModelID)
+        } else {
+            person.isPinned = true
+            recentlyUnpinned.remove(person.persistentModelID)
+        }
         try? context.save()
     }
 }
@@ -265,8 +302,33 @@ struct PeopleListView: View {
 
 struct PersonRow: View {
     let person: Person
+    var isSelected = false
     var onDelete: () -> Void
     var onTogglePin: () -> Void
+
+    /// Selection paints the row in the workspace accent, so every color in
+    /// the row is chosen explicitly against it — relying on `.primary` /
+    /// `.secondary` is what made selected names vanish on the Mac, where the
+    /// system flips row content to white over our custom row background.
+    private var selectionAccent: Color {
+        person.isBusiness ? Theme.graphite : Theme.aegean
+    }
+
+    private var nameColor: Color {
+        if isSelected { return .white }
+        return person.isDeceased ? Color.secondary : Color.primary
+    }
+
+    private var detailColor: Color {
+        isSelected ? Color.white.opacity(0.8) : Color.secondary
+    }
+
+    private var pinColor: Color {
+        if person.isPinned {
+            return isSelected ? .white : Theme.gold
+        }
+        return isSelected ? Color.white.opacity(0.55) : Color.secondary.opacity(0.45)
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -281,22 +343,17 @@ struct PersonRow: View {
                 HStack(spacing: 5) {
                     Text(person.name)
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(person.isDeceased ? .secondary : .primary)
-                    if person.isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.gold)
-                    }
+                        .foregroundStyle(nameColor)
                     if person.isDeceased {
                         Image(systemName: "leaf")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(detailColor)
                     }
                 }
                 if !person.subtitle.isEmpty {
                     Text(person.subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(detailColor)
                         .lineLimit(1)
                 }
             }
@@ -306,11 +363,26 @@ struct PersonRow: View {
             if !person.isDeceased, let days = person.daysUntilNextBirthday, days <= 14 {
                 Text(days == 0 ? "🎂 today" : "🎂 \(days)d")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Theme.bougainvillea)
+                    .foregroundStyle(isSelected ? .white : Theme.bougainvillea)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Theme.bougainvillea.opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(
+                        isSelected ? Color.white.opacity(0.18) : Theme.bougainvillea.opacity(0.15),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
             }
+
+            Button(action: onTogglePin) {
+                Image(systemName: person.isPinned ? "pin.fill" : "pin")
+                    .font(.callout)
+                    .foregroundStyle(pinColor)
+                    .frame(width: 32, height: 32)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            // Borderless keeps the tap on the pin itself — a default button
+            // inside a List row would swallow taps meant to select the row.
+            .buttonStyle(.borderless)
+            .accessibilityLabel(person.isPinned ? "Unpin \(person.name)" : "Pin \(person.name) to top")
         }
         .padding(.vertical, 3)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -329,6 +401,6 @@ struct PersonRow: View {
                 Label(person.isPinned ? "Unpin" : "Pin to Top", systemImage: person.isPinned ? "pin.slash" : "pin")
             }
         }
-        .listRowBackground(Theme.card)
+        .listRowBackground(isSelected ? selectionAccent : Theme.card)
     }
 }
