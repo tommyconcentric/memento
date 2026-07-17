@@ -100,6 +100,9 @@ struct RootView: View {
             .onAppear {
                 seedDefaultGroupsIfNeeded()
                 mergeDuplicateBuiltInGroups()
+                #if DEBUG
+                StressSeeder.seedIfRequested(context)
+                #endif
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
