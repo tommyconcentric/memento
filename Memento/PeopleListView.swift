@@ -20,7 +20,6 @@ struct PeopleListView: View {
     @State private var showingSettings = false
     @State private var showingTree = false
     @State private var showingCalendar = false
-    @State private var showingImport = false
     @State private var showingAbout = false
     @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
@@ -41,7 +40,7 @@ struct PeopleListView: View {
     /// "navigated away" and pending unpins can settle into their folders.
     private var isCoveredBySheet: Bool {
         showingAddPerson || showingFolders || showingSettings || showingTree
-            || showingCalendar || showingImport || showingAbout
+            || showingCalendar || showingAbout
     }
 
     private func showsInPinnedSection(_ person: Person) -> Bool {
@@ -87,9 +86,6 @@ struct PeopleListView: View {
         }
         .sheet(isPresented: $showingCalendar) {
             CalendarView()
-        }
-        .sheet(isPresented: $showingImport) {
-            ImportContactsView()
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()
@@ -195,17 +191,6 @@ struct PeopleListView: View {
                     Image(systemName: "calendar")
                 }
                 .accessibilityLabel("Important dates calendar")
-                Menu {
-                    Button("New Person", systemImage: "person.badge.plus") {
-                        showingAddPerson = true
-                    }
-                    Button("Import Contacts…", systemImage: "square.and.arrow.down") {
-                        showingImport = true
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add or import people")
             }
         }
         .overlay {
@@ -233,12 +218,33 @@ struct PeopleListView: View {
         // This bar makes the active mode readable at a glance and the
         // switch a single visible tap, on every device.
         .safeAreaInset(edge: .top, spacing: 0) {
-            workspaceSwitcher
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 10)
-                .background(Theme.background)
+            HStack(spacing: 10) {
+                workspaceSwitcher
+                addPersonButton
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
+            .background(Theme.background)
         }
+    }
+
+    /// Lives in the pinned bar for the same reason as the switcher: a
+    /// toolbar "+" disappears into the overflow "…" menu on iPad and the
+    /// Mac, and adding someone is the app's most basic action.
+    private var addPersonButton: some View {
+        Button {
+            showingAddPerson = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(workspace.accent, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add person")
     }
 
     private var workspaceSwitcher: some View {
