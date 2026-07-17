@@ -22,14 +22,18 @@ struct CalendarView: View {
     }
 
     var body: some View {
+        // Computed once per render: eventsByDay walks every person's dates,
+        // and evaluating it per day cell (31×) plus the selected-day list
+        // made month navigation crawl with a few hundred contacts.
+        let events = eventsByDay
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     monthHeader
                     weekdayHeader
-                    dayGrid
+                    dayGrid(events)
                     Divider()
-                    selectedDaySection
+                    selectedDaySection(events)
                 }
                 .padding()
             }
@@ -107,11 +111,11 @@ struct CalendarView: View {
         return Array(repeating: nil, count: leadingBlanks) + dayRange.map { Optional($0) }
     }
 
-    private var dayGrid: some View {
+    private func dayGrid(_ events: [Int: [DayEvent]]) -> some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
             ForEach(Array(monthDays.enumerated()), id: \.offset) { _, day in
                 if let day {
-                    dayCell(day)
+                    dayCell(day, events[day] ?? [])
                 } else {
                     Color.clear.frame(height: 54)
                 }
@@ -119,8 +123,7 @@ struct CalendarView: View {
         }
     }
 
-    private func dayCell(_ day: Int) -> some View {
-        let events = eventsByDay[day] ?? []
+    private func dayCell(_ day: Int, _ events: [DayEvent]) -> some View {
         let isSelected = selectedDay == day
         return Button {
             selectedDay = day
@@ -194,7 +197,7 @@ struct CalendarView: View {
         return map
     }
 
-    private var selectedDaySection: some View {
+    private func selectedDaySection(_ eventsByDay: [Int: [DayEvent]]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let day = selectedDay {
                 let events = eventsByDay[day] ?? []
