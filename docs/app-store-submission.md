@@ -6,7 +6,7 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 
 ## Listing copy (paste into App Store Connect)
 
-**Name:** Memento
+**Name:** Memento Vivere (plain "Memento" was taken at app creation, July 2026). The app itself still shows "Memento" on the Home Screen and in its UI — a store name and bundle display name are allowed to differ.
 
 **Subtitle** (30 chars max): `Remember everyone who matters`
 
@@ -93,7 +93,7 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [ ] CloudKit Console (icloud.developer.apple.com) → container `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production**. A TestFlight/App Store build talks to the *production* CloudKit environment; without this, sync silently fails for release users. Redo this any time the SwiftData schema changes.
 
 **App Store Connect**
-- [ ] Create the app: bundle ID `brickcedar.Memento`, name "Memento" (have 2–3 fallback names ready — plain "Memento" may be taken; e.g. "Memento — Personal CRM").
+- [x] Create the app: bundle ID `brickcedar.Memento`, store name "Memento Vivere" (plain "Memento" was taken). iOS platform only — Mac availability comes from the "Make this app available on Mac" checkbox, not the macOS platform.
 - [ ] Paste in the listing copy, keywords, URLs and privacy answers above.
 - [ ] **Pricing & Availability → confirm "Make this app available on Mac"** (iPhone & iPad Apps on Apple Silicon Macs) is ON — that's the Mac App Store presence for this project. (A native Mac Catalyst app would be a separate future project.)
 - [ ] Upload screenshots (iPhone 6.9" + iPad 13").
