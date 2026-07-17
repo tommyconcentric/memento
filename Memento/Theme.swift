@@ -29,6 +29,18 @@ enum Theme {
         dark: UIColor(red: 0.082, green: 0.161, blue: 0.227, alpha: 1)      // #15293A
     )
 
+    /// Business workspace surfaces: the holiday whitewash swaps for a cool
+    /// boardroom slate so the two modes read differently at a glance.
+    static let businessBackground = dynamic(
+        light: UIColor(red: 0.949, green: 0.957, blue: 0.965, alpha: 1),    // #F2F4F6
+        dark: UIColor(red: 0.055, green: 0.078, blue: 0.106, alpha: 1)      // #0E141B
+    )
+
+    static let businessCard = dynamic(
+        light: .white,
+        dark: UIColor(red: 0.106, green: 0.137, blue: 0.176, alpha: 1)      // #1B232D
+    )
+
     private static func dynamic(light: UIColor, dark: UIColor) -> Color {
         Color(UIColor { $0.userInterfaceStyle == .dark ? dark : light })
     }
@@ -48,4 +60,19 @@ enum Workspace: String, CaseIterable {
     var title: String { self == .personal ? "Personal" : "Business" }
     var icon: String { self == .personal ? "person.2" : "briefcase" }
     var accent: Color { self == .personal ? Theme.aegean : Theme.graphite }
+
+    /// Personal keeps the warm serif voice; Business drops to the system
+    /// sans for a plainer, corporate register. Every view that renders
+    /// display text (names, tab labels, empty states) should pick its
+    /// design through this rather than hardcoding `.serif`.
+    var displayFontDesign: Font.Design { self == .personal ? .serif : .default }
+
+    var background: Color { self == .personal ? Theme.background : Theme.businessBackground }
+    var card: Color { self == .personal ? Theme.card : Theme.businessCard }
+}
+
+extension Person {
+    /// The workspace this person belongs to — the hook for per-person
+    /// theming (detail hero, row cards) matching their side of the app.
+    var workspace: Workspace { isBusiness ? .business : .personal }
 }
