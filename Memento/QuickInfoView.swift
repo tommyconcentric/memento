@@ -14,6 +14,10 @@ struct QuickInfoView: View {
             if person.hasAnyQuickInfo {
                 infoCard
 
+                if !person.projectsArray.isEmpty {
+                    projectsCard
+                }
+
                 if person.birthday != nil || !person.importantDatesArray.isEmpty {
                     Text("Toggle a date to turn its reminder on or off — every date still shows on the Memento calendar either way.")
                         .font(.caption2)
@@ -38,6 +42,38 @@ struct QuickInfoView: View {
                 .padding(.vertical)
             }
         }
+    }
+
+    /// Shared work with this contact: ongoing first, wrapped-up history
+    /// below. Edited from the same editor as everything else.
+    private var projectsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Projects")
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .kerning(1.1)
+                .foregroundStyle(.secondary)
+            ForEach(person.sortedProjects) { project in
+                HStack(spacing: 10) {
+                    Image(systemName: project.isCompleted ? "checkmark.circle.fill" : "circle.dashed")
+                        .foregroundStyle(project.isCompleted ? Theme.olive : Color.accentColor)
+                    Text(project.name)
+                        .font(.body)
+                    Spacer(minLength: 0)
+                    Text(project.isCompleted ? "Completed" : "Ongoing")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            (project.isCompleted ? Theme.olive : Theme.steel).opacity(0.15),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                        .foregroundStyle(project.isCompleted ? Theme.olive : Theme.graphite)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .mementoCard()
     }
 
     private var infoCard: some View {

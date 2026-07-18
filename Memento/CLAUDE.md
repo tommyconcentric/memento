@@ -15,7 +15,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 ## File map
 
 - `MementoApp.swift` — entry point, SwiftData container (register every new `@Model` here), seeds starter folders once (`didSeedDefaultGroups` in UserDefaults).
-- `Models.swift` — `Person`, `PersonGroup` (folders), `NoteEntry`, `EventPhoto`, `ImportantDate`, `FamilyMember` + helper extensions. `Person.birthdayReminderEnabled` and `ImportantDate.remindersEnabled` (both default `true`) gate NotificationManager scheduling per-date; they don't affect CalendarView or CalendarSyncManager, which always show/sync every date.
+- `Models.swift` — `Person`, `PersonGroup` (folders), `NoteEntry`, `EventPhoto`, `ImportantDate`, `FamilyMember`, `Project` (business shared work, ongoing/completed) + helper extensions. `Person.birthdayReminderEnabled` and `ImportantDate.remindersEnabled` (both default `true`) gate NotificationManager scheduling per-date; they don't affect CalendarView or CalendarSyncManager, which always show/sync every date.
 - `Theme.swift` — Mamma Mia palette (aegean, sky, bougainvillea, sunshine, olive, terracotta, gold; dynamic `background`/`card`).
 - `Utilities.swift` — `AvatarView`, `InfoRow`, `.mementoCard()` modifier, `PillPicker`, `UIImage.compressedData`, `String.trimmed`/`personInitials`, `Date.daysUntilNextOccurrence`.
 - `PeopleListView.swift` — split view, sidebar list with selection, toolbar (settings/folders/tree/calendar/add-import menu).
@@ -51,7 +51,8 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 ## Gotchas
 
 - **CloudKit schema validation is runtime-only.** `xcodebuild build` compiling cleanly proves nothing about the CloudKit configuration — SwiftData only validates the schema (every to-many relationship Optional, every attribute has a default) when the `ModelContainer` is actually constructed at launch. A bad schema change will build fine and then crash on first launch with "CloudKit integration requires that all relationships be optional." Always actually run the app after touching `Models.swift`, not just build it.
-- To-many relationships (`notes`, `importantDates`, `familyMembers`, `people`, `photos`) are declared `Optional` in `Models.swift` for that reason — use the non-optional `notesArray`/`importantDatesArray`/`familyMembersArray`/`peopleArray`/`photosArray` computed accessors everywhere else; don't reintroduce raw non-optional array properties.
+- To-many relationships (`notes`, `importantDates`, `familyMembers`, `people`, `photos`, `contactFields`, `projects`) are declared `Optional` in `Models.swift` for that reason — use the non-optional `notesArray`/`importantDatesArray`/`familyMembersArray`/`peopleArray`/`photosArray`/`contactFieldsArray`/`projectsArray` computed accessors everywhere else; don't reintroduce raw non-optional array properties.
+- **Workspaces diverge on purpose:** Business swaps the accent (graphite), surfaces (`Workspace.background`/`card`) and display type (`Workspace.displayFontDesign` — sans, vs Personal's serif), business profiles use `BusinessRelation` (working relationships → corporate ladder) while their links to *other* people stay family, and `Project` rows only get an editor section on business profiles.
 - If an old `PeopleNotesApp.swift` exists from the first version, **delete it** — `MementoApp.swift` is the entry point now.
 - The SwiftData schema grew over versions (isDeceased, relationshipToUser, address, FamilyMember). After replacing sources over an old build, delete the installed app from the simulator/device once.
 - Speech recognition is flaky on the Simulator; test dictation on hardware.
