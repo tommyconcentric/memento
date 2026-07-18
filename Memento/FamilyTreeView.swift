@@ -57,6 +57,16 @@ enum FamilyRelation {
         return matching.isEmpty ? ["Family"] : matching
     }
 
+    /// Only preset relations earn a place on the family tree. Custom
+    /// "Other…" relationships stay off the chart by design — and keyword
+    /// sniffing is no substitute, since a custom label like "childhood
+    /// neighbour" would substring-match "child" straight into the
+    /// children's lane. Nothing but the editor's preset picker has ever
+    /// written this field, so exact matching loses no legacy data.
+    static func isChartable(_ label: String) -> Bool {
+        presets.contains { $0.compare(label, options: .caseInsensitive) == .orderedSame }
+    }
+
     static func rowTitle(for generation: Int, subject: String) -> String {
         switch generation {
         case 3...: return "Great-grandparents"
@@ -97,6 +107,12 @@ enum BusinessRelation {
             return 1
         }
         return 0
+    }
+
+    /// Only preset working relationships climb the ladder — custom
+    /// "Other…" labels describe the relationship without charting it.
+    static func isChartable(_ label: String) -> Bool {
+        presets.contains { $0.compare(label, options: .caseInsensitive) == .orderedSame }
     }
 
     /// Labels that belong to a ladder level (for the drag-to-move chooser).
@@ -388,7 +404,11 @@ struct MyFamilyTreeView: View {
 
     private var labeled: [Person] {
         people.filter {
-            !$0.relationshipToUser.trimmed.isEmpty && $0.isBusiness == isLadder
+            let label = $0.relationshipToUser.trimmed
+            guard !label.isEmpty, $0.isBusiness == isLadder else { return false }
+            // Custom "Other…" relationships describe someone without
+            // placing them on the chart.
+            return isLadder ? BusinessRelation.isChartable(label) : FamilyRelation.isChartable(label)
         }
     }
 
