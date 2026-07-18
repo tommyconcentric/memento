@@ -11,8 +11,13 @@ struct QuickInfoView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            if person.hasAnyQuickInfo {
-                infoCard
+            // Projects count as content in their own right — a profile
+            // holding nothing but shared projects must not fall into the
+            // "No Details Yet" empty state and hide them.
+            if person.hasAnyQuickInfo || !person.projectsArray.isEmpty {
+                if person.hasAnyQuickInfo {
+                    infoCard
+                }
 
                 if !person.projectsArray.isEmpty {
                     projectsCard
