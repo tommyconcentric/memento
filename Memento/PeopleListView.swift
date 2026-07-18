@@ -182,9 +182,9 @@ struct PeopleListView: View {
                 Button {
                     showingTree = true
                 } label: {
-                    Image(systemName: "tree")
+                    Image(systemName: workspace == .business ? "building.2" : "tree")
                 }
-                .accessibilityLabel("My family tree")
+                .accessibilityLabel(workspace == .business ? "Corporate ladder" : "My family tree")
                 Button {
                     showingCalendar = true
                 } label: {

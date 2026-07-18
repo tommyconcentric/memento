@@ -44,6 +44,12 @@ struct PersonEditorView: View {
 
     @State private var loadedInitial = false
 
+    /// Business profiles pick from working relationships (they build the
+    /// corporate ladder); personal ones keep the family vocabulary.
+    private var relationshipPresets: [String] {
+        isBusiness ? BusinessRelation.presets : FamilyRelation.presets
+    }
+
     // Legacy free-text family fields are only shown when they already
     // hold data from an earlier version — new profiles record family
     // through named members instead. Captured once at load so a field
@@ -113,14 +119,22 @@ struct PersonEditorView: View {
                 Section {
                     Picker("They're your…", selection: $relationshipToUser) {
                         Text("Not set").tag("")
-                        ForEach(FamilyRelation.presets, id: \.self) { label in
+                        // A value picked in the other workspace stays
+                        // selectable, so flipping the workspace toggle
+                        // doesn't silently blank the relationship.
+                        if !relationshipToUser.isEmpty && !relationshipPresets.contains(relationshipToUser) {
+                            Text(relationshipToUser).tag(relationshipToUser)
+                        }
+                        ForEach(relationshipPresets, id: \.self) { label in
                             Text(label).tag(label)
                         }
                     }
                 } header: {
-                    Text("Family Relationship to You")
+                    Text(isBusiness ? "Working Relationship to You" : "Family Relationship to You")
                 } footer: {
-                    Text("Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family.")
+                    Text(isBusiness
+                        ? "Colleague, client, manager, mentor — this is what places them on your corporate ladder and tells you at a glance how you work together."
+                        : "Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family.")
                 }
 
                 Section("Birthday") {
