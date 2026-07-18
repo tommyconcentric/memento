@@ -41,6 +41,7 @@ struct PersonEditorView: View {
     @State private var draftFamilyMembers: [DraftFamilyMember] = []
     @State private var draftDates: [DraftDate] = []
     @State private var draftContacts: [DraftContact] = []
+    @State private var draftProjects: [DraftProject] = []
 
     @State private var loadedInitial = false
 
@@ -77,6 +78,12 @@ struct PersonEditorView: View {
         let id = UUID()
         var name = ""
         var relation = "Mother"
+    }
+
+    struct DraftProject: Identifiable {
+        let id = UUID()
+        var name = ""
+        var isCompleted = false
     }
 
     enum PickTarget: Identifiable {
@@ -202,6 +209,10 @@ struct PersonEditorView: View {
                 Section("Work") {
                     TextField("Job title", text: $jobTitle)
                     TextField("Company", text: $company)
+                }
+
+                if isBusiness {
+                    projectsSection
                 }
 
                 Section("Hobbies & Interests") {
@@ -388,6 +399,36 @@ struct PersonEditorView: View {
         }
     }
 
+    private var projectsSection: some View {
+        Section {
+            ForEach($draftProjects) { $draft in
+                HStack {
+                    TextField("Project name", text: $draft.name)
+                    Picker("", selection: $draft.isCompleted) {
+                        Text("Ongoing").tag(false)
+                        Text("Completed").tag(true)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    rowDeleteButton(label: "Remove this project") {
+                        draftProjects.removeAll { $0.id == draft.id }
+                    }
+                }
+            }
+            .onDelete { draftProjects.remove(atOffsets: $0) }
+
+            Button {
+                draftProjects.append(DraftProject())
+            } label: {
+                Label("Add Project", systemImage: "plus.circle")
+            }
+        } header: {
+            Text("Projects")
+        } footer: {
+            Text("Work you share — pitches, builds, accounts. Mark one Completed when it wraps and it stays on their profile as history.")
+        }
+    }
+
     private var importantDatesSection: some View {
         Section {
             ForEach($draftDates) { $draft in
@@ -459,6 +500,9 @@ struct PersonEditorView: View {
         draftContacts = person.contactFieldsArray
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value, starred: $0.isPreferred) }
+        draftProjects = person.projectsArray
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { DraftProject(name: $0.name, isCompleted: $0.isCompleted) }
     }
 
     // MARK: - Photo loading
@@ -542,6 +586,15 @@ struct PersonEditorView: View {
                 starredKinds.insert(draft.kind.rawValue)
             }
             target.contactFieldsArray.append(field)
+        }
+
+        // Replace projects with the edited set (blank ones dropped).
+        let oldProjects = target.projectsArray
+        for old in oldProjects {
+            context.delete(old)
+        }
+        for (index, draft) in draftProjects.enumerated() where !draft.name.trimmed.isEmpty {
+            target.projectsArray.append(Project(name: draft.name.trimmed, isCompleted: draft.isCompleted, sortOrder: index))
         }
 
         applyReciprocalLinks(around: target)

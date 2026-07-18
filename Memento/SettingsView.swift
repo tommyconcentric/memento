@@ -256,6 +256,7 @@ struct SettingsView: View {
             for date in try context.fetch(FetchDescriptor<ImportantDate>()) { context.delete(date) }
             for member in try context.fetch(FetchDescriptor<FamilyMember>()) { context.delete(member) }
             for field in try context.fetch(FetchDescriptor<ContactField>()) { context.delete(field) }
+            for project in try context.fetch(FetchDescriptor<Project>()) { context.delete(project) }
             try context.save()
             resetNote = nil
         } catch {

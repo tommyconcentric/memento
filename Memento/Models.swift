@@ -72,6 +72,10 @@ final class Person {
     @Relationship(deleteRule: .cascade, inverse: \ContactField.person)
     var contactFields: [ContactField]?
 
+    // Shared work with a business contact; use `projectsArray`.
+    @Relationship(deleteRule: .cascade, inverse: \Project.person)
+    var projects: [Project]?
+
     init(name: String, group: PersonGroup? = nil) {
         self.name = name
         self.group = group
@@ -118,6 +122,18 @@ extension Person {
     var contactFieldsArray: [ContactField] {
         get { contactFields ?? [] }
         set { contactFields = newValue }
+    }
+
+    var projectsArray: [Project] {
+        get { projects ?? [] }
+        set { projects = newValue }
+    }
+
+    /// Ongoing work first, completed history below, each in entry order.
+    var sortedProjects: [Project] {
+        projectsArray.sorted {
+            ($0.isCompleted ? 1 : 0, $0.sortOrder) < ($1.isCompleted ? 1 : 0, $1.sortOrder)
+        }
     }
 
     /// Additional contact methods of one kind, in entry order.
@@ -258,6 +274,22 @@ final class ContactField {
     init(kind: Kind, value: String = "", sortOrder: Int = 0) {
         self.kind = kind.rawValue
         self.value = value
+        self.sortOrder = sortOrder
+    }
+}
+
+// MARK: - Project (work you share with a business contact)
+
+@Model
+final class Project {
+    var name: String = ""
+    var isCompleted: Bool = false
+    var sortOrder: Int = 0
+    var person: Person?
+
+    init(name: String, isCompleted: Bool = false, sortOrder: Int = 0) {
+        self.name = name
+        self.isCompleted = isCompleted
         self.sortOrder = sortOrder
     }
 }
