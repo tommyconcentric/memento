@@ -45,10 +45,41 @@ struct PersonEditorView: View {
 
     @State private var loadedInitial = false
 
+    // "Other…" reveals a free-text box; the typed label is stored in the
+    // same relationshipToUser field but never charts (see isChartable).
+    @State private var isOtherRelationship = false
+    @State private var customRelationship = ""
+    private static let otherRelationshipTag = "__other__"
+
     /// Business profiles pick from working relationships (they build the
     /// corporate ladder); personal ones keep the family vocabulary.
     private var relationshipPresets: [String] {
         isBusiness ? BusinessRelation.presets : FamilyRelation.presets
+    }
+
+    /// Routes the "Other…" row into the free-text state; preset picks land
+    /// in relationshipToUser directly.
+    private var relationshipPickerBinding: Binding<String> {
+        Binding(
+            get: { isOtherRelationship ? Self.otherRelationshipTag : relationshipToUser },
+            set: { picked in
+                if picked == Self.otherRelationshipTag {
+                    isOtherRelationship = true
+                } else {
+                    isOtherRelationship = false
+                    relationshipToUser = picked
+                }
+            }
+        )
+    }
+
+    /// Values that don't fit the current workspace's presets (a custom
+    /// label, or one picked before the workspace toggle was flipped)
+    /// present as "Other…" with the text box pre-filled.
+    private func adoptCustomRelationshipIfNeeded() {
+        guard !relationshipToUser.isEmpty, !relationshipPresets.contains(relationshipToUser) else { return }
+        isOtherRelationship = true
+        customRelationship = relationshipToUser
     }
 
     // Legacy free-text family fields are only shown when they already
@@ -124,24 +155,25 @@ struct PersonEditorView: View {
                 }
 
                 Section {
-                    Picker("They're your…", selection: $relationshipToUser) {
+                    Picker("They're your…", selection: relationshipPickerBinding) {
                         Text("Not set").tag("")
-                        // A value picked in the other workspace stays
-                        // selectable, so flipping the workspace toggle
-                        // doesn't silently blank the relationship.
-                        if !relationshipToUser.isEmpty && !relationshipPresets.contains(relationshipToUser) {
-                            Text(relationshipToUser).tag(relationshipToUser)
-                        }
                         ForEach(relationshipPresets, id: \.self) { label in
                             Text(label).tag(label)
                         }
+                        Text("Other…").tag(Self.otherRelationshipTag)
+                    }
+                    if isOtherRelationship {
+                        TextField(
+                            isBusiness ? "e.g. Co-founder at my old startup" : "e.g. Childhood neighbour",
+                            text: $customRelationship
+                        )
                     }
                 } header: {
                     Text(isBusiness ? "Working Relationship to You" : "Family Relationship to You")
                 } footer: {
                     Text(isBusiness
-                        ? "Colleague, client, manager, mentor — this is what places them on your corporate ladder and tells you at a glance how you work together."
-                        : "Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family.")
+                        ? "Colleague, client, manager, mentor — this is what places them on your corporate ladder and tells you at a glance how you work together. Pick Other… to write your own; custom relationships don't join the ladder."
+                        : "Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family, or pick Other… to write your own; custom relationships don't join the tree.")
                 }
 
                 Section("Birthday") {
@@ -306,6 +338,14 @@ struct PersonEditorView: View {
                 }
             }
             .onAppear(perform: loadInitial)
+            .onChange(of: isBusiness) { _, _ in
+                // Flipping the workspace swaps the preset list; a value
+                // that no longer fits carries over as a custom "Other"
+                // instead of silently blanking.
+                if !isOtherRelationship {
+                    adoptCustomRelationshipIfNeeded()
+                }
+            }
             .onChange(of: photoItem) { _, item in
                 loadPhoto(item)
             }
@@ -491,6 +531,7 @@ struct PersonEditorView: View {
         email = person.email
         address = person.address
         relationshipToUser = person.relationshipToUser
+        adoptCustomRelationshipIfNeeded()
         draftFamilyMembers = person.familyMembersArray.map {
             DraftFamilyMember(name: $0.name, relation: $0.relation)
         }
@@ -548,7 +589,7 @@ struct PersonEditorView: View {
         target.phoneNumber = phoneNumber.trimmed
         target.email = email.trimmed
         target.address = address.trimmed
-        target.relationshipToUser = relationshipToUser
+        target.relationshipToUser = isOtherRelationship ? customRelationship.trimmed : relationshipToUser
 
         // Replace important dates with the edited set.
         let oldDates = target.importantDatesArray
