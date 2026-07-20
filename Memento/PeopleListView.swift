@@ -300,7 +300,11 @@ struct PeopleListView: View {
                     recentlyUnpinned.removeAll()
                 } label: {
                     Label(option.title, systemImage: option.icon)
-                        .font(.system(.subheadline, design: option.displayFontDesign).weight(isActive ? .semibold : .regular))
+                        // Both segments use one font (Business's sans) rather
+                        // than each option's own display design — otherwise
+                        // "Personal" renders in serif and "Business" in sans,
+                        // which reads as a mismatch inside a single control.
+                        .font(.system(.subheadline, design: Workspace.business.displayFontDesign).weight(isActive ? .semibold : .regular))
                         .foregroundStyle(isActive ? .white : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
