@@ -7,19 +7,29 @@ import SwiftData
 /// into an auto-generated family tree.
 enum FamilyRelation {
     static let presets: [String] = [
-        "Mother", "Father", "Parent", "Stepmother", "Stepfather",
+        "Mother", "Father", "Parent",
+        "Stepmother", "Stepfather", "Stepparent",
         "Grandmother", "Grandfather", "Grandparent",
         "Wife", "Husband", "Fiancée", "Fiancé", "Partner", "Girlfriend", "Boyfriend",
-        "Sister", "Brother", "Sibling", "Stepsister", "Stepbrother", "Cousin",
+        "Sister", "Brother", "Sibling",
+        "Stepsister", "Stepbrother", "Stepsibling",
+        "Half-sister", "Half-brother", "Half-sibling",
+        "Cousin",
         "Aunt", "Uncle", "Aunt/Uncle",
-        "Daughter", "Son", "Child", "Stepdaughter", "Stepson",
+        "Daughter", "Son", "Child",
+        "Stepdaughter", "Stepson", "Stepchild",
         "Niece", "Nephew", "Niece/Nephew",
         "Granddaughter", "Grandson", "Grandchild",
         "Mother-in-law", "Father-in-law", "Parent-in-law",
         "Sister-in-law", "Brother-in-law", "Sibling-in-law",
         "Daughter-in-law", "Son-in-law", "Child-in-law",
-        // Less common relations, kept at the bottom of the picker.
-        "Half-sister", "Half-brother", "Half-sibling",
+        // Adopted and foster relations — same generations as the blood
+        // relatives they mirror, so the tree places them correctly.
+        "Adoptive mother", "Adoptive father", "Adoptive parent",
+        "Adopted daughter", "Adopted son", "Adopted child",
+        "Foster mother", "Foster father", "Foster parent",
+        "Foster daughter", "Foster son", "Foster child",
+        // Less common relations, kept toward the bottom of the picker.
         "Great-grandmother", "Great-grandfather", "Great-grandparent",
         "Great-granddaughter", "Great-grandson", "Great-grandchild",
         "Godmother", "Godfather", "Goddaughter", "Godson",

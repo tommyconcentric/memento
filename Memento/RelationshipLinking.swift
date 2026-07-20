@@ -31,6 +31,23 @@ extension FamilyRelation {
         // Halves before the sibling branch, so the qualifier survives the
         // round trip.
         if l.contains("half") { return "Half-sibling" }
+        // Step / adoptive / foster relations keep their qualifier across the
+        // link, the way half- and god- do — a stepfather's counterpart is a
+        // stepchild, not a plain child. Parent-side labels invert to the
+        // child term and vice versa.
+        if l.contains("step") || l.contains("adopt") || l.contains("foster") {
+            let parentTerm: String, childTerm: String, siblingTerm: String
+            if l.contains("adopt") {
+                (parentTerm, childTerm, siblingTerm) = ("Adoptive parent", "Adopted child", "Sibling")
+            } else if l.contains("foster") {
+                (parentTerm, childTerm, siblingTerm) = ("Foster parent", "Foster child", "Sibling")
+            } else {
+                (parentTerm, childTerm, siblingTerm) = ("Stepparent", "Stepchild", "Stepsibling")
+            }
+            if l.contains("mother") || l.contains("father") || l.contains("parent") { return childTerm }
+            if l.contains("daughter") || l.contains("son") || l.contains("child") { return parentTerm }
+            if l.contains("sister") || l.contains("brother") || l.contains("sibling") { return siblingTerm }
+        }
         if l.contains("fianc") { return "Fiancé(e)" }
         if l.contains("mother") || l.contains("father") || l.contains("parent") { return "Child" }
         if l.contains("aunt") || l.contains("uncle") { return "Niece/Nephew" }
