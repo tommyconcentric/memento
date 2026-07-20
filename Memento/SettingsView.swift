@@ -47,7 +47,7 @@ struct SettingsView: View {
                     Text("Reminders")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("A 9 AM notification on birthdays and important dates. Reminders skip people marked in memoriam and any date you've turned off from its Quick Info tab, and iOS allows up to 60 scheduled dates — the nearest ones are kept.")
+                        Text("9 AM alerts for birthdays and important dates. Skips in-memoriam people and dates you've turned off; keeps the nearest 60.")
                         if let reminderNote {
                             Text(reminderNote)
                                 .foregroundStyle(Theme.terracotta)
@@ -72,10 +72,10 @@ struct SettingsView: View {
                     Text("Apple Calendar")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Adds a “Memento” calendar with everyone's birthdays and important dates, so you can show or hide it in the Calendar app just like Birthdays or Holidays. Every date appears here, even ones you've turned reminders off for.")
+                        Text("Adds a “Memento” calendar of everyone's dates that you can show or hide in the Calendar app. Includes dates with reminders off.")
                         if calendarSyncEnabled {
                             if manualSyncOnly {
-                                Text("Changes you make in Memento only reach Apple Calendar when you tap Sync Now.")
+                                Text("Changes reach Apple Calendar only when you tap Sync Now.")
                             }
                             Text(lastSyncedText)
                         }
@@ -95,7 +95,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Contacts")
                 } footer: {
-                    Text("Pick people from your contacts — names, photos, birthdays and every number, email and address come along.")
+                    Text("Import contacts with their names, photos, birthdays and details.")
                 }
 
                 Section {
@@ -109,7 +109,7 @@ struct SettingsView: View {
                 } header: {
                     Text("App Lock")
                 } footer: {
-                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") whenever you leave the app. If you ever forget the PIN, delete and reinstall Memento — your data is safe and restores automatically from iCloud once you sign back in.")
+                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Reinstall — iCloud restores your data.")
                 }
 
                 Section {
@@ -126,7 +126,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Help & Feedback")
                 } footer: {
-                    Text("Reviews help other people find Memento, and feedback goes straight to the developer.")
+                    Text("Reviews help others find Memento; feedback reaches the developer.")
                 }
 
                 Section {
@@ -137,7 +137,7 @@ struct SettingsView: View {
                     }
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Permanently deletes every profile and every note from Memento. Because your data syncs through iCloud, they are also removed from all devices signed into your account. Folders are kept, but emptied.")
+                        Text("Permanently deletes every profile and note from all devices on your iCloud. Folders stay, emptied.")
                         if let resetNote {
                             Text(resetNote)
                                 .foregroundStyle(Theme.terracotta)
@@ -173,7 +173,7 @@ struct SettingsView: View {
                 Button("Delete Everything", role: .destructive) { resetAllData() }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This permanently deletes all profiles and notes in Memento. The deletion syncs to every device signed into your iCloud account, and it cannot be undone.")
+                Text("Permanently deletes all profiles and notes from every device on your iCloud. Can't be undone.")
             }
             .alert("Couldn't Save PIN", isPresented: $pinSaveFailed) {
                 Button("OK", role: .cancel) {}
@@ -186,7 +186,7 @@ struct SettingsView: View {
                         let granted = await NotificationManager.requestPermission()
                         if !granted {
                             remindersEnabled = false
-                            reminderNote = "Notifications are turned off for Memento — enable them in \(Self.systemSettingsName), then try again."
+                            reminderNote = "Turn on notifications in \(Self.systemSettingsName), then try again."
                             NotificationManager.refreshFromContext(context)
                             return
                         }
@@ -201,7 +201,7 @@ struct SettingsView: View {
                         let granted = await CalendarSyncManager.requestAccess()
                         if !granted {
                             calendarSyncEnabled = false
-                            calendarSyncNote = "Calendar access is turned off for Memento — enable it in \(Self.systemSettingsName), then try again."
+                            calendarSyncNote = "Turn on Calendar access in \(Self.systemSettingsName), then try again."
                             return
                         }
                         calendarSyncNote = nil
