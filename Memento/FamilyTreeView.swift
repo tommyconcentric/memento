@@ -177,6 +177,13 @@ func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: S
 /// Generation rows joined by a spine — designed to live inside a ScrollView.
 /// When `onDropInGeneration` is set, people can be held and dragged between
 /// rows; the handler receives the dropped person's name and the target row.
+private struct LaneWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct FamilyTreeContent: View {
     let rows: [TreeRow]
     var dragEnabled = false
@@ -186,9 +193,15 @@ struct FamilyTreeContent: View {
     var onDropInGeneration: ((String, Int) -> Void)? = nil
 
     @State private var targetedGeneration: Int? = nil
+    // Width of the chart, so a lane with only a person or two can centre
+    // them across it instead of leaving them pinned to the left edge.
+    @State private var laneWidth: CGFloat = 0
 
     private var ruleColor: Color { corporate ? Theme.graphite : Theme.bark }
     private var ornamentColor: Color { corporate ? Theme.steel : Theme.gold }
+    // Total horizontal inset the lane adds around its scroll area; the
+    // node row fills the chart width minus this so centring lines up.
+    private let laneHorizontalPadding: CGFloat = 16
 
     var body: some View {
         VStack(spacing: 0) {
@@ -199,6 +212,12 @@ struct FamilyTreeContent: View {
                 }
             }
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: LaneWidthKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(LaneWidthKey.self) { laneWidth = $0 }
     }
 
     /// The descent line between generations, drawn like the inked joins on
@@ -260,7 +279,11 @@ struct FamilyTreeContent: View {
                         }
                     }
                     .padding(.horizontal, 2)
-                    .frame(maxWidth: .infinity)
+                    // Fill the chart width so a sparse generation centres;
+                    // a crowded one exceeds it and the ScrollView takes over.
+                    // (maxWidth: .infinity is inert inside a horizontal
+                    // ScrollView, which sizes content to its natural width.)
+                    .frame(minWidth: max(0, laneWidth - laneHorizontalPadding), alignment: .center)
                 }
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
