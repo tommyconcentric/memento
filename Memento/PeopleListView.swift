@@ -178,20 +178,6 @@ struct PeopleListView: View {
                 }
                 .accessibilityLabel("Manage folders")
             }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    showingTree = true
-                } label: {
-                    Image(systemName: workspace == .business ? "building.2" : "tree")
-                }
-                .accessibilityLabel(workspace == .business ? "Corporate ladder" : "My family tree")
-                Button {
-                    showingCalendar = true
-                } label: {
-                    Image(systemName: "calendar")
-                }
-                .accessibilityLabel("Important dates calendar")
-            }
         }
         .overlay {
             if workspacePeople.isEmpty {
@@ -218,15 +204,69 @@ struct PeopleListView: View {
         // This bar makes the active mode readable at a glance and the
         // switch a single visible tap, on every device.
         .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 10) {
-                workspaceSwitcher
-                addPersonButton
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    workspaceSwitcher
+                    addPersonButton
+                }
+                // Tree and calendar sit on their own row as two wide icon
+                // tiles: crammed onto the switcher's row they squeeze it
+                // until "Personal"/"Business" wrap. A dedicated row keeps
+                // them direct, generously tappable, and balanced at any
+                // sidebar width.
+                HStack(spacing: 10) {
+                    treeButton
+                    calendarButton
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 10)
             .background(workspace.background)
         }
+    }
+
+    /// Tree and calendar live in the pinned bar alongside the switcher and
+    /// "+", not the toolbar: the split-view sidebar can only fit a few
+    /// toolbar icons before demoting the rest into SwiftUI's auto-generated
+    /// "…" overflow menu, which flashes and shows nothing when tapped on
+    /// macOS ("Designed for iPad"). This bar never overflows, so they stay
+    /// direct, tappable icons on every OS.
+    private var treeButton: some View {
+        Button {
+            showingTree = true
+        } label: {
+            secondaryPinnedIcon(workspace == .business ? "building.2" : "tree")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(workspace == .business ? "Corporate ladder" : "My family tree")
+    }
+
+    private var calendarButton: some View {
+        Button {
+            showingCalendar = true
+        } label: {
+            secondaryPinnedIcon("calendar")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Important dates calendar")
+    }
+
+    /// Shared look for the pinned bar's secondary actions: a card-filled
+    /// square with an accent glyph and hairline border, so they read as
+    /// siblings of the "+" without competing with its filled emphasis.
+    private func secondaryPinnedIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.headline)
+            .foregroundStyle(workspace.accent)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(workspace.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(.quaternary, lineWidth: 0.5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     /// Lives in the pinned bar for the same reason as the switcher: a
