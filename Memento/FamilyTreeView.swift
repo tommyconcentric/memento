@@ -194,6 +194,20 @@ private struct LaneWidthKey: PreferenceKey {
     }
 }
 
+/// A node's laid-out frame, tagged with its generation, so the chart can
+/// draw genealogy-style connectors between one generation and the next.
+struct NodeAnchor: Equatable {
+    let generation: Int
+    let bounds: Anchor<CGRect>
+}
+
+private struct NodeAnchorKey: PreferenceKey {
+    static var defaultValue: [NodeAnchor] = []
+    static func reduce(value: inout [NodeAnchor], nextValue: () -> [NodeAnchor]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
 struct FamilyTreeContent: View {
     let rows: [TreeRow]
     var dragEnabled = false
@@ -208,7 +222,6 @@ struct FamilyTreeContent: View {
     @State private var laneWidth: CGFloat = 0
 
     private var ruleColor: Color { corporate ? Theme.graphite : Theme.bark }
-    private var ornamentColor: Color { corporate ? Theme.steel : Theme.gold }
     // Total horizontal inset the lane adds around its scroll area; the
     // node row fills the chart width minus this so centring lines up.
     private let laneHorizontalPadding: CGFloat = 16
@@ -228,23 +241,63 @@ struct FamilyTreeContent: View {
             }
         )
         .onPreferenceChange(LaneWidthKey.self) { laneWidth = $0 }
+        // Genealogy-chart connectors: each generation hangs from a
+        // horizontal bar joined by a vertical drop-line to the one below,
+        // the way a family tree links parents to their offspring. Drawn as
+        // an overlay so the lines sit above the lane tints, but every
+        // segment lives in the gap between rows, never over a portrait.
+        .overlayPreferenceValue(NodeAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                connectorPath(anchors, in: proxy)
+                    .stroke(
+                        ruleColor.opacity(0.5),
+                        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
+                    )
+            }
+            .allowsHitTesting(false)
+        }
     }
 
-    /// The descent line between generations, drawn like the inked joins on
-    /// an old genealogical chart: a fine rule with a small gilt ornament.
+    /// Clear breathing room between generations; the actual descent lines
+    /// are drawn across this gap by the connector overlay.
     private var generationJoin: some View {
-        VStack(spacing: 3) {
-            Rectangle()
-                .fill(ruleColor.opacity(0.5))
-                .frame(width: 1, height: 7)
-            Image(systemName: corporate ? "square.fill" : "suit.diamond.fill")
-                .font(.system(size: corporate ? 5 : 7))
-                .foregroundStyle(ornamentColor.opacity(0.85))
-            Rectangle()
-                .fill(ruleColor.opacity(0.5))
-                .frame(width: 1, height: 7)
+        Color.clear.frame(height: 26)
+    }
+
+    /// Builds the family-tree connectors between adjacent populated
+    /// generations: a short vertical from the bottom of every person in the
+    /// upper row and from the top of every person in the lower row, joined
+    /// by one horizontal bar running along the midline of the gap.
+    private func connectorPath(_ anchors: [NodeAnchor], in proxy: GeometryProxy) -> Path {
+        var byGeneration: [Int: [CGRect]] = [:]
+        for anchor in anchors {
+            byGeneration[anchor.generation, default: []].append(proxy[anchor.bounds])
         }
-        .frame(maxWidth: .infinity)
+        // Only generations that actually hold people; link each to the next
+        // populated one below (empty lanes are skipped, not spanned to).
+        let generations = byGeneration.keys.sorted(by: >)
+        var path = Path()
+        for index in generations.indices.dropLast() {
+            guard let upper = byGeneration[generations[index]],
+                  let lower = byGeneration[generations[index + 1]],
+                  let upperBottom = upper.map({ $0.maxY }).max(),
+                  let lowerTop = lower.map({ $0.minY }).min() else { continue }
+            let midY = (upperBottom + lowerTop) / 2
+            for rect in upper {
+                path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+                path.addLine(to: CGPoint(x: rect.midX, y: midY))
+            }
+            for rect in lower {
+                path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.midX, y: midY))
+            }
+            let centers = (upper + lower).map { $0.midX }
+            if let minX = centers.min(), let maxX = centers.max(), minX < maxX {
+                path.move(to: CGPoint(x: minX, y: midY))
+                path.addLine(to: CGPoint(x: maxX, y: midY))
+            }
+        }
+        return path
     }
 
     @ViewBuilder
@@ -304,11 +357,10 @@ struct FamilyTreeContent: View {
         .padding(.vertical, 1)
     }
 
-    /// Engraved-plate generation caption: letterspaced serif small caps
-    /// between two fine rules, the way old charts label each rank.
+    /// Engraved generation caption, pinned to the lane's leading edge so the
+    /// vertical centre stays clear for the family-tree connector lines.
     private func laneTitle(_ title: String) -> some View {
-        HStack(spacing: 8) {
-            titleRule
+        HStack(spacing: 0) {
             Text(title)
                 .font(.system(.caption2, design: corporate ? .default : .serif).weight(.semibold))
                 .textCase(.uppercase)
@@ -316,15 +368,9 @@ struct FamilyTreeContent: View {
                 .foregroundStyle(ruleColor.opacity(0.85))
                 .lineLimit(1)
                 .fixedSize()
-            titleRule
+            Spacer(minLength: 0)
         }
-    }
-
-    private var titleRule: some View {
-        Rectangle()
-            .fill(ruleColor.opacity(0.3))
-            .frame(height: 0.5)
-            .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
     }
 
     /// Parchment bands: ancestors fade lighter toward the top of the
@@ -408,6 +454,11 @@ struct FamilyNodeView: View {
             }
         }
         .frame(width: 88)
+        // Report this node's frame so the chart can route connector lines
+        // from the bottom of each parent's row to the top of each child's.
+        .anchorPreference(key: NodeAnchorKey.self, value: .bounds) {
+            [NodeAnchor(generation: node.generation, bounds: $0)]
+        }
     }
 }
 
