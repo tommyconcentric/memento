@@ -52,8 +52,8 @@ struct AboutView: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(supportsIconChange
-                            ? "Changes both the Home Screen icon and the logo shown in Memento. iOS may ask you to confirm the change."
-                            : "Changes the logo shown in Memento. The Dock icon can't be changed on Mac.")
+                            ? "Sets the Home Screen icon and in-app logo."
+                            : "Sets the in-app logo. The Mac Dock icon can't change.")
                         if let iconChangeError {
                             Text(iconChangeError)
                                 .foregroundStyle(Theme.terracotta)

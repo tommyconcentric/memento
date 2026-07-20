@@ -151,7 +151,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Workspace")
                 } footer: {
-                    Text("Business contacts live in Memento Business — switch workspaces from the badge next to the logo.")
+                    Text("Business contacts live in Memento Business; switch from the badge by the logo.")
                 }
 
                 Section {
@@ -172,8 +172,8 @@ struct PersonEditorView: View {
                     Text(isBusiness ? "Working Relationship to You" : "Family Relationship to You")
                 } footer: {
                     Text(isBusiness
-                        ? "Colleague, client, manager, mentor — this is what places them on your corporate ladder and tells you at a glance how you work together. Pick Other… to write your own; custom relationships don't join the ladder."
-                        : "Only for relatives — mother, brother, grandson — this is what places them on your family tree. Leave it as “Not set” for friends, colleagues and everyone who isn't family, or pick Other… to write your own; custom relationships don't join the tree.")
+                        ? "Places them on your corporate ladder. Other… is custom and won't join the ladder."
+                        : "For relatives only — places them on your family tree. Leave “Not set” for non-family; Other… is custom and won't join the tree.")
                 }
 
                 Section("Birthday") {
@@ -235,7 +235,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Family")
                 } footer: {
-                    Text("Partner and named members (with their relation to this person) build their family tree automatically. Tap \u{1F50D} to link someone already in Memento — the relationship is written to their profile too, so it shows both ways.")
+                    Text("Builds this person's family tree. Tap \u{1F50D} to link someone in Memento — the link is written both ways.")
                 }
 
                 Section("Work") {
@@ -313,7 +313,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Contact")
                 } footer: {
-                    Text("The first phone, email and address show at the top of Quick Info. Add as many extra numbers, emails or addresses as you like below — tap ★ to prefer one over the primary, and it moves to the top.")
+                    Text("The first phone, email and address show in Quick Info. Tap ★ to move another to the top.")
                 }
 
                 importantDatesSection
@@ -323,7 +323,7 @@ struct PersonEditorView: View {
                 } header: {
                     Text("Remembrance")
                 } footer: {
-                    Text("Grays their profile across the app and hides birthday countdowns.")
+                    Text("Grays their profile and hides birthday countdowns.")
                 }
             }
             .navigationTitle(person == nil ? "New Person" : "Edit Person")
@@ -465,7 +465,7 @@ struct PersonEditorView: View {
         } header: {
             Text("Projects")
         } footer: {
-            Text("Work you share — pitches, builds, accounts. Mark one Completed when it wraps and it stays on their profile as history.")
+            Text("Work you share. Mark Completed when it wraps; it stays as history.")
         }
     }
 
@@ -492,7 +492,7 @@ struct PersonEditorView: View {
         } header: {
             Text("Important Dates")
         } footer: {
-            Text("Anniversaries, kids' birthdays, big events — anything worth remembering.")
+            Text("Anniversaries, birthdays and big events.")
         }
     }
 
