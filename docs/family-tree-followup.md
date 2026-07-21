@@ -124,7 +124,11 @@ predecessor of this — they connect whole rows, not individuals.
    via profile pick or ghost name, with per-edge kind menus and ghost-promote.
    Reachable from a person's Family tab and (for the self node) the tree's Edit
    button.*
-4. Derivation: generations, couples, full/half/step logic. *Medium — next.*
+4. ✅ Derivation: generations, couples, full/half/step logic. *Done:
+   `FamilyGraph.build` derives each reachable person's generation (BFS from
+   self), the couples, and sibling groups keyed by exact parent set — so full
+   siblings cluster and half-siblings split into separate groups. Pure/testable.*
+5. Layout engine (draws the real tree). *Large — next.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
