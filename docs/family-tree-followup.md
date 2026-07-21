@@ -128,16 +128,18 @@ predecessor of this — they connect whole rows, not individuals.
    `FamilyGraph.build` derives each reachable person's generation (BFS from
    self), the couples, and sibling groups keyed by exact parent set — so full
    siblings cluster and half-siblings split into separate groups. Pure/testable.*
-5. 🔵 Layout engine (draws the real tree). *Core done behind the
-   `useNewFamilyTree` beta toggle: `FamilyTreeLayout` (layered layout with
-   relaxation passes) + `PedigreeTreeView` (Canvas connectors + pan/scroll)
-   render couple bars, sibling groups and per-parent-child descent. Styling
-   (parchment plate + gilt portrait rings), pinch-zoom, and tap-to-open
-   profiles are in. Remaining: crossing reduction on dense trees and
-   single-parent/no-parent polish; then make it the default and retire the old
-   generation chart. Crossing reduction (barycenter row seeding) landed and
-   holds up on a dense two-sided pedigree with grandparents, a half-sibling and
-   collateral families. Only the flip-to-default remains.*
+5. ✅ Layout engine (draws the real tree). *`FamilyTreeLayout` (layered layout
+   with barycenter row seeding + relaxation passes) + `PedigreeTreeView` (Canvas
+   connectors, parchment/gilt styling, pinch-zoom, tap-to-open) render couple
+   bars, sibling groups and per-parent-child descent, crossing-free on a dense
+   two-sided pedigree.*
+6. ✅ Default flip. *The new pedigree is now the default (`useNewFamilyTree`
+   defaults on) with a "New tree layout" toggle in the tree menu to fall back to
+   the classic generation chart, and a "No Family Yet" empty state. The classic
+   chart is kept, not retired.*
+
+**Status: feature complete** — the new per-parent-child family tree is the
+default, with a classic fallback toggle.
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
