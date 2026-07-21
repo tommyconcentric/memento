@@ -1,0 +1,124 @@
+# Follow-up: true per-parent-child family trees
+
+Status: **planned** (not started). This is the agreed design for turning the
+current generation-lane chart into a real genealogical tree with individual
+parent→child edges, couples, and correctly distinguished sibling/step/half
+relations.
+
+## Confirmed decisions
+
+1. **Ghost nodes** — relatives named in free text (no profile) are represented
+   as nodes so they can carry edges. They are *not* real contacts.
+2. **Hidden self profile** — "You" becomes a real but non-listed `Person`, so
+   the pedigree can root on it with genuine edges.
+3. **Full pedigree** — ancestors *and* descendants (plus collaterals: siblings,
+   aunts/uncles, cousins), not just a descendant chart.
+4. **Dashed styling** — step and foster links draw dashed; bio and adopted draw
+   solid (adopted optionally badged).
+5. **Full build** — new edge model + layout engine, not the name-based
+   middle-ground.
+
+## Why the current model can't do this
+
+`Person` stores only free-text relationship strings (`relationshipToUser`,
+`partnerName`, `childrenNames`, `FamilyMember.name/relation`) and no parentage
+edges or IDs. It records "how this person relates to the focus person" (a
+generation), never "who this person's parents are." A real tree needs explicit,
+typed edges between specific individuals. Everything else is layout on top.
+
+## Data model
+
+Use **join models** rather than bare self-referential `Person` relationships:
+they store the edge *type*, and a self-referential many-to-many across the
+CloudKit mirror is the riskiest possible shape (see Phase 1).
+
+```
+@Model Parentage    { parent: Person?; child: Person?; kind: String = "bio" }   // bio | adopted | foster | step
+@Model Partnership  { a: Person?;      b: Person?;     kind: String = "married" } // married | partner | engaged | former
+```
+
+`Person` gains:
+- `isSelf: Bool = false` — the single hidden self node.
+- `isGhost: Bool = false` — an un-profiled relative (name only).
+- inverse optional relationships to `Parentage` (as parent and as child) and
+  `Partnership`.
+
+CloudKit rules (see `CLAUDE.md` "Gotchas"): every relationship Optional, every
+attribute defaulted, and **the schema only validates when the `ModelContainer`
+is built at launch** — so it must be run, not just compiled. Register both new
+models in `MementoApp.swift`.
+
+### `isSelf` / `isGhost` are cross-cutting
+
+Both must be excluded everywhere the people list is surfaced. Known touch
+points to audit: `PeopleListView` (`people` query, `workspacePeople`, folder
+sections, search, counts), `StressSeeder`, `SettingsView` reset counts,
+`ImportContactsView`, `NotificationManager`/`CalendarSyncManager` scans, and the
+`PersonPickerSheet`. A single computed "listed people" filter should gate all of
+them to avoid leaks. This breadth is the main correctness risk after CloudKit.
+
+## Relation semantics → edges/lines
+
+- **Full sibling**: shares both parents. **Half-sibling**: shares exactly one.
+  Derived from `Parentage`, not stored.
+- **Step-parent**: a parent's partner (`Partnership`) who has no `Parentage`
+  edge to you → drawn as spouse-of-parent with a **dashed** link to you.
+- **Step-sibling**: child of a step-parent via a different union.
+- **Adopted**: solid parent edge, `kind = adopted` (optional badge).
+- **Foster**: dashed parent edge, `kind = foster`.
+- **Former partner**: `Partnership.kind = former` → dashed couple bar.
+
+## Editor / UX
+
+A dedicated "Family" editor: link parents (0–2), partner(s), and children from
+existing profiles via `PersonPickerSheet`, or type a name to spawn a ghost;
+pick the edge `kind`. Stay cancel-safe (draft → `save()`), and write reciprocal
+edges (a `Parentage` is inherently two-sided; no manual inverse needed, unlike
+today's `applyReciprocalLinks`). Ghosts get a "promote to full profile" action.
+
+## Layout engine (largest, riskiest piece)
+
+Replace the generation-lane + horizontal-`ScrollView` layout:
+
+1. Assign generations from the edge graph (BFS from self across parent/child).
+2. Order within each generation so partners are adjacent and sibling groups sit
+   centered under their parents' union; minimize edge crossings
+   (Reingold–Tilford / Walker-style tidy layout per subtree).
+3. Emit node coordinates + typed connector segments: couple bars, union→sibling
+   descent drops, sibling bars, and per-child stubs.
+4. Render with a custom SwiftUI `Layout` + `Canvas`; dashed vs solid per edge
+   `kind`. Needs pan/zoom for large trees and must work on Mac (no swipe).
+
+The generation-level connectors already shipped (PR #50) are the throwaway
+predecessor of this — they connect whole rows, not individuals.
+
+## Migration & compatibility
+
+- On first launch of the new version: create the self `Person`; convert each
+  `relationshipToUser` into edges relative to self where determinable
+  (Mother/Father → `Parentage`; Son/Daughter → `Parentage`; partner terms →
+  `Partnership`; step/half/adopted/foster → set `kind`). Convert
+  `partnerName`/`childrenNames`/`FamilyMember` into edges, linking to an existing
+  profile by case-insensitive name match or spawning a ghost.
+- Keep the old free-text fields intact for a release; **feature-flag** the new
+  chart so the shipped generation chart stays the default until the new one is
+  proven. Self is created only when the pedigree is first opened.
+
+## Phases & effort
+
+1. **CloudKit spike** — the two join models + `isSelf`/`isGhost` launching
+   cleanly against iCloud. *Small, must be first, highest risk.*
+2. Model + reciprocal edges + migration. *Medium.*
+3. Family-linking editor (incl. ghosts, promote-to-profile). *Medium.*
+4. Derivation: generations, couples, full/half/step logic. *Medium.*
+5. Layout engine + typed connector rendering + pan/zoom. *Large.*
+6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
+   generation chart behind the flag. *Medium.*
+
+Overall **XL** (several focused days). Phases 1 and 5 drive the risk.
+
+## Open sub-decisions (can be settled during Phase 1–2)
+
+- Self node's display name: literal "You", or the user's own name (editable)?
+- Adopted badge: show a small marker, or rely on the editor only?
+- Max pedigree depth to render before requiring tap-to-expand (performance).
