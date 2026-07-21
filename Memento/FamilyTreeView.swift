@@ -291,11 +291,26 @@ struct FamilyTreeLayout {
 
         func placedNeighbours(_ list: [Person]) -> [Person] { list.filter { placedIDs.contains($0.persistentModelID) } }
 
+        // Initial order, top generation down: each row is sequenced by the
+        // average position of its parents in the row above (a barycenter
+        // seed), so children start under their parents and full sibling groups
+        // stay contiguous. The relaxation below then refines it. Without this
+        // seed, an arbitrary (name) order leaves siblings interleaved and the
+        // descent lines cross.
         var x: [PersistentIdentifier: CGFloat] = [:]
-        for g in gens {
-            for (i, p) in byGen[g]!.sorted(by: { $0.name < $1.name }).enumerated() {
-                x[p.persistentModelID] = CGFloat(i) * hGap
+        for (rowIndex, g) in gens.enumerated() {
+            let row = byGen[g]!
+            let ordered: [Person]
+            if rowIndex == 0 {
+                ordered = row.sorted { $0.name < $1.name }
+            } else {
+                func parentKey(_ p: Person) -> CGFloat {
+                    let px = placedNeighbours(p.parents).compactMap { x[$0.persistentModelID] }
+                    return px.isEmpty ? .greatestFiniteMagnitude : px.reduce(0, +) / CGFloat(px.count)
+                }
+                ordered = row.sorted { (parentKey($0), $0.name) < (parentKey($1), $1.name) }
             }
+            for (i, p) in ordered.enumerated() { x[p.persistentModelID] = CGFloat(i) * hGap }
         }
 
         for _ in 0..<10 {
