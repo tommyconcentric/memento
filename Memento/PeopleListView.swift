@@ -33,7 +33,9 @@ struct PeopleListView: View {
     }
 
     private var workspacePeople: [Person] {
-        people.filter { $0.isBusiness == (workspace == .business) }
+        // Hidden family-tree nodes (the "You" self node and un-profiled ghost
+        // relatives) carry edges but are never listed as contacts.
+        people.filter { $0.isBusiness == (workspace == .business) && !$0.isSelf && !$0.isGhost }
     }
 
     /// True while any sheet covers the list — the moment the user has
