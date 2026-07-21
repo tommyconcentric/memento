@@ -1,9 +1,17 @@
 # Follow-up: true per-parent-child family trees
 
-Status: **planned** (not started). This is the agreed design for turning the
-current generation-lane chart into a real genealogical tree with individual
-parent→child edges, couples, and correctly distinguished sibling/step/half
-relations.
+Status: **in progress** — Phase 1 (CloudKit spike) complete; Phases 2–6 pending.
+This is the agreed design for turning the current generation-lane chart into a
+real genealogical tree with individual parent→child edges, couples, and
+correctly distinguished sibling/step/half relations.
+
+**Phase 1 result:** the `Parentage`/`Partnership` join models and
+`isSelf`/`isGhost` flags ship as of this change. Validated at runtime on the
+simulator — the `ModelContainer` builds against the CloudKit configuration with
+no "relationships must be optional" error, and a throwaway probe confirmed edges
+insert, save, refetch, and resolve inverses (a self node reading both its
+parents through the two Person→`Parentage` relationships). The models are not
+yet used by any UI.
 
 ## Confirmed decisions
 
@@ -106,8 +114,8 @@ predecessor of this — they connect whole rows, not individuals.
 
 ## Phases & effort
 
-1. **CloudKit spike** — the two join models + `isSelf`/`isGhost` launching
-   cleanly against iCloud. *Small, must be first, highest risk.*
+1. ✅ **CloudKit spike** — the two join models + `isSelf`/`isGhost` launching
+   cleanly against iCloud. *Done: schema validates and edges persist.*
 2. Model + reciprocal edges + migration. *Medium.*
 3. Family-linking editor (incl. ghosts, promote-to-profile). *Medium.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*

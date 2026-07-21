@@ -12,7 +12,9 @@ struct MementoApp: App {
             ImportantDate.self,
             FamilyMember.self,
             ContactField.self,
-            Project.self
+            Project.self,
+            Parentage.self,
+            Partnership.self
         ])
         let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
         do {
