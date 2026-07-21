@@ -128,7 +128,13 @@ predecessor of this — they connect whole rows, not individuals.
    `FamilyGraph.build` derives each reachable person's generation (BFS from
    self), the couples, and sibling groups keyed by exact parent set — so full
    siblings cluster and half-siblings split into separate groups. Pure/testable.*
-5. Layout engine (draws the real tree). *Large — next.*
+5. 🔵 Layout engine (draws the real tree). *Core done behind the
+   `useNewFamilyTree` beta toggle: `FamilyTreeLayout` (layered layout with
+   relaxation passes) + `PedigreeTreeView` (Canvas connectors + pan/scroll)
+   render couple bars, sibling groups and per-parent-child descent. Remaining:
+   crossing reduction on dense trees, single-parent cases, zoom, and styling to
+   match the parchment chrome; then make it the default and retire the old
+   generation chart.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
