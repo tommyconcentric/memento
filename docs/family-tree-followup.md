@@ -119,7 +119,12 @@ predecessor of this — they connect whole rows, not individuals.
 2. ✅ Model + reciprocal edges + migration. *Done: hidden self node + list
    exclusion (2a), one-time best-effort migration of direct relations into
    edges with ghost creation (2b). Indirect relations left in the old fields.*
-3. Family-linking editor (incl. ghosts, promote-to-profile). *Medium — next.*
+3. ✅ Family-linking editor (incl. ghosts, promote-to-profile). *Done:
+   `FamilyLinksEditor` edits a subject's parents/partners/children live, adding
+   via profile pick or ghost name, with per-edge kind menus and ghost-promote.
+   Reachable from a person's Family tab and (for the self node) the tree's Edit
+   button.*
+4. Derivation: generations, couples, full/half/step logic. *Medium — next.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
