@@ -131,9 +131,10 @@ predecessor of this — they connect whole rows, not individuals.
 5. 🔵 Layout engine (draws the real tree). *Core done behind the
    `useNewFamilyTree` beta toggle: `FamilyTreeLayout` (layered layout with
    relaxation passes) + `PedigreeTreeView` (Canvas connectors + pan/scroll)
-   render couple bars, sibling groups and per-parent-child descent. Remaining:
-   crossing reduction on dense trees, single-parent cases, zoom, and styling to
-   match the parchment chrome; then make it the default and retire the old
+   render couple bars, sibling groups and per-parent-child descent. Styling
+   (parchment plate + gilt portrait rings), pinch-zoom, and tap-to-open
+   profiles are in. Remaining: crossing reduction on dense trees and
+   single-parent/no-parent polish; then make it the default and retire the old
    generation chart.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
