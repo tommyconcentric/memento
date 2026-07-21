@@ -116,8 +116,10 @@ predecessor of this — they connect whole rows, not individuals.
 
 1. ✅ **CloudKit spike** — the two join models + `isSelf`/`isGhost` launching
    cleanly against iCloud. *Done: schema validates and edges persist.*
-2. Model + reciprocal edges + migration. *Medium.*
-3. Family-linking editor (incl. ghosts, promote-to-profile). *Medium.*
+2. ✅ Model + reciprocal edges + migration. *Done: hidden self node + list
+   exclusion (2a), one-time best-effort migration of direct relations into
+   edges with ghost creation (2b). Indirect relations left in the old fields.*
+3. Family-linking editor (incl. ghosts, promote-to-profile). *Medium — next.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
