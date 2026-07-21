@@ -773,7 +773,7 @@ struct MyFamilyTreeView: View {
     @State private var showingSelfLinks = false
     // Opt-in preview of the edge-driven pedigree while it's being built; the
     // classic generation chart stays the default until it's finished.
-    @AppStorage("useNewFamilyTree") private var useNewTree = false
+    @AppStorage("useNewFamilyTree") private var useNewTree = true
 
     private var pedigreeLayout: FamilyTreeLayout? {
         guard let selfNode = people.first(where: { $0.isSelf }) else { return nil }
@@ -827,11 +827,31 @@ struct MyFamilyTreeView: View {
         )
     }
 
+    /// Shown when the new tree is on but you've recorded no family yet — the
+    /// pedigree would otherwise be a lone "You". Points at the same editor the
+    /// menu's "Edit Family Links" opens.
+    private var newTreeEmptyState: some View {
+        ContentUnavailableView {
+            Label("No Family Yet", systemImage: "tree")
+        } description: {
+            Text("Add your parents, partner and children — or link relatives you already keep in Memento — and your tree draws itself.")
+        } actions: {
+            Button("Add Family") { showingSelfLinks = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
     var body: some View {
         NavigationStack {
             Group {
-            if useNewTree && !isLadder, let layout = pedigreeLayout, !layout.nodes.isEmpty {
-                PedigreeTreeView(layout: layout, accent: workspace.accent)
+            if useNewTree && !isLadder {
+                if let layout = pedigreeLayout, layout.nodes.count > 1 {
+                    PedigreeTreeView(layout: layout, accent: workspace.accent)
+                } else {
+                    newTreeEmptyState
+                }
             } else {
             ScrollView {
                 if labeled.isEmpty {
@@ -874,7 +894,7 @@ struct MyFamilyTreeView: View {
                             Button("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted") {
                                 showingSelfLinks = true
                             }
-                            Toggle("New tree layout (beta)", isOn: $useNewTree)
+                            Toggle("New tree layout", isOn: $useNewTree)
                         } label: {
                             Image(systemName: "ellipsis.circle")
                         }
