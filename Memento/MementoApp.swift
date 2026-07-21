@@ -99,6 +99,10 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Query private var groups: [PersonGroup]
+    // The hidden "You" node(s) the family tree roots on. Queried so first
+    // launch (and a post-reset launch) can recreate it, and so duplicates
+    // created by two devices seeding before sync can be folded together.
+    @Query(filter: #Predicate<Person> { $0.isSelf }) private var selfNodes: [Person]
     @AppStorage("didSeedDefaultGroups") private var didSeedDefaultGroups = false
 
     var body: some View {
@@ -106,6 +110,7 @@ struct RootView: View {
             .onAppear {
                 seedDefaultGroupsIfNeeded()
                 mergeDuplicateBuiltInGroups()
+                ensureSelfNode()
                 #if DEBUG
                 StressSeeder.seedIfRequested(context)
                 #endif
@@ -113,8 +118,33 @@ struct RootView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     mergeDuplicateBuiltInGroups()
+                    ensureSelfNode()
                 }
             }
+    }
+
+    /// Guarantees exactly one hidden self node. Creates it when none exists
+    /// (first launch, or after a full reset); if two devices each seeded one
+    /// before syncing, keeps the earliest and removes edgeless duplicates —
+    /// the same convention as the built-in folders.
+    private func ensureSelfNode() {
+        if selfNodes.isEmpty {
+            let me = Person(name: "You")
+            me.isSelf = true
+            context.insert(me)
+            try? context.save()
+        } else if selfNodes.count > 1 {
+            let survivors = selfNodes.sorted { $0.createdAt < $1.createdAt }
+            var changed = false
+            for extra in survivors.dropFirst() where extra.edgesAsParentArray.isEmpty
+                && extra.edgesAsChildArray.isEmpty
+                && extra.partnershipsAsAArray.isEmpty
+                && extra.partnershipsAsBArray.isEmpty {
+                context.delete(extra)
+                changed = true
+            }
+            if changed { try? context.save() }
+        }
     }
 
     private func seedDefaultGroupsIfNeeded() {

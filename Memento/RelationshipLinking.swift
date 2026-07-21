@@ -125,7 +125,7 @@ struct PersonPickerSheet: View {
 
     private var results: [Person] {
         people.filter { p in
-            p.persistentModelID != excludeID &&
+            p.persistentModelID != excludeID && !p.isSelf && !p.isGhost &&
             (query.trimmed.isEmpty || p.name.localizedCaseInsensitiveContains(query))
         }
     }
