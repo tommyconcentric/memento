@@ -291,3 +291,231 @@ struct PersonPickerSheet: View {
         }
     }
 }
+
+// MARK: - Family links editor (edit the tree graph directly)
+
+/// Picks an existing profile *or* creates a named ghost, for adding a family
+/// link. Search matches profiles; when the query names no one, a "create"
+/// row spawns a ghost the tree can carry without a full contact.
+struct PersonOrGhostPicker: View {
+    let title: String
+    let excludeIDs: Set<PersistentIdentifier>
+    var onPick: (Person) -> Void
+    var onCreate: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+    @State private var query = ""
+
+    private var trimmedQuery: String { query.trimmed }
+
+    private var results: [Person] {
+        people.filter { p in
+            !p.isSelf && !excludeIDs.contains(p.persistentModelID) &&
+            (trimmedQuery.isEmpty || p.name.localizedCaseInsensitiveContains(trimmedQuery))
+        }
+    }
+
+    private var exactMatchExists: Bool {
+        people.contains { $0.name.compare(trimmedQuery, options: .caseInsensitive) == .orderedSame }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !trimmedQuery.isEmpty && !exactMatchExists {
+                    Button {
+                        onCreate(trimmedQuery)
+                        dismiss()
+                    } label: {
+                        Label("Add “\(trimmedQuery)” as a name", systemImage: "plus.circle")
+                    }
+                }
+                ForEach(results) { p in
+                    Button {
+                        onPick(p)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            AvatarView(data: p.profilePhotoData, name: p.name, size: 36, desaturated: p.isDeceased)
+                            Text(p.name).foregroundStyle(.primary)
+                            if p.isGhost {
+                                Spacer()
+                                Text("name only").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(text: $query, prompt: "Search or type a name")
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+        }
+    }
+}
+
+/// Live editor for one person's place in the family graph: their parents,
+/// partners and children, each an add/remove/kind control. Applies straight
+/// to the store (no draft) — the same immediate model the tree's drag-to-
+/// reparent uses.
+struct FamilyLinksEditor: View {
+    let subject: Person
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query private var allPeople: [Person]
+
+    private enum Role: String, Identifiable { case parent, partner, child; var id: String { rawValue } }
+    @State private var adding: Role?
+
+    private var possessive: String { subject.isSelf ? "Your" : "\(subject.name)’s" }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                parentsSection
+                partnersSection
+                childrenSection
+            }
+            .navigationTitle(subject.isSelf ? "Your Family" : "Family Links")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .sheet(item: $adding) { role in
+                PersonOrGhostPicker(
+                    title: role == .parent ? "Add a Parent" : role == .partner ? "Add a Partner" : "Add a Child",
+                    excludeIDs: excludeIDs(for: role),
+                    onPick: { link(role, to: $0) },
+                    onCreate: { link(role, to: resolveGhost(named: $0)) }
+                )
+            }
+        }
+    }
+
+    // MARK: Sections
+
+    private var parentsSection: some View {
+        Section {
+            ForEach(subject.parentEdges, id: \.persistentModelID) { edge in
+                if let parent = edge.parent {
+                    personRow(parent, kindMenu: parentageKindMenu(edge)) { context.delete(edge); save() }
+                }
+            }
+            addButton("Add parent", role: .parent)
+        } header: { Text("\(possessive) parents") }
+    }
+
+    private var childrenSection: some View {
+        Section {
+            ForEach(subject.childEdges, id: \.persistentModelID) { edge in
+                if let child = edge.child {
+                    personRow(child, kindMenu: parentageKindMenu(edge)) { context.delete(edge); save() }
+                }
+            }
+            addButton("Add child", role: .child)
+        } header: { Text("\(possessive) children") }
+    }
+
+    private var partnersSection: some View {
+        Section {
+            ForEach(subject.partnerEdges, id: \.edge.persistentModelID) { pair in
+                personRow(pair.other, kindMenu: partnershipKindMenu(pair.edge)) { context.delete(pair.edge); save() }
+            }
+            addButton("Add partner", role: .partner)
+        } header: { Text("\(possessive) partner") }
+    }
+
+    // MARK: Row + controls
+
+    private func personRow(_ person: Person, kindMenu: some View, onRemove: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            AvatarView(data: person.profilePhotoData, name: person.name, size: 36, desaturated: person.isDeceased)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(person.name)
+                if person.isGhost {
+                    Button("Make a full contact") { person.isGhost = false; save() }
+                        .font(.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.aegean)
+                }
+            }
+            Spacer()
+            kindMenu
+        }
+        .swipeActions {
+            Button("Remove", role: .destructive, action: onRemove)
+        }
+    }
+
+    private func addButton(_ label: String, role: Role) -> some View {
+        Button { adding = role } label: {
+            Label(label, systemImage: "plus.circle")
+        }
+    }
+
+    private func parentageKindMenu(_ edge: Parentage) -> some View {
+        Menu {
+            ForEach(ParentageKind.allCases, id: \.self) { kind in
+                Button(kind.rawValue.capitalized) { edge.kind = kind.rawValue; save() }
+            }
+        } label: {
+            Text(edge.kind.capitalized).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func partnershipKindMenu(_ edge: Partnership) -> some View {
+        Menu {
+            ForEach(PartnershipKind.allCases, id: \.self) { kind in
+                Button(kind.rawValue.capitalized) { edge.kind = kind.rawValue; save() }
+            }
+        } label: {
+            Text(edge.kind.capitalized).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: Actions
+
+    private func excludeIDs(for role: Role) -> Set<PersistentIdentifier> {
+        var ids: Set<PersistentIdentifier> = [subject.persistentModelID]
+        switch role {
+        case .parent: ids.formUnion(subject.parents.map(\.persistentModelID))
+        case .child: ids.formUnion(subject.children.map(\.persistentModelID))
+        case .partner: ids.formUnion(subject.partnerEdges.map(\.other.persistentModelID))
+        }
+        return ids
+    }
+
+    private func link(_ role: Role, to other: Person?) {
+        guard let other, other !== subject else { return }
+        switch role {
+        case .parent: context.insert(Parentage(parent: other, child: subject, kind: .bio))
+        case .child: context.insert(Parentage(parent: subject, child: other, kind: .bio))
+        case .partner: context.insert(Partnership(a: subject, b: other, kind: .partner))
+        }
+        save()
+    }
+
+    private func resolveGhost(named rawName: String) -> Person? {
+        resolveOrCreateGhost(named: rawName, in: context, among: allPeople)
+    }
+
+    private func save() { try? context.save() }
+}
+
+/// Finds a non-self profile/ghost by case-insensitive name, or creates a new
+/// ghost. Shared by the migration and the family editor.
+func resolveOrCreateGhost(named rawName: String, in context: ModelContext, among people: [Person]) -> Person? {
+    let name = rawName.trimmed
+    guard !name.isEmpty else { return nil }
+    if let match = people.first(where: {
+        !$0.isSelf && $0.name.compare(name, options: .caseInsensitive) == .orderedSame
+    }) { return match }
+    let ghost = Person(name: name)
+    ghost.isGhost = true
+    context.insert(ghost)
+    return ghost
+}

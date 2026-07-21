@@ -476,6 +476,7 @@ struct MyFamilyTreeView: View {
         let generation: Int
     }
     @State private var pendingMove: MoveRequest?
+    @State private var showingSelfLinks = false
 
     private var workspace: Workspace {
         Workspace(rawValue: storedWorkspace) ?? .personal
@@ -559,8 +560,18 @@ struct MyFamilyTreeView: View {
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !isLadder {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Edit") { showingSelfLinks = true }
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showingSelfLinks) {
+                if let selfNode = people.first(where: { $0.isSelf }) {
+                    FamilyLinksEditor(subject: selfNode)
                 }
             }
             .confirmationDialog(
@@ -626,6 +637,7 @@ struct PersonFamilySection: View {
     var onEdit: () -> Void
 
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+    @State private var showingLinks = false
 
     private var nodes: [TreeNode] {
         var result: [TreeNode] = [
@@ -709,6 +721,15 @@ struct PersonFamilySection: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            Button { showingLinks = true } label: {
+                Label("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .sheet(isPresented: $showingLinks) {
+            FamilyLinksEditor(subject: person)
         }
     }
 }

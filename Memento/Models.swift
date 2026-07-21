@@ -169,6 +169,18 @@ extension Person {
         set { partnershipsAsB = newValue }
     }
 
+    /// Parentage edges where this person is the child — i.e. their parents.
+    var parentEdges: [Parentage] { edgesAsChildArray }
+    /// Parentage edges where this person is the parent — i.e. their children.
+    var childEdges: [Parentage] { edgesAsParentArray }
+    var parents: [Person] { parentEdges.compactMap(\.parent) }
+    var children: [Person] { childEdges.compactMap(\.child) }
+    /// Each partnership paired with the person on the other side of it.
+    var partnerEdges: [(edge: Partnership, other: Person)] {
+        partnershipsAsAArray.compactMap { edge in edge.b.map { (edge, $0) } }
+            + partnershipsAsBArray.compactMap { edge in edge.a.map { (edge, $0) } }
+    }
+
     /// Ongoing work first, completed history below, each in entry order.
     var sortedProjects: [Project] {
         projectsArray.sorted {
