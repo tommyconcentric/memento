@@ -182,6 +182,79 @@ func buildTreeRows(nodes: [TreeNode], subjectTitle: String, ensureGenerations: S
     }
 }
 
+// MARK: - Family graph derivation (edges → generations, couples, siblings)
+
+/// Turns the raw `Parentage`/`Partnership` edges into the structure the tree
+/// layout draws: every reachable person's generation relative to the self
+/// node, the couples, and the sibling groups (children keyed by their exact
+/// set of parents, so full siblings cluster and half-siblings fall into
+/// separate groups). Pure and self-contained, so it can be tested in isolation.
+struct FamilyGraph {
+    let generation: [PersistentIdentifier: Int]
+    let couples: [Couple]
+    let siblingGroups: [SiblingGroup]
+
+    struct Couple: Identifiable {
+        let id = UUID()
+        let a: Person
+        let b: Person
+        let kind: PartnershipKind
+    }
+
+    struct SiblingGroup: Identifiable {
+        let id = UUID()
+        let parents: [Person]   // the one or two shared parents
+        let children: [Person]  // full siblings — they share this exact parent set
+    }
+
+    static func build(rootedAt root: Person, among people: [Person]) -> FamilyGraph {
+        // Generation via breadth-first search from the self node: a parent is
+        // one generation up, a child one down, a partner on the same rung.
+        // Shortest-path (BFS) wins if remarriage creates more than one route.
+        var generation: [PersistentIdentifier: Int] = [root.persistentModelID: 0]
+        var queue = [root]
+        var head = 0
+        while head < queue.count {
+            let person = queue[head]; head += 1
+            let g = generation[person.persistentModelID] ?? 0
+            func visit(_ other: Person, _ gen: Int) {
+                guard generation[other.persistentModelID] == nil else { return }
+                generation[other.persistentModelID] = gen
+                queue.append(other)
+            }
+            for parent in person.parents { visit(parent, g + 1) }
+            for child in person.children { visit(child, g - 1) }
+            for (_, partner) in person.partnerEdges { visit(partner, g) }
+        }
+
+        let placed = Set(generation.keys)
+        func isPlaced(_ p: Person) -> Bool { placed.contains(p.persistentModelID) }
+
+        // Couples, de-duplicated by unordered pair.
+        var seenPairs = Set<Set<PersistentIdentifier>>()
+        var couples: [Couple] = []
+        for person in people where isPlaced(person) {
+            for (edge, other) in person.partnerEdges where isPlaced(other) {
+                let key: Set = [person.persistentModelID, other.persistentModelID]
+                guard seenPairs.insert(key).inserted else { continue }
+                couples.append(Couple(a: person, b: other, kind: PartnershipKind(rawValue: edge.kind) ?? .partner))
+            }
+        }
+
+        // Sibling groups: bucket children by the sorted ids of their parents.
+        var buckets: [String: (parents: [Person], children: [Person])] = [:]
+        for person in people where isPlaced(person) {
+            let parents = person.parents.filter(isPlaced)
+            guard !parents.isEmpty else { continue }
+            let key = parents.map { "\($0.persistentModelID)" }.sorted().joined(separator: "|")
+            buckets[key, default: (parents, [])].children.append(person)
+        }
+        let siblingGroups = buckets.values.map { SiblingGroup(parents: $0.parents, children: $0.children) }
+
+        return FamilyGraph(generation: generation, couples: couples, siblingGroups: siblingGroups)
+    }
+}
+
 // MARK: - Tree rendering
 
 /// Generation rows joined by a spine — designed to live inside a ScrollView.
