@@ -41,6 +41,12 @@ final class Person {
     var isBusiness: Bool = false          // lives in the Business workspace instead of Personal
     var relationshipToUser: String = ""   // e.g. "Mother" — places them on your family tree
     var address: String = ""
+    // Family-tree graph nodes that never appear in the people list (see the
+    // "listed people" filter): `isSelf` is the single hidden "You" node the
+    // pedigree roots on; `isGhost` is a relative known only by name, kept so
+    // it can carry parentage/partner edges. Both default false.
+    var isSelf: Bool = false
+    var isGhost: Bool = false
 
     // Quick-reference details — kept separate from the running notes
     var birthday: Date?
@@ -75,6 +81,22 @@ final class Person {
     // Shared work with a business contact; use `projectsArray`.
     @Relationship(deleteRule: .cascade, inverse: \Project.person)
     var projects: [Project]?
+
+    // Family-tree edges. A person appears as the parent in some `Parentage`
+    // rows and the child in others; likewise either side of a `Partnership`.
+    // All Optional for CloudKit; use the array accessors below. Deleting a
+    // person cascades their edges so none dangle.
+    @Relationship(deleteRule: .cascade, inverse: \Parentage.parent)
+    var edgesAsParent: [Parentage]?
+
+    @Relationship(deleteRule: .cascade, inverse: \Parentage.child)
+    var edgesAsChild: [Parentage]?
+
+    @Relationship(deleteRule: .cascade, inverse: \Partnership.a)
+    var partnershipsAsA: [Partnership]?
+
+    @Relationship(deleteRule: .cascade, inverse: \Partnership.b)
+    var partnershipsAsB: [Partnership]?
 
     init(name: String, group: PersonGroup? = nil) {
         self.name = name
@@ -127,6 +149,24 @@ extension Person {
     var projectsArray: [Project] {
         get { projects ?? [] }
         set { projects = newValue }
+    }
+
+    // Family-tree edge accessors (non-optional, like the others above).
+    var edgesAsParentArray: [Parentage] {
+        get { edgesAsParent ?? [] }
+        set { edgesAsParent = newValue }
+    }
+    var edgesAsChildArray: [Parentage] {
+        get { edgesAsChild ?? [] }
+        set { edgesAsChild = newValue }
+    }
+    var partnershipsAsAArray: [Partnership] {
+        get { partnershipsAsA ?? [] }
+        set { partnershipsAsA = newValue }
+    }
+    var partnershipsAsBArray: [Partnership] {
+        get { partnershipsAsB ?? [] }
+        set { partnershipsAsB = newValue }
     }
 
     /// Ongoing work first, completed history below, each in entry order.
@@ -306,4 +346,49 @@ final class FamilyMember {
         self.name = name
         self.relation = relation
     }
+}
+
+// MARK: - Family-tree edges (parentage & partnership)
+
+/// One directed parent→child link between two people (either may be a hidden
+/// self/ghost node). `kind` styles the line and decides half- vs full-sibling
+/// math: two people are full siblings when they share both parents, half when
+/// they share one.
+@Model
+final class Parentage {
+    var parent: Person?
+    var child: Person?
+    var kind: String = ParentageKind.bio.rawValue
+
+    init(parent: Person?, child: Person?, kind: ParentageKind = .bio) {
+        self.parent = parent
+        self.child = child
+        self.kind = kind.rawValue
+    }
+}
+
+enum ParentageKind: String, CaseIterable {
+    case bio, adopted, foster, step
+    /// Step and foster ties draw dashed; blood and adoption draw solid.
+    var isDashed: Bool { self == .step || self == .foster }
+}
+
+/// An undirected couple link between two people. `kind` distinguishes a
+/// current union from a former one (a former partner draws a dashed bar).
+@Model
+final class Partnership {
+    var a: Person?
+    var b: Person?
+    var kind: String = PartnershipKind.married.rawValue
+
+    init(a: Person?, b: Person?, kind: PartnershipKind = .married) {
+        self.a = a
+        self.b = b
+        self.kind = kind.rawValue
+    }
+}
+
+enum PartnershipKind: String, CaseIterable {
+    case married, partner, engaged, former
+    var isDashed: Bool { self == .former }
 }
