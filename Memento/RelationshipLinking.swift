@@ -61,6 +61,128 @@ extension FamilyRelation {
     }
 }
 
+// MARK: - One-time migration of free-text family data into edges
+
+/// Converts the existing free-text family fields into `Parentage`/`Partnership`
+/// edges once, so the new tree has data to draw. Best-effort: only relations
+/// that map to a *direct* edge are converted (parents, children, partners).
+/// Indirect ones (siblings, grandparents, aunts, cousins, in-laws) are left in
+/// the old fields for the user to re-link precisely in the family editor —
+/// they can't be placed without inventing intermediate people.
+enum FamilyGraphMigration {
+    static let didRunKey = "didMigrateFamilyEdgesV1"
+
+    static func runIfNeeded(_ context: ModelContext) {
+        guard !UserDefaults.standard.bool(forKey: didRunKey) else { return }
+        guard let people = try? context.fetch(FetchDescriptor<Person>()),
+              let selfNode = people.first(where: { $0.isSelf }) else { return }
+
+        // Resolve a name to a node: prefer a real profile, then any existing
+        // ghost, else create a ghost. Profiles registered last so they win.
+        var byName: [String: Person] = [:]
+        for p in people where !p.isSelf && p.isGhost { byName[p.name.trimmed.lowercased()] = p }
+        for p in people where !p.isSelf && !p.isGhost { byName[p.name.trimmed.lowercased()] = p }
+
+        func node(for rawName: String) -> Person? {
+            let name = rawName.trimmed
+            guard !name.isEmpty else { return nil }
+            if let existing = byName[name.lowercased()] { return existing }
+            let ghost = Person(name: name)
+            ghost.isGhost = true
+            context.insert(ghost)
+            byName[name.lowercased()] = ghost
+            return ghost
+        }
+
+        func addParentage(parent: Person, child: Person, kind: ParentageKind) {
+            guard parent !== child,
+                  !parent.edgesAsParentArray.contains(where: { $0.child === child }) else { return }
+            context.insert(Parentage(parent: parent, child: child, kind: kind))
+        }
+
+        func addPartnership(_ a: Person, _ b: Person, kind: PartnershipKind) {
+            guard a !== b else { return }
+            let linked = a.partnershipsAsAArray.contains { $0.b === b }
+                || a.partnershipsAsBArray.contains { $0.a === b }
+            guard !linked else { return }
+            context.insert(Partnership(a: a, b: b, kind: kind))
+        }
+
+        // 1) relationshipToUser → edges relative to the self node.
+        for p in people where !p.isSelf && !p.isGhost {
+            let label = p.relationshipToUser.trimmed
+            guard FamilyRelation.isChartable(label) else { continue }
+            let l = label.lowercased()
+            if isPartnerTerm(l) {
+                addPartnership(selfNode, p, kind: partnershipKind(l))
+            } else if isDirectParentTerm(l) {
+                addParentage(parent: p, child: selfNode, kind: parentageKind(l))
+            } else if isDirectChildTerm(l) {
+                addParentage(parent: selfNode, child: p, kind: parentageKind(l))
+            }
+        }
+
+        // 2) Each person's own partner / children / family-member fields.
+        for p in people where !p.isSelf && !p.isGhost {
+            if let partner = node(for: p.partnerName) {
+                addPartnership(p, partner, kind: .partner)
+            }
+            for childName in childNames(of: p) {
+                if let child = node(for: childName) {
+                    addParentage(parent: p, child: child, kind: .bio)
+                }
+            }
+            for member in p.familyMembersArray {
+                let l = member.relation.trimmed.lowercased()
+                guard let other = node(for: member.name) else { continue }
+                if isPartnerTerm(l) {
+                    addPartnership(p, other, kind: partnershipKind(l))
+                } else if isDirectParentTerm(l) {
+                    addParentage(parent: other, child: p, kind: parentageKind(l))
+                } else if isDirectChildTerm(l) {
+                    addParentage(parent: p, child: other, kind: parentageKind(l))
+                }
+            }
+        }
+
+        if (try? context.save()) != nil {
+            UserDefaults.standard.set(true, forKey: didRunKey)
+        }
+    }
+
+    // A direct parent/child is a plain mother/father/child term — not a
+    // grandparent, aunt/uncle, niece/nephew, in-law, or godparent, all of
+    // which contain those words but sit off the direct line.
+    private static func isIndirect(_ l: String) -> Bool {
+        l.contains("grand") || l.contains("great") || l.contains("aunt")
+            || l.contains("uncle") || l.contains("niece") || l.contains("nephew")
+            || l.contains("in-law") || l.contains("god") || l.contains("cousin")
+    }
+    private static func isDirectParentTerm(_ l: String) -> Bool {
+        !isIndirect(l) && (l.contains("mother") || l.contains("father") || l.contains("parent"))
+    }
+    private static func isDirectChildTerm(_ l: String) -> Bool {
+        !isIndirect(l) && (l.contains("daughter") || l.contains("son") || l.contains("child"))
+    }
+    private static func isPartnerTerm(_ l: String) -> Bool {
+        l.contains("wife") || l.contains("husband") || l.contains("spouse")
+            || l.contains("partner") || l.contains("girlfriend") || l.contains("boyfriend")
+            || l.contains("fianc")
+    }
+    private static func parentageKind(_ l: String) -> ParentageKind {
+        if l.contains("step") { return .step }
+        if l.contains("adopt") { return .adopted }
+        if l.contains("foster") { return .foster }
+        return .bio
+    }
+    private static func partnershipKind(_ l: String) -> PartnershipKind {
+        if l.hasPrefix("ex-") || l.hasPrefix("ex ") || l.contains("former") { return .former }
+        if l.contains("fianc") { return .engaged }
+        if l.contains("wife") || l.contains("husband") || l.contains("spouse") { return .married }
+        return .partner
+    }
+}
+
 // MARK: - Deep relationship description ("Your father's brother's daughter")
 
 enum RelationshipPath {

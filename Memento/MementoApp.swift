@@ -114,6 +114,7 @@ struct RootView: View {
                 #if DEBUG
                 StressSeeder.seedIfRequested(context)
                 #endif
+                FamilyGraphMigration.runIfNeeded(context)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
