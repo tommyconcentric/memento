@@ -366,40 +366,56 @@ struct PedigreeTreeView: View {
     let layout: FamilyTreeLayout
     var accent: Color = Theme.gold
 
+    @State private var scale: CGFloat = 1
+    @State private var pinchStart: CGFloat = 1
+
     private var lineColor: Color { Theme.bark.opacity(0.55) }
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
             ZStack(alignment: .topLeading) {
-                Canvas { ctx, _ in
-                    for bar in layout.coupleBars {
-                        var p = Path(); p.move(to: bar.a); p.addLine(to: bar.b)
-                        ctx.stroke(p, with: .color(lineColor), style: stroke(bar.dashed))
-                    }
-                    for d in layout.descents {
-                        guard !d.children.isEmpty else { continue }
-                        let busY = (d.anchor.y + (d.children.map(\.point.y).min() ?? d.anchor.y)) / 2
-                        var trunk = Path(); trunk.move(to: d.anchor); trunk.addLine(to: CGPoint(x: d.anchor.x, y: busY))
-                        ctx.stroke(trunk, with: .color(lineColor), style: stroke(false))
-                        let xs = d.children.map(\.point.x)
-                        var bus = Path()
-                        bus.move(to: CGPoint(x: min(d.anchor.x, xs.min() ?? d.anchor.x), y: busY))
-                        bus.addLine(to: CGPoint(x: max(d.anchor.x, xs.max() ?? d.anchor.x), y: busY))
-                        ctx.stroke(bus, with: .color(lineColor), style: stroke(false))
-                        for stub in d.children {
-                            var s = Path(); s.move(to: CGPoint(x: stub.point.x, y: busY))
-                            s.addLine(to: CGPoint(x: stub.point.x, y: stub.point.y - FamilyTreeLayout.nodeR))
-                            ctx.stroke(s, with: .color(lineColor), style: stroke(stub.dashed))
-                        }
-                    }
-                }
+                Canvas { ctx, _ in draw(&ctx) }
                 ForEach(layout.nodes) { node in
                     pedigreeNode(node.person)
                         .position(node.point)
                 }
             }
             .frame(width: max(layout.size.width, 1), height: max(layout.size.height, 1))
-            .padding(.bottom, 8)
+            .background(treeParchmentGradient)
+            .scaleEffect(scale, anchor: .topLeading)
+            // Reserve the scaled footprint so the ScrollView can reach every
+            // corner when zoomed in.
+            .frame(width: max(layout.size.width, 1) * scale,
+                   height: max(layout.size.height, 1) * scale,
+                   alignment: .topLeading)
+            .padding(20)
+        }
+        .gesture(
+            MagnificationGesture()
+                .onChanged { value in scale = (pinchStart * value).clamped(to: 0.4...2.5) }
+                .onEnded { _ in pinchStart = scale }
+        )
+    }
+
+    private func draw(_ ctx: inout GraphicsContext) {
+        for bar in layout.coupleBars {
+            var p = Path(); p.move(to: bar.a); p.addLine(to: bar.b)
+            ctx.stroke(p, with: .color(lineColor), style: stroke(bar.dashed))
+        }
+        for d in layout.descents where !d.children.isEmpty {
+            let busY = (d.anchor.y + (d.children.map(\.point.y).min() ?? d.anchor.y)) / 2
+            var trunk = Path(); trunk.move(to: d.anchor); trunk.addLine(to: CGPoint(x: d.anchor.x, y: busY))
+            ctx.stroke(trunk, with: .color(lineColor), style: stroke(false))
+            let xs = d.children.map(\.point.x)
+            var bus = Path()
+            bus.move(to: CGPoint(x: min(d.anchor.x, xs.min() ?? d.anchor.x), y: busY))
+            bus.addLine(to: CGPoint(x: max(d.anchor.x, xs.max() ?? d.anchor.x), y: busY))
+            ctx.stroke(bus, with: .color(lineColor), style: stroke(false))
+            for stub in d.children {
+                var s = Path(); s.move(to: CGPoint(x: stub.point.x, y: busY))
+                s.addLine(to: CGPoint(x: stub.point.x, y: stub.point.y - FamilyTreeLayout.nodeR))
+                ctx.stroke(s, with: .color(lineColor), style: stroke(stub.dashed))
+            }
         }
     }
 
@@ -407,19 +423,41 @@ struct PedigreeTreeView: View {
         StrokeStyle(lineWidth: 1.3, lineCap: .round, dash: dashed ? [3, 4] : [])
     }
 
+    @ViewBuilder
     private func pedigreeNode(_ person: Person) -> some View {
+        // Real profiles open on tap; the self node and name-only ghosts don't.
+        if !person.isSelf && !person.isGhost {
+            NavigationLink { PersonDetailView(person: person) } label: { portrait(person) }
+                .buttonStyle(.plain)
+        } else {
+            portrait(person)
+        }
+    }
+
+    private func portrait(_ person: Person) -> some View {
         VStack(spacing: 3) {
             AvatarView(data: person.profilePhotoData,
                        name: person.isSelf ? "You" : person.name,
                        size: FamilyTreeLayout.nodeR * 2,
                        desaturated: person.isDeceased)
-                .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.5),
+                // Gilt ring with a fine bark rule floating outside, matching
+                // the classic chart's framed-portrait look.
+                .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.55),
                                          lineWidth: person.isSelf ? 2.5 : 1.5))
+                .overlay(Circle().stroke(Theme.bark.opacity(person.isSelf ? 0.6 : 0.35), lineWidth: 0.5).padding(-3))
+                .padding(3)
             Text(person.isSelf ? "You" : person.name)
                 .font(.system(.caption2, design: .serif).weight(person.isSelf ? .semibold : .regular))
+                .foregroundStyle(person.isGhost ? Color.secondary : .primary)
                 .lineLimit(1)
                 .frame(width: 96)
         }
+    }
+}
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 
