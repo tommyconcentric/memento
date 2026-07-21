@@ -135,7 +135,9 @@ predecessor of this — they connect whole rows, not individuals.
    (parchment plate + gilt portrait rings), pinch-zoom, and tap-to-open
    profiles are in. Remaining: crossing reduction on dense trees and
    single-parent/no-parent polish; then make it the default and retire the old
-   generation chart.*
+   generation chart. Crossing reduction (barycenter row seeding) landed and
+   holds up on a dense two-sided pedigree with grandparents, a half-sibling and
+   collateral families. Only the flip-to-default remains.*
 4. Derivation: generations, couples, full/half/step logic. *Medium.*
 5. Layout engine + typed connector rendering + pan/zoom. *Large.*
 6. Hidden-self wiring across all list surfaces; reconcile/replace the existing
