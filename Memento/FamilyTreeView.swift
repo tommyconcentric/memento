@@ -255,6 +255,174 @@ struct FamilyGraph {
     }
 }
 
+// MARK: - Pedigree layout engine
+
+/// Positions a `FamilyGraph` for drawing: a layered layout (one row per
+/// generation) with a few relaxation passes that pull each person toward the
+/// average x of their parents, children and partner, then de-overlap each row.
+/// Emits node points, couple bars, and parent→children descent lines. Not a
+/// crossing-minimal tidy layout, but reads as a conventional pedigree.
+struct FamilyTreeLayout {
+    struct Node: Identifiable { let id: PersistentIdentifier; let person: Person; let point: CGPoint }
+    struct CoupleBar: Identifiable { let id = UUID(); let a: CGPoint; let b: CGPoint; let dashed: Bool }
+    struct Descent: Identifiable { let id = UUID(); let anchor: CGPoint; let children: [ChildStub] }
+    struct ChildStub: Identifiable { let id = UUID(); let point: CGPoint; let dashed: Bool }
+
+    let nodes: [Node]
+    let coupleBars: [CoupleBar]
+    let descents: [Descent]
+    let size: CGSize
+
+    static let hGap: CGFloat = 112
+    static let vGap: CGFloat = 150
+    static let nodeR: CGFloat = 30
+    static let margin: CGFloat = 40
+
+    static func compute(_ graph: FamilyGraph, people: [Person]) -> FamilyTreeLayout {
+        let placedIDs = Set(graph.generation.keys)
+        let placed = people.filter { placedIDs.contains($0.persistentModelID) }
+        guard !placed.isEmpty else { return .init(nodes: [], coupleBars: [], descents: [], size: .zero) }
+
+        var byGen: [Int: [Person]] = [:]
+        for p in placed { byGen[graph.generation[p.persistentModelID] ?? 0, default: []].append(p) }
+        let gens = byGen.keys.sorted(by: >)
+        let topGen = gens.first ?? 0
+        func rowY(_ g: Int) -> CGFloat { CGFloat(topGen - g) * vGap + margin + nodeR }
+
+        func placedNeighbours(_ list: [Person]) -> [Person] { list.filter { placedIDs.contains($0.persistentModelID) } }
+
+        var x: [PersistentIdentifier: CGFloat] = [:]
+        for g in gens {
+            for (i, p) in byGen[g]!.sorted(by: { $0.name < $1.name }).enumerated() {
+                x[p.persistentModelID] = CGFloat(i) * hGap
+            }
+        }
+
+        for _ in 0..<10 {
+            var desired: [PersistentIdentifier: CGFloat] = [:]
+            for p in placed {
+                var samples = [x[p.persistentModelID] ?? 0]
+                let kids = placedNeighbours(p.children).compactMap { x[$0.persistentModelID] }
+                if !kids.isEmpty { samples.append(kids.reduce(0, +) / CGFloat(kids.count)) }
+                let par = placedNeighbours(p.parents).compactMap { x[$0.persistentModelID] }
+                if !par.isEmpty { samples.append(par.reduce(0, +) / CGFloat(par.count)) }
+                let prt = placedNeighbours(p.partnerEdges.map(\.other)).compactMap { x[$0.persistentModelID] }
+                if !prt.isEmpty { samples.append(prt.reduce(0, +) / CGFloat(prt.count)) }
+                desired[p.persistentModelID] = samples.reduce(0, +) / CGFloat(samples.count)
+            }
+            for g in gens {
+                let row = byGen[g]!.sorted { (desired[$0.persistentModelID] ?? 0) < (desired[$1.persistentModelID] ?? 0) }
+                var last = -CGFloat.greatestFiniteMagnitude
+                for p in row {
+                    var nx = desired[p.persistentModelID] ?? 0
+                    if nx < last + hGap { nx = last + hGap }
+                    x[p.persistentModelID] = nx
+                    last = nx
+                }
+            }
+        }
+
+        let minX = x.values.min() ?? 0
+        func point(_ p: Person) -> CGPoint? {
+            guard let px = x[p.persistentModelID], let g = graph.generation[p.persistentModelID] else { return nil }
+            return CGPoint(x: px - minX + margin + nodeR, y: rowY(g))
+        }
+
+        let nodes: [Node] = placed.compactMap { p in point(p).map { Node(id: p.persistentModelID, person: p, point: $0) } }
+
+        var seen = Set<Set<PersistentIdentifier>>()
+        let coupleBars: [CoupleBar] = graph.couples.compactMap { c in
+            let key: Set = [c.a.persistentModelID, c.b.persistentModelID]
+            guard seen.insert(key).inserted, let pa = point(c.a), let pb = point(c.b) else { return nil }
+            return CoupleBar(a: pa, b: pb, dashed: c.kind.isDashed)
+        }
+
+        let descents: [Descent] = graph.siblingGroups.compactMap { grp in
+            let parentPts = grp.parents.compactMap(point)
+            guard !parentPts.isEmpty else { return nil }
+            let anchor = CGPoint(
+                x: parentPts.map(\.x).reduce(0, +) / CGFloat(parentPts.count),
+                y: parentPts.map(\.y).reduce(0, +) / CGFloat(parentPts.count))
+            let stubs: [ChildStub] = grp.children.compactMap { kid in
+                guard let pt = point(kid) else { return nil }
+                let dashed = kid.parentEdges.contains { e in
+                    grp.parents.contains { $0 === e.parent } && (ParentageKind(rawValue: e.kind)?.isDashed ?? false)
+                }
+                return ChildStub(point: pt, dashed: dashed)
+            }
+            return Descent(anchor: anchor, children: stubs)
+        }
+
+        let maxX = nodes.map(\.point.x).max() ?? 0
+        let maxY = nodes.map(\.point.y).max() ?? 0
+        return .init(nodes: nodes, coupleBars: coupleBars, descents: descents,
+                     size: CGSize(width: maxX + margin + nodeR, height: maxY + margin + nodeR))
+    }
+}
+
+/// Renders a `FamilyTreeLayout` as a pan/scrollable pedigree: couple bars and
+/// descent lines drawn in a Canvas, portraits laid over them.
+struct PedigreeTreeView: View {
+    let layout: FamilyTreeLayout
+    var accent: Color = Theme.gold
+
+    private var lineColor: Color { Theme.bark.opacity(0.55) }
+
+    var body: some View {
+        ScrollView([.horizontal, .vertical]) {
+            ZStack(alignment: .topLeading) {
+                Canvas { ctx, _ in
+                    for bar in layout.coupleBars {
+                        var p = Path(); p.move(to: bar.a); p.addLine(to: bar.b)
+                        ctx.stroke(p, with: .color(lineColor), style: stroke(bar.dashed))
+                    }
+                    for d in layout.descents {
+                        guard !d.children.isEmpty else { continue }
+                        let busY = (d.anchor.y + (d.children.map(\.point.y).min() ?? d.anchor.y)) / 2
+                        var trunk = Path(); trunk.move(to: d.anchor); trunk.addLine(to: CGPoint(x: d.anchor.x, y: busY))
+                        ctx.stroke(trunk, with: .color(lineColor), style: stroke(false))
+                        let xs = d.children.map(\.point.x)
+                        var bus = Path()
+                        bus.move(to: CGPoint(x: min(d.anchor.x, xs.min() ?? d.anchor.x), y: busY))
+                        bus.addLine(to: CGPoint(x: max(d.anchor.x, xs.max() ?? d.anchor.x), y: busY))
+                        ctx.stroke(bus, with: .color(lineColor), style: stroke(false))
+                        for stub in d.children {
+                            var s = Path(); s.move(to: CGPoint(x: stub.point.x, y: busY))
+                            s.addLine(to: CGPoint(x: stub.point.x, y: stub.point.y - FamilyTreeLayout.nodeR))
+                            ctx.stroke(s, with: .color(lineColor), style: stroke(stub.dashed))
+                        }
+                    }
+                }
+                ForEach(layout.nodes) { node in
+                    pedigreeNode(node.person)
+                        .position(node.point)
+                }
+            }
+            .frame(width: max(layout.size.width, 1), height: max(layout.size.height, 1))
+            .padding(.bottom, 8)
+        }
+    }
+
+    private func stroke(_ dashed: Bool) -> StrokeStyle {
+        StrokeStyle(lineWidth: 1.3, lineCap: .round, dash: dashed ? [3, 4] : [])
+    }
+
+    private func pedigreeNode(_ person: Person) -> some View {
+        VStack(spacing: 3) {
+            AvatarView(data: person.profilePhotoData,
+                       name: person.isSelf ? "You" : person.name,
+                       size: FamilyTreeLayout.nodeR * 2,
+                       desaturated: person.isDeceased)
+                .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.5),
+                                         lineWidth: person.isSelf ? 2.5 : 1.5))
+            Text(person.isSelf ? "You" : person.name)
+                .font(.system(.caption2, design: .serif).weight(person.isSelf ? .semibold : .regular))
+                .lineLimit(1)
+                .frame(width: 96)
+        }
+    }
+}
+
 // MARK: - Tree rendering
 
 /// Generation rows joined by a spine — designed to live inside a ScrollView.
@@ -550,6 +718,14 @@ struct MyFamilyTreeView: View {
     }
     @State private var pendingMove: MoveRequest?
     @State private var showingSelfLinks = false
+    // Opt-in preview of the edge-driven pedigree while it's being built; the
+    // classic generation chart stays the default until it's finished.
+    @AppStorage("useNewFamilyTree") private var useNewTree = false
+
+    private var pedigreeLayout: FamilyTreeLayout? {
+        guard let selfNode = people.first(where: { $0.isSelf }) else { return nil }
+        return FamilyTreeLayout.compute(FamilyGraph.build(rootedAt: selfNode, among: people), people: people)
+    }
 
     private var workspace: Workspace {
         Workspace(rawValue: storedWorkspace) ?? .personal
@@ -600,6 +776,10 @@ struct MyFamilyTreeView: View {
 
     var body: some View {
         NavigationStack {
+            Group {
+            if useNewTree && !isLadder, let layout = pedigreeLayout, !layout.nodes.isEmpty {
+                PedigreeTreeView(layout: layout, accent: workspace.accent)
+            } else {
             ScrollView {
                 if labeled.isEmpty {
                     ContentUnavailableView {
@@ -629,13 +809,22 @@ struct MyFamilyTreeView: View {
                     .padding()
                 }
             }
+            }
+            }
             .background(workspace.background)
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !isLadder {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Edit") { showingSelfLinks = true }
+                        Menu {
+                            Button("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted") {
+                                showingSelfLinks = true
+                            }
+                            Toggle("New tree layout (beta)", isOn: $useNewTree)
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
