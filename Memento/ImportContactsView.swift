@@ -49,6 +49,10 @@ struct ImportContactsView: View {
         candidates.filter(\.include).count
     }
 
+    private var newCandidateCount: Int {
+        candidates.filter { !$0.alreadyExists }.count
+    }
+
     // "All" means everyone not already in Memento — those default to
     // unticked precisely to avoid duplicate imports, and Select All
     // shouldn't quietly undo that. They can still be ticked by hand.
@@ -183,6 +187,30 @@ struct ImportContactsView: View {
                         Text(group.name).tag(Optional(group))
                     }
                 }
+            }
+            .listRowBackground(Theme.card)
+
+            // One-tap bulk import — the alternative to ticking each person.
+            // "All" means everyone not already in Memento; duplicate rows
+            // stay out unless ticked by hand (and a hand-ticked one still
+            // comes along).
+            Section {
+                Button {
+                    setAllIncluded(true)
+                    importSelected()
+                } label: {
+                    Label(
+                        newCandidateCount == candidates.count
+                            ? "Import All \(newCandidateCount)"
+                            : "Import All \(newCandidateCount) New",
+                        systemImage: "square.and.arrow.down.on.square"
+                    )
+                }
+                .disabled(newCandidateCount == 0)
+            } footer: {
+                Text(newCandidateCount == candidates.count
+                    ? "Brings everyone in at once — or tick people individually and use Import at the top."
+                    : "Brings in everyone not already in Memento — \"Already in Memento\" rows stay out unless you tick them.")
             }
             .listRowBackground(Theme.card)
 
