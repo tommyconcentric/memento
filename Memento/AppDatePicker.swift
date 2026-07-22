@@ -20,18 +20,22 @@ struct AppDatePicker: View {
         self._isExpanded = State(initialValue: initiallyExpanded)
     }
 
-    /// The picker's arithmetic (the 1900-based year menu, 12 month symbols,
-    /// day-grid construction) is Gregorian by design. `Calendar.current` on
-    /// a device set to the Japanese, Republic of China or Persian calendar
-    /// reports era-based years (Reiwa 8, 115, ~1405) that invert the year
-    /// range and trap at runtime — same defense as `Date.gregorian` in
-    /// Utilities. The user's locale and week start still apply; only the
-    /// calendar arithmetic is pinned.
+    /// The picker runs in the device calendar so its numbers agree with the
+    /// header row and the rest of the app — Buddhist (year 2569) and Hebrew
+    /// (5786) devices work natively. But a calendar whose current year sits
+    /// below the year menu's 1900 floor (Japanese ≈ Reiwa 8, Republic of
+    /// China ≈ 115, Persian ≈ 1405, Islamic ≈ 1447) would invert the
+    /// `1900...` range and trap; those fall back to Gregorian arithmetic
+    /// (keeping locale, time zone and week start) — same defense as
+    /// `Date.gregorian` in Utilities — turning a guaranteed crash into
+    /// Gregorian year numbering.
     private var calendar: Calendar {
+        let current = Calendar.current
+        if current.component(.year, from: .now) >= 1900 { return current }
         var gregorian = Calendar(identifier: .gregorian)
-        gregorian.locale = .current
-        gregorian.timeZone = Calendar.current.timeZone
-        gregorian.firstWeekday = Calendar.current.firstWeekday
+        gregorian.locale = current.locale
+        gregorian.timeZone = current.timeZone
+        gregorian.firstWeekday = current.firstWeekday
         return gregorian
     }
     private var accent: Color { business ? Theme.graphite : Theme.aegean }
