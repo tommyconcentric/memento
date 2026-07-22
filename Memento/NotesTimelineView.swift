@@ -18,6 +18,11 @@ struct NotesTimelineView: View {
     enum ActiveNoteSheet: Identifiable {
         case reading(NoteEntry)
         case editing(NoteEntry)
+        var note: NoteEntry {
+            switch self {
+            case .reading(let note), .editing(let note): return note
+            }
+        }
         var id: String {
             switch self {
             case .reading(let note): return "read-\(note.persistentModelID.hashValue)"
@@ -63,17 +68,35 @@ struct NotesTimelineView: View {
             NoteComposerView(person: person, note: nil)
         }
         .sheet(item: $activeNoteSheet) { sheet in
-            switch sheet {
-            case .reading(let note):
-                NoteDetailSheet(note: note) {
-                    activeNoteSheet = .editing(note)
+            // A sync from another device can delete the note while its
+            // sheet is open — render nothing against the dead model (the
+            // isDeleted defense PersonDetailView uses) while the onChange
+            // below dismisses the sheet.
+            if sheet.note.isDeleted {
+                Color.clear
+            } else {
+                switch sheet {
+                case .reading(let note):
+                    NoteDetailSheet(note: note) {
+                        activeNoteSheet = .editing(note)
+                    }
+                case .editing(let note):
+                    NoteComposerView(person: person, note: note)
                 }
-            case .editing(let note):
-                NoteComposerView(person: person, note: note)
             }
         }
         .sheet(item: $viewerPhoto) { photo in
-            PhotoViewerSheet(photo: photo)
+            if photo.isDeleted {
+                Color.clear
+            } else {
+                PhotoViewerSheet(photo: photo)
+            }
+        }
+        .onChange(of: activeNoteSheet?.note.isDeleted ?? false) { _, deleted in
+            if deleted { activeNoteSheet = nil }
+        }
+        .onChange(of: viewerPhoto?.isDeleted ?? false) { _, deleted in
+            if deleted { viewerPhoto = nil }
         }
         .confirmationDialog(
             "Delete this note?",
@@ -196,6 +219,16 @@ struct NoteDetailSheet: View {
     @State private var viewerPhoto: EventPhoto?
 
     var body: some View {
+        // Deleted by a CloudKit sync while open — render nothing (as
+        // PersonDetailView does); the presenting timeline dismisses it.
+        if note.isDeleted {
+            Color.clear
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -279,6 +312,15 @@ struct PhotoViewerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        // Same deleted-out-from-under defense as NoteDetailSheet above.
+        if photo.isDeleted {
+            Color.clear
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         NavigationStack {
             VStack(spacing: 12) {
                 if let data = photo.imageData, let uiImage = UIImage(data: data) {

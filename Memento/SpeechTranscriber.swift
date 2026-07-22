@@ -24,6 +24,10 @@ final class SpeechTranscriber {
     // start (double-click) that arrived during the wait aborts the stale
     // start before it can hot-mic an empty screen or double-tap the input.
     private var startGeneration = 0
+    // True while this transcriber holds the shared audio session active
+    // (ducking other apps' audio). Tracked so both stop() and start()'s
+    // failure paths can release the session exactly once, whichever runs.
+    private var sessionActive = false
 
     // MARK: - Permissions
 
@@ -67,6 +71,7 @@ final class SpeechTranscriber {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: .duckOthers)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
+            sessionActive = true
 
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
@@ -77,7 +82,7 @@ final class SpeechTranscriber {
             // grants mic access independently of whether a mic exists.
             guard format.sampleRate > 0, format.channelCount > 0 else {
                 errorMessage = "No microphone is available on this device — connect one and try again."
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                deactivateSession()
                 return
             }
             inputNode.removeTap(onBus: 0)
@@ -88,6 +93,11 @@ final class SpeechTranscriber {
             try audioEngine.start()
         } catch {
             errorMessage = "Couldn't start the microphone: \(error.localizedDescription)"
+            // The session is already active (still ducking other apps) when
+            // the engine is what threw — release it here: isRecording never
+            // became true, so nothing else would.
+            audioEngine.inputNode.removeTap(onBus: 0)
+            deactivateSession()
             return
         }
 
@@ -100,7 +110,7 @@ final class SpeechTranscriber {
         // Always invalidate a pending start, even when nothing is running
         // yet — the guard below must not swallow that.
         startGeneration += 1
-        guard isRecording || audioEngine.isRunning else { return }
+        guard isRecording || audioEngine.isRunning || sessionActive else { return }
         isRecording = false
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -108,6 +118,15 @@ final class SpeechTranscriber {
         task?.cancel()
         task = nil
         request = nil
+        deactivateSession()
+    }
+
+    /// Releases the shared audio session if this transcriber activated it.
+    /// Idempotent — safe from any cleanup path, releases at most once.
+    @MainActor
+    private func deactivateSession() {
+        guard sessionActive else { return }
+        sessionActive = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
