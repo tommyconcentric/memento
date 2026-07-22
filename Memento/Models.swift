@@ -116,6 +116,17 @@ final class Person {
     }
 }
 
+extension Array where Element == Person {
+    /// The single self node every feature should agree on. Two devices can
+    /// each seed a "You" before CloudKit merges; picking the earliest
+    /// created (deterministically, everywhere) keeps My Profile, the
+    /// pedigree root and new edges on the same node while the duplicate
+    /// merge folds the others away.
+    var canonicalSelfNode: Person? {
+        filter(\.isSelf).min { ($0.createdAt, $0.name) < ($1.createdAt, $1.name) }
+    }
+}
+
 extension Person {
     /// A one-line summary shown under the name in the people list.
     var subtitle: String {

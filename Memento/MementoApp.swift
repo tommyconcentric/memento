@@ -94,6 +94,89 @@ struct MementoApp: App {
     }
 }
 
+/// Guarantees exactly one hidden self node. Creates it when none exists
+/// (first launch, or after a full reset). When two devices each seeded and
+/// *used* their own "You" before CloudKit merged, deleting only edgeless
+/// duplicates left both forever — with the pedigree, My Profile and new
+/// edges each free to land on a different one. Duplicates are now merged:
+/// their edges re-point onto the canonical (earliest-created) node, profile
+/// fields the keeper lacks carry over, and only then is the duplicate
+/// deleted.
+enum SelfNodeMaintenance {
+    static func ensure(_ context: ModelContext, selfNodes: [Person]) {
+        guard !selfNodes.isEmpty else {
+            let me = Person(name: "You")
+            me.isSelf = true
+            context.insert(me)
+            try? context.save()
+            return
+        }
+        guard selfNodes.count > 1, let keeper = selfNodes.canonicalSelfNode else { return }
+
+        for extra in selfNodes where extra !== keeper {
+            // Re-point the duplicate's edges onto the keeper; an edge the
+            // keeper already has (or one that would self-link) is dropped
+            // rather than duplicated.
+            for edge in extra.edgesAsParentArray {
+                if let child = edge.child, child !== keeper,
+                   !keeper.edgesAsParentArray.contains(where: { $0.child === child }) {
+                    edge.parent = keeper
+                } else {
+                    context.delete(edge)
+                }
+            }
+            for edge in extra.edgesAsChildArray {
+                if let parent = edge.parent, parent !== keeper,
+                   !keeper.edgesAsChildArray.contains(where: { $0.parent === parent }) {
+                    edge.child = keeper
+                } else {
+                    context.delete(edge)
+                }
+            }
+            for edge in extra.partnershipsAsAArray {
+                if let other = edge.b, other !== keeper,
+                   !keeper.partnershipsAsAArray.contains(where: { $0.b === other }),
+                   !keeper.partnershipsAsBArray.contains(where: { $0.a === other }) {
+                    edge.a = keeper
+                } else {
+                    context.delete(edge)
+                }
+            }
+            for edge in extra.partnershipsAsBArray {
+                if let other = edge.a, other !== keeper,
+                   !keeper.partnershipsAsAArray.contains(where: { $0.b === other }),
+                   !keeper.partnershipsAsBArray.contains(where: { $0.a === other }) {
+                    edge.b = keeper
+                } else {
+                    context.delete(edge)
+                }
+            }
+
+            // My Profile may have been filled in on the other device —
+            // carry anything the keeper is missing before deleting.
+            let keeperUnnamed = keeper.name.trimmed.isEmpty || keeper.name == "You"
+            if keeperUnnamed, !extra.name.trimmed.isEmpty, extra.name != "You" {
+                keeper.name = extra.name
+            }
+            if keeper.profilePhotoData == nil { keeper.profilePhotoData = extra.profilePhotoData }
+            if keeper.birthday == nil { keeper.birthday = extra.birthday }
+            if keeper.phoneNumber.isEmpty { keeper.phoneNumber = extra.phoneNumber }
+            if keeper.email.isEmpty { keeper.email = extra.email }
+            if keeper.address.isEmpty { keeper.address = extra.address }
+            if keeper.jobTitle.isEmpty { keeper.jobTitle = extra.jobTitle }
+            if keeper.company.isEmpty { keeper.company = extra.company }
+            if keeper.hobbies.isEmpty { keeper.hobbies = extra.hobbies }
+            if keeper.hometown.isEmpty { keeper.hometown = extra.hometown }
+            if keeper.foodPreferences.isEmpty { keeper.foodPreferences = extra.foodPreferences }
+            if keeper.partnerName.isEmpty { keeper.partnerName = extra.partnerName }
+            if keeper.childrenNames.isEmpty { keeper.childrenNames = extra.childrenNames }
+
+            context.delete(extra)
+        }
+        try? context.save()
+    }
+}
+
 /// Hosts the main list and seeds the four starter folders on first launch.
 struct RootView: View {
     @Environment(\.modelContext) private var context
@@ -145,28 +228,8 @@ struct RootView: View {
             }
     }
 
-    /// Guarantees exactly one hidden self node. Creates it when none exists
-    /// (first launch, or after a full reset); if two devices each seeded one
-    /// before syncing, keeps the earliest and removes edgeless duplicates —
-    /// the same convention as the built-in folders.
     private func ensureSelfNode() {
-        if selfNodes.isEmpty {
-            let me = Person(name: "You")
-            me.isSelf = true
-            context.insert(me)
-            try? context.save()
-        } else if selfNodes.count > 1 {
-            let survivors = selfNodes.sorted { $0.createdAt < $1.createdAt }
-            var changed = false
-            for extra in survivors.dropFirst() where extra.edgesAsParentArray.isEmpty
-                && extra.edgesAsChildArray.isEmpty
-                && extra.partnershipsAsAArray.isEmpty
-                && extra.partnershipsAsBArray.isEmpty {
-                context.delete(extra)
-                changed = true
-            }
-            if changed { try? context.save() }
-        }
+        SelfNodeMaintenance.ensure(context, selfNodes: selfNodes)
     }
 
     private func seedDefaultGroupsIfNeeded() {

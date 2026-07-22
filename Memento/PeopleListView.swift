@@ -99,7 +99,7 @@ struct PeopleListView: View {
             AboutView()
         }
         .sheet(isPresented: $showingMyProfile) {
-            if let selfNode = selfNodes.first {
+            if let selfNode = selfNodes.canonicalSelfNode {
                 MyProfileSheet(person: selfNode)
             }
         }
@@ -343,7 +343,7 @@ struct PeopleListView: View {
             showingMyProfile = true
         } label: {
             AvatarView(
-                data: selfNodes.first?.profilePhotoData,
+                data: selfNodes.canonicalSelfNode?.profilePhotoData,
                 name: myProfileDisplayName,
                 size: 42
             )
@@ -354,7 +354,7 @@ struct PeopleListView: View {
     }
 
     private var myProfileDisplayName: String {
-        let name = selfNodes.first?.name.trimmed ?? ""
+        let name = selfNodes.canonicalSelfNode?.name.trimmed ?? ""
         return name.isEmpty ? "You" : name
     }
 

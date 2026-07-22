@@ -817,7 +817,7 @@ struct MyFamilyTreeView: View {
     @AppStorage("useNewFamilyTree") private var useNewTree = true
 
     private var pedigreeLayout: FamilyTreeLayout? {
-        guard let selfNode = people.first(where: { $0.isSelf }) else { return nil }
+        guard let selfNode = people.canonicalSelfNode else { return nil }
         return FamilyTreeLayout.compute(FamilyGraph.build(rootedAt: selfNode, among: people), people: people)
     }
 
@@ -946,7 +946,7 @@ struct MyFamilyTreeView: View {
                 }
             }
             .sheet(isPresented: $showingSelfLinks) {
-                if let selfNode = people.first(where: { $0.isSelf }) {
+                if let selfNode = people.canonicalSelfNode {
                     FamilyLinksEditor(subject: selfNode)
                 }
             }
