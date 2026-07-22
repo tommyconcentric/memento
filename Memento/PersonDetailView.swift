@@ -28,6 +28,11 @@ struct PersonDetailView: View {
                 content
             }
         }
+        // Set here, not at any single presentation site: this screen is
+        // reachable from the sidebar, the ladder, and family-tab links,
+        // and its cards must wear the person's workspace surfaces on
+        // every route.
+        .environment(\.cardWorkspace, person.workspace)
     }
 
     private var content: some View {

@@ -242,6 +242,16 @@ struct SettingsView: View {
                     }
                 }
             }
+            .onChange(of: manualSyncOnly) { _, isManual in
+                // Edits made while in manual mode never reached the calendar
+                // (refreshFromContext is gated on this flag), so switching
+                // back to Automatically must catch up now — otherwise the
+                // calendar stays stale until the next date-affecting save,
+                // which reads as broken. (syncNow no-ops if sync is off.)
+                if !isManual {
+                    CalendarSyncManager.syncNow(context)
+                }
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

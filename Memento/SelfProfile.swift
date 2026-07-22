@@ -263,7 +263,10 @@ struct MyProfileSheet: View {
             .sheet(isPresented: $showingEditor, onDismiss: regenerateShareFile) {
                 PersonEditorView(person: person)
             }
-            .sheet(isPresented: $showingTree) {
+            // The tree sheet reaches the family-links editor, whose save
+            // mutates card fields (partner, family rows) on this very
+            // person — rebuild on dismissal like the profile editor's.
+            .sheet(isPresented: $showingTree, onDismiss: regenerateShareFile) {
                 MyFamilyTreeView()
             }
             .onAppear(perform: regenerateShareFile)
@@ -271,7 +274,7 @@ struct MyProfileSheet: View {
     }
 
     /// The card mirrors the saved profile; rebuild it whenever the sheet
-    /// appears or the editor closes so a stale file is never shared.
+    /// appears or an editing sheet closes so a stale file is never shared.
     private func regenerateShareFile() {
         shareURL = ProfileCard.writeTemporaryFile(for: person)
     }
