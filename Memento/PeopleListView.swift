@@ -160,25 +160,20 @@ struct PeopleListView: View {
         .searchable(text: $searchText, prompt: "Search by name, company, hobby")
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarLeading) {
+            // Only the brand logo stays in the toolbar. A split-view sidebar
+            // can fit just a couple of toolbar icons before SwiftUI demotes
+            // the rest into its auto-generated "…" overflow menu — which on
+            // macOS ("Designed for iPad") flashes and shows nothing when
+            // tapped. A single item never overflows, so it stays a direct,
+            // working button; settings and folders move to the pinned bar
+            // alongside the other always-visible actions.
+            ToolbarItem(placement: .topBarLeading) {
                 Button {
                     showingAbout = true
                 } label: {
                     LogoMark(size: 27, colorScheme: logoColorScheme)
                 }
                 .accessibilityLabel("About Memento")
-                Button {
-                    showingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-                Button {
-                    showingFolders = true
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .accessibilityLabel("Manage folders")
             }
         }
         .overlay {
@@ -219,6 +214,8 @@ struct PeopleListView: View {
                 HStack(spacing: 10) {
                     treeButton
                     calendarButton
+                    foldersButton
+                    settingsButton
                 }
             }
             .padding(.horizontal, 16)
@@ -252,6 +249,29 @@ struct PeopleListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Important dates calendar")
+    }
+
+    /// Folders and settings live in the pinned bar for the same reason as the
+    /// tree and calendar: as toolbar items they'd collapse into the
+    /// non-functional "…" overflow menu on iPad and the Mac.
+    private var foldersButton: some View {
+        Button {
+            showingFolders = true
+        } label: {
+            secondaryPinnedIcon("folder")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Manage folders")
+    }
+
+    private var settingsButton: some View {
+        Button {
+            showingSettings = true
+        } label: {
+            secondaryPinnedIcon("gearshape")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
     }
 
     /// Shared look for the pinned bar's secondary actions: a card-filled
