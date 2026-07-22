@@ -500,6 +500,9 @@ struct PersonRow: View {
                 size: 48,
                 desaturated: person.isDeceased
             )
+            // Belt and braces against the accent fill: even a photo that
+            // happens to be selection-blue keeps a visible edge.
+            .overlay(Circle().strokeBorder(.white.opacity(isSelected ? 0.9 : 0), lineWidth: 1.5))
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -546,7 +549,14 @@ struct PersonRow: View {
             .buttonStyle(.borderless)
             .accessibilityLabel(person.isPinned ? "Unpin \(person.name)" : "Pin \(person.name) to top")
         }
-        .padding(.vertical, 3)
+        // Generous row height: 3pt of breathing room read as cramped, and
+        // left the first row's avatar hugging its card's top edge.
+        .padding(.vertical, 9)
+        // The default separator starts past the avatar and all but
+        // disappears — full-width and warm-tinted, it gives unselected
+        // rows a discernible boundary.
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+        .listRowSeparatorTint(Theme.bark.opacity(0.25))
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button(action: onTogglePin) {
                 Label(person.isPinned ? "Unpin" : "Pin", systemImage: person.isPinned ? "pin.slash" : "pin")
