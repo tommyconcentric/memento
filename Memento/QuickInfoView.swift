@@ -77,6 +77,16 @@ struct QuickInfoView: View {
                         .foregroundStyle(project.isCompleted ? Theme.olive : Theme.graphite)
                 }
             }
+            if !person.isBusiness {
+                // The editor only offers the Projects section on business
+                // profiles, so a contact moved to Personal keeps these rows
+                // with no way to change them. Keep them visible and say
+                // where the editor went, rather than stranding the data
+                // behind an undiscoverable workaround.
+                Text("Projects belong to Memento Business. To change or remove these, set “Shown in” back to Memento Business in Edit Details.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .mementoCard()
@@ -96,7 +106,7 @@ struct QuickInfoView: View {
             InfoRow(
                 icon: person.isBusiness ? "person.crop.rectangle" : "person",
                 label: person.isBusiness ? "Working Relationship" : "Relationship",
-                value: "Your \(person.relationshipToUser.lowercased())"
+                value: relationshipValue
             )
         }
         if let birthday = person.birthday {
@@ -227,6 +237,20 @@ struct QuickInfoView: View {
             .controlSize(.mini)
             .accessibilityLabel("Remind me for \(label)")
         }
+    }
+
+    /// Presets read naturally lowercased mid-sentence ("Mother" → "Your
+    /// mother"), but the editor's "Other…" path stores the user's own
+    /// words — lowercasing those mangles names and acronyms ("CEO at
+    /// Acme" → "ceo at acme"), so custom text renders verbatim. Both
+    /// vocabularies are checked: a workspace flip can leave either kind
+    /// of preset on either kind of profile.
+    private var relationshipValue: String {
+        let relation = person.relationshipToUser
+        let isPreset = (FamilyRelation.presets + BusinessRelation.presets).contains {
+            $0.compare(relation, options: .caseInsensitive) == .orderedSame
+        }
+        return "Your \(isPreset ? relation.lowercased() : relation)"
     }
 
     private func saveDateChange() {

@@ -121,6 +121,17 @@ enum AppDateFormat: String, CaseIterable, Identifiable {
     static func cachedFormatter(_ pattern: String) -> DateFormatter {
         if let cached = formatterCache[pattern] { return cached }
         let formatter = DateFormatter()
+        if pattern == Self.iso8601.fullPattern || pattern == Self.iso8601.monthDayPattern {
+            // ISO 8601 fixes its digits as well as its calendar — pin
+            // POSIX so locales with native numbering still emit ISO.
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+        }
+        // The explicit patterns are Gregorian by definition: left on the
+        // device calendar, `yyyy` renders era years on Buddhist- or
+        // Japanese-calendar devices (1990 → 2533 BE) and "ISO 8601"
+        // stops being ISO. Only the "System" option follows the device,
+        // and it never reaches this cache.
+        formatter.calendar = Date.gregorian
         formatter.dateFormat = pattern
         formatterCache[pattern] = formatter
         return formatter
@@ -281,18 +292,38 @@ struct InfoRow: View {
 
 // MARK: - Card style
 
+/// The workspace whose surfaces `.mementoCard()` draws. Personal is the
+/// default so standalone surfaces (settings, calendar, import, lock
+/// screen — all on the personal whitewash) keep today's look; workspace-
+/// themed roots override it once so business screens get slate cards and
+/// a graphite hairline instead of Personal navy and aegean, without any
+/// call-site changes.
+private struct CardWorkspaceKey: EnvironmentKey {
+    static let defaultValue = Workspace.personal
+}
+
+extension EnvironmentValues {
+    var cardWorkspace: Workspace {
+        get { self[CardWorkspaceKey.self] }
+        set { self[CardWorkspaceKey.self] = newValue }
+    }
+}
+
 /// The shared surface treatment: continuous corners, hairline border,
-/// soft shadow. Keeps every card in the app consistent.
+/// soft shadow. Keeps every card in the app consistent — tinted by the
+/// `cardWorkspace` environment so each workspace's cards match its
+/// background.
 struct MementoCard: ViewModifier {
     var padding: CGFloat = 16
+    @Environment(\.cardWorkspace) private var workspace
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(workspace.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Theme.aegean.opacity(0.14), lineWidth: 1)
+                    .strokeBorder(workspace.accent.opacity(0.14), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
     }
