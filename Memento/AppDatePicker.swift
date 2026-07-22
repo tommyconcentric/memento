@@ -20,7 +20,20 @@ struct AppDatePicker: View {
         self._isExpanded = State(initialValue: initiallyExpanded)
     }
 
-    private var calendar: Calendar { .current }
+    /// The picker's arithmetic (the 1900-based year menu, 12 month symbols,
+    /// day-grid construction) is Gregorian by design. `Calendar.current` on
+    /// a device set to the Japanese, Republic of China or Persian calendar
+    /// reports era-based years (Reiwa 8, 115, ~1405) that invert the year
+    /// range and trap at runtime — same defense as `Date.gregorian` in
+    /// Utilities. The user's locale and week start still apply; only the
+    /// calendar arithmetic is pinned.
+    private var calendar: Calendar {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.locale = .current
+        gregorian.timeZone = Calendar.current.timeZone
+        gregorian.firstWeekday = Calendar.current.firstWeekday
+        return gregorian
+    }
     private var accent: Color { business ? Theme.graphite : Theme.aegean }
     private var fontDesign: Font.Design { business ? .default : .serif }
     private var plateTint: Color { business ? Theme.steel.opacity(0.08) : Theme.gold.opacity(0.07) }
@@ -94,8 +107,10 @@ struct AppDatePicker: View {
     }
 
     private var yearOptions: [Int] {
+        // Belt and braces: never build an inverted range even if the
+        // calendar's year math ever surprises again.
         let thisYear = calendar.component(.year, from: .now)
-        return Array((1900...(thisYear + 10)).reversed())
+        return Array((1900...max(thisYear + 10, 1900)).reversed())
     }
 
     private func menuLabel(_ text: String) -> some View {
