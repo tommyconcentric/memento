@@ -593,6 +593,10 @@ struct FamilyTreeContent: View {
     /// Corporate dressing for the Business ladder: slate lanes and steel
     /// rules in place of the genealogy chart's parchment and gilt.
     var corporate = false
+    /// False for image export: ImageRenderer doesn't render the content of
+    /// UIKit-backed ScrollViews, so exported lanes lay their people out in
+    /// plain rows instead (the export is given a wide fixed frame).
+    var scrollableLanes = true
     var onDropInGeneration: ((String, Int) -> Void)? = nil
 
     @State private var targetedGeneration: Int? = nil
@@ -706,34 +710,42 @@ struct FamilyTreeContent: View {
                     .font(.system(.caption2, design: .serif).italic())
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 10)
-            } else {
+            } else if scrollableLanes {
                 // A crowded generation overflows its lane sideways; the
                 // visible indicator is what makes that scrollable at all
                 // with a mouse on the Mac, where there's no swipe.
                 ScrollView(.horizontal, showsIndicators: true) {
-                    HStack(spacing: 12) {
-                        ForEach(row.nodes) { node in
-                            FamilyNodeView(
-                                node: node,
-                                dragPayload: (dragEnabled && !node.isFocus) ? node.name : nil,
-                                corporate: corporate
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 2)
-                    // Fill the chart width so a sparse generation centres;
-                    // a crowded one exceeds it and the ScrollView takes over.
-                    // (maxWidth: .infinity is inert inside a horizontal
-                    // ScrollView, which sizes content to its natural width.)
-                    .frame(minWidth: max(0, laneWidth - laneHorizontalPadding), alignment: .center)
+                    nodeRow(row)
+                        // Fill the chart width so a sparse generation
+                        // centres; a crowded one exceeds it and the
+                        // ScrollView takes over. (maxWidth: .infinity is
+                        // inert inside a horizontal ScrollView, which sizes
+                        // content to its natural width.)
+                        .frame(minWidth: max(0, laneWidth - laneHorizontalPadding), alignment: .center)
                 }
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            } else {
+                nodeRow(row)
+                    .frame(maxWidth: .infinity)
             }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 8)
         .background(laneTint(row.id), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.vertical, 1)
+    }
+
+    private func nodeRow(_ row: TreeRow) -> some View {
+        HStack(spacing: 12) {
+            ForEach(row.nodes) { node in
+                FamilyNodeView(
+                    node: node,
+                    dragPayload: (dragEnabled && !node.isFocus) ? node.name : nil,
+                    corporate: corporate
+                )
+            }
+        }
+        .padding(.horizontal, 2)
     }
 
     /// Engraved generation caption, pinned to the lane's leading edge so the
@@ -857,6 +869,7 @@ struct MyFamilyTreeView: View {
     }
     @State private var pendingMove: MoveRequest?
     @State private var showingSelfLinks = false
+    @State private var exportedTree: TreeImageExport.Item?
 
     private var pedigreeLayout: FamilyTreeLayout? {
         guard let selfNode = people.canonicalSelfNode else { return nil }
@@ -939,16 +952,27 @@ struct MyFamilyTreeView: View {
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !isLadder {
-                    ToolbarItem(placement: .cancellationAction) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    if !isLadder {
                         Button("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted") {
                             showingSelfLinks = true
                         }
                     }
+                    Button {
+                        exportTreeImage()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel(isLadder ? "Share ladder as picture" : "Share tree as picture")
+                    .disabled(isLadder ? labeled.isEmpty : (pedigreeLayout?.nodes.count ?? 0) <= 1)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(item: $exportedTree) { item in
+                ActivityShareSheet(url: item.url)
+                    .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingSelfLinks) {
                 if let selfNode = people.canonicalSelfNode {
@@ -1008,6 +1032,22 @@ struct MyFamilyTreeView: View {
         level == 0 ? "your rung" : BusinessRelation.rowTitle(for: level).lowercased()
     }
 
+    /// Renders the visible tree — pedigree or ladder — into a watermarked
+    /// PNG and hands it to the share sheet.
+    private func exportTreeImage() {
+        if isLadder {
+            guard !labeled.isEmpty else { return }
+            let content = FamilyTreeContent(rows: rows, corporate: true, scrollableLanes: false)
+                .historicalTreePlate(corporate: true)
+                .frame(width: 780)
+            exportedTree = TreeImageExport.export(content, background: workspace.background, filename: "Corporate Ladder")
+        } else {
+            guard let layout = pedigreeLayout, layout.nodes.count > 1 else { return }
+            let content = PedigreeTreeView(layout: layout, accent: workspace.accent).chartBody
+            exportedTree = TreeImageExport.export(content, background: workspace.background, filename: "My Family Tree")
+        }
+    }
+
     private func handleDrop(name: String, generation: Int) {
         // The drag payload is a display name, so resolve it only among the
         // people this tree actually renders, and refuse ambiguous duplicates
@@ -1040,6 +1080,7 @@ struct PersonFamilySection: View {
 
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
     @State private var showingLinks = false
+    @State private var exportedTree: TreeImageExport.Item?
 
     private var nodes: [TreeNode] {
         var result: [TreeNode] = [
@@ -1121,6 +1162,33 @@ struct PersonFamilySection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .historicalTreePlate()
                     .mementoCard(padding: 10)
+                    // Share this tree as a watermarked picture, from right
+                    // on the plate — same export the big tree offers.
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            let content = FamilyTreeContent(rows: buildTreeRows(nodes: nodes, subjectTitle: person.name), scrollableLanes: false)
+                                .historicalTreePlate()
+                                .frame(width: 720)
+                            exportedTree = TreeImageExport.export(
+                                content,
+                                background: Theme.background,
+                                filename: "\(person.name) — Family Tree"
+                            )
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.card, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(.quaternary, lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Share \(person.name)'s tree as picture")
+                        .padding(8)
+                    }
 
                 Button(action: onEdit) {
                     Label("Edit Family", systemImage: "pencil")
@@ -1137,6 +1205,10 @@ struct PersonFamilySection: View {
         }
         .sheet(isPresented: $showingLinks) {
             FamilyLinksEditor(subject: person)
+        }
+        .sheet(item: $exportedTree) { item in
+            ActivityShareSheet(url: item.url)
+                .presentationDetents([.medium, .large])
         }
     }
 }
