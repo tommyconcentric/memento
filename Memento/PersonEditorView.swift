@@ -279,23 +279,51 @@ struct PersonEditorView: View {
                 }
 
                 Section {
-                    TextField("Phone", text: $phoneNumber)
-                        .keyboardType(.phonePad)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    TextField("Address", text: $address, axis: .vertical)
+                    // Primary rows share the extras' anatomy: kind icon on
+                    // the left, star on the right. The primary leads Quick
+                    // Info by default, so its star shows filled unless an
+                    // extra of the same kind holds the preference — tapping
+                    // it reclaims the lead.
+                    primaryContactRow(kind: .phone, value: phoneNumber) {
+                        TextField("Phone", text: $phoneNumber)
+                            .keyboardType(.phonePad)
+                    }
+                    primaryContactRow(kind: .email, value: email) {
+                        TextField("Email", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    primaryContactRow(kind: .address, value: address) {
+                        TextField("Address", text: $address, axis: .vertical)
+                    }
 
                     ForEach($draftContacts) { $draft in
                         HStack {
-                            Picker("", selection: $draft.kind) {
-                                ForEach(ContactField.Kind.allCases, id: \.self) { kind in
-                                    Image(systemName: kind.icon).tag(kind)
+                            // A Menu with a hand-built label, not a bare
+                            // menu-style Picker: the picker's label carries
+                            // internal padding that can't be controlled, so
+                            // its glyph never lined up with the primary
+                            // rows' icons and its caret crowded the field.
+                            Menu {
+                                Picker("", selection: $draft.kind) {
+                                    ForEach(ContactField.Kind.allCases, id: \.self) { kind in
+                                        Label(kind.label, systemImage: kind.icon).tag(kind)
+                                    }
                                 }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: draft.kind.icon)
+                                        .foregroundStyle(Color.accentColor)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: Self.contactIconColumnWidth, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Change kind — currently \(draft.kind.label.lowercased())")
                             // A starred row changing kind must displace any
                             // star already held in the new kind — otherwise
                             // two stars show, and the save's first-wins
@@ -448,6 +476,47 @@ struct PersonEditorView: View {
         .buttonStyle(.borderless)
         .accessibilityLabel(label)
     }
+
+    /// A primary contact row dressed like the extras: the kind's icon
+    /// leads, the star trails. The star is filled when no extra of the
+    /// kind is starred (the primary is Quick Info's default lead);
+    /// tapping it clears any extra's star, handing the lead back.
+    private func primaryContactRow(
+        kind: ContactField.Kind,
+        value: String,
+        @ViewBuilder field: () -> some View
+    ) -> some View {
+        let isPreferred = !draftContacts.contains { $0.kind == kind && $0.starred }
+        return HStack {
+            // Same fixed leading column as the extras' kind picker, so
+            // every text field in the section starts at one x.
+            Image(systemName: kind.icon)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: Self.contactIconColumnWidth, alignment: .leading)
+            field()
+            Button {
+                for index in draftContacts.indices where draftContacts[index].kind == kind {
+                    draftContacts[index].starred = false
+                }
+            } label: {
+                Image(systemName: isPreferred && !value.trimmed.isEmpty ? "star.fill" : "star")
+                    .foregroundStyle(isPreferred && !value.trimmed.isEmpty ? Theme.gold : Color.secondary)
+            }
+            .buttonStyle(.borderless)
+            .disabled(value.trimmed.isEmpty)
+            .accessibilityLabel(isPreferred
+                ? "This \(kind.label.lowercased()) is preferred"
+                : "Prefer this \(kind.label.lowercased())")
+            // Ghost of the extras' delete button: identical metrics, zero
+            // ink — keeps the star column aligned across both row types.
+            Image(systemName: "minus.circle.fill")
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// One shared leading-column width for the Contact section's rows.
+    static let contactIconColumnWidth: CGFloat = 44
 
     /// One starred entry per kind: starring a row clears the star from its
     /// siblings of the same kind; tapping a starred row removes the star,
