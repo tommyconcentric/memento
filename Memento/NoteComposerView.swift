@@ -16,7 +16,11 @@ struct NoteComposerView: View {
     @State private var location = ""
     @State private var drafts: [DraftPhoto] = []
     @State private var pickerItems: [PhotosPickerItem] = []
-    @State private var isLoadingPhotos = false
+    // Count of in-flight picker batches, not a Bool: each selection spawns
+    // its own load Task, and a shared Bool would be cleared by whichever
+    // batch finished first — re-enabling Save while the other was still
+    // loading and silently dropping its photos.
+    @State private var photoLoadsInFlight = 0
     @State private var isSaving = false
     @State private var loadedInitial = false
     @State private var transcriber = SpeechTranscriber()
@@ -36,6 +40,8 @@ struct NoteComposerView: View {
     private var canSave: Bool {
         !title.trimmed.isEmpty || !text.trimmed.isEmpty || !location.trimmed.isEmpty || !drafts.isEmpty
     }
+
+    private var isLoadingPhotos: Bool { photoLoadsInFlight > 0 }
 
     var body: some View {
         NavigationStack {
@@ -185,7 +191,7 @@ struct NoteComposerView: View {
         // all again, duplicating every photo. (The clear re-fires onChange
         // with an empty array; the guard above swallows it.)
         pickerItems = []
-        isLoadingPhotos = true
+        photoLoadsInFlight += 1
         Task { @MainActor in
             for item in items {
                 if let data = try? await item.loadTransferable(type: Data.self),
@@ -194,7 +200,7 @@ struct NoteComposerView: View {
                     drafts.append(DraftPhoto(data: compressed, caption: ""))
                 }
             }
-            isLoadingPhotos = false
+            photoLoadsInFlight -= 1
         }
     }
 

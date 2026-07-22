@@ -31,10 +31,13 @@ enum NotificationManager {
         }
 
         var events: [PendingEvent] = []
-        // Skip hidden graph nodes — the self node would otherwise notify
-        // "It's <your name>'s birthday — send them a message!" at yourself.
-        for person in people where !person.isDeceased && !person.isSelf && !person.isGhost {
-            if let birthday = person.birthday, person.birthdayReminderEnabled {
+        // Ghost nodes (name-only relatives) are skipped. So is the self
+        // node's *birthday* — it would notify "It's <your name>'s birthday
+        // — send them a message!" at yourself — but the important dates the
+        // My Profile editor accepts do remind, phrased as "Your …" rather
+        // than addressing you by name.
+        for person in people where !person.isDeceased && !person.isGhost {
+            if let birthday = person.birthday, person.birthdayReminderEnabled, !person.isSelf {
                 events.append(PendingEvent(
                     title: "🎂 \(person.name)'s birthday",
                     body: "It's \(person.name)'s birthday today — send them a message!",
@@ -45,7 +48,9 @@ enum NotificationManager {
             for item in person.importantDatesArray where item.remindersEnabled {
                 events.append(PendingEvent(
                     title: "📅 \(item.label)",
-                    body: "\(item.label) for \(person.name) is today.",
+                    body: person.isSelf
+                        ? "Your \(item.label) is today."
+                        : "\(item.label) for \(person.name) is today.",
                     date: item.date,
                     daysAway: Date.daysUntilNextOccurrence(of: item.date) ?? Int.max
                 ))

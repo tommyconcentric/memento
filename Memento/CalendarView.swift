@@ -172,10 +172,13 @@ struct CalendarView: View {
         // was never rendered (dropping the event from the calendar).
         let daysInDisplayedMonth = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 31
 
-        // Hidden graph nodes stay hidden: the self node would render "your
-        // own birthday" as a tappable person row whose detail view exposes
-        // Delete Person — which cascades away every family-tree edge.
-        for person in people where !person.isSelf && !person.isGhost {
+        // Ghost nodes (name-only relatives) stay hidden. The self node's
+        // dates do show — the My Profile editor accepts them, so dropping
+        // them here would silently discard what the user entered. Self rows
+        // are labeled "You" and don't navigate (see eventRow): the detail
+        // view would expose Delete Person, which cascades away every
+        // family-tree edge.
+        for person in people where !person.isGhost {
             if let birthday = person.birthday {
                 let comps = calendar.dateComponents([.month, .day, .year], from: birthday)
                 if comps.month == month, let day = comps.day {
@@ -242,37 +245,50 @@ struct CalendarView: View {
         return "Day \(day)"
     }
 
+    @ViewBuilder
     private func eventRow(_ event: DayEvent) -> some View {
-        NavigationLink {
-            PersonDetailView(person: event.person)
-        } label: {
-            HStack(spacing: 12) {
-                AvatarView(
-                    data: event.person.profilePhotoData,
-                    name: event.person.name,
-                    size: 40,
-                    desaturated: event.person.isDeceased,
-                    business: event.person.isBusiness
-                )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(event.person.name)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
-                    Text(eventDetail(event))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if event.person.isDeceased {
-                    Image(systemName: "leaf")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if event.isBirthday {
-                    Text("🎂")
-                }
+        if event.person.isSelf {
+            // The self node's row must not open PersonDetailView — it
+            // exposes Delete Person, which cascades away every family-tree
+            // edge. Your own dates are display-only here; edit them in
+            // My Profile.
+            eventRowLabel(event)
+        } else {
+            NavigationLink {
+                PersonDetailView(person: event.person)
+            } label: {
+                eventRowLabel(event)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func eventRowLabel(_ event: DayEvent) -> some View {
+        HStack(spacing: 12) {
+            AvatarView(
+                data: event.person.profilePhotoData,
+                name: event.person.name,
+                size: 40,
+                desaturated: event.person.isDeceased,
+                business: event.person.isBusiness
+            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.person.isSelf ? "You" : event.person.name)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(eventDetail(event))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if event.person.isDeceased {
+                Image(systemName: "leaf")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if event.isBirthday {
+                Text("🎂")
             }
         }
-        .buttonStyle(.plain)
     }
 
     private func eventDetail(_ event: DayEvent) -> String {
