@@ -138,7 +138,7 @@ enum FamilyEdgeSync {
         // authoritative for this one link: changing "Mother" to "Daughter"
         // must stop drawing her as a parent. Business labels chart the
         // corporate ladder, not the family tree.
-        if !subject.isSelf, !subject.isBusiness, let selfNode = people.first(where: { $0.isSelf }) {
+        if !subject.isSelf, !subject.isBusiness, let selfNode = people.canonicalSelfNode {
             syncSelfEdge(subject: subject, selfNode: selfNode, context: context)
         }
 
@@ -274,7 +274,7 @@ enum FamilyGraphMigration {
     static func runIfNeeded(_ context: ModelContext) {
         guard !UserDefaults.standard.bool(forKey: didRunKey) else { return }
         guard let people = try? context.fetch(FetchDescriptor<Person>()),
-              let selfNode = people.first(where: { $0.isSelf }) else { return }
+              let selfNode = people.canonicalSelfNode else { return }
 
         // Resolve a name to a node: prefer a real profile, then any existing
         // ghost, else create a ghost. Profiles registered last so they win.
