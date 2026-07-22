@@ -8,6 +8,8 @@ struct PeopleListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: [SortDescriptor(\PersonGroup.sortOrder)]) private var groups: [PersonGroup]
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
+    // The hidden self node backs the "You" avatar in the pinned bar.
+    @Query(filter: #Predicate<Person> { $0.isSelf }) private var selfNodes: [Person]
 
     @State private var selectedPerson: Person?
     @State private var searchText = ""
@@ -24,6 +26,7 @@ struct PeopleListView: View {
     @State private var showingTree = false
     @State private var showingCalendar = false
     @State private var showingAbout = false
+    @State private var showingMyProfile = false
     @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
@@ -45,7 +48,7 @@ struct PeopleListView: View {
     /// "navigated away" and pending unpins can settle into their folders.
     private var isCoveredBySheet: Bool {
         showingAddPerson || showingFolders || showingSettings || showingTree
-            || showingCalendar || showingAbout
+            || showingCalendar || showingAbout || showingMyProfile
     }
 
     private func showsInPinnedSection(_ person: Person) -> Bool {
@@ -94,6 +97,11 @@ struct PeopleListView: View {
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()
+        }
+        .sheet(isPresented: $showingMyProfile) {
+            if let selfNode = selfNodes.first {
+                MyProfileSheet(person: selfNode)
+            }
         }
         .onChange(of: isCoveredBySheet) { _, covered in
             if covered {
@@ -220,6 +228,7 @@ struct PeopleListView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 8) {
                 HStack(spacing: 10) {
+                    myProfileButton
                     workspaceSwitcher
                     addPersonButton
                 }
@@ -324,6 +333,29 @@ struct PeopleListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add person")
+    }
+
+    /// Your own circle beside the workspace switcher: initials (or photo
+    /// once set) opening My Profile — edit yourself like any other profile,
+    /// and share the profile card from there.
+    private var myProfileButton: some View {
+        Button {
+            showingMyProfile = true
+        } label: {
+            AvatarView(
+                data: selfNodes.first?.profilePhotoData,
+                name: myProfileDisplayName,
+                size: 42
+            )
+            .overlay(Circle().strokeBorder(workspace.accent.opacity(0.45), lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("My profile")
+    }
+
+    private var myProfileDisplayName: String {
+        let name = selfNodes.first?.name.trimmed ?? ""
+        return name.isEmpty ? "You" : name
     }
 
     private var workspaceSwitcher: some View {

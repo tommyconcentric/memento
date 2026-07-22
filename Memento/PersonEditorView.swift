@@ -3,9 +3,14 @@ import SwiftData
 import PhotosUI
 
 /// Creates a new person, or edits an existing one when `person` is set.
-/// Covers the profile photo, folder and every quick-info field.
+/// Covers the profile photo, folder and every quick-info field. Editing
+/// the hidden self node ("My Profile") uses this same editor with the
+/// sections that describe someone *else* — folder, workspace, their
+/// relationship to you, remembrance — folded away.
 struct PersonEditorView: View {
     let person: Person?
+
+    private var isSelfProfile: Bool { person?.isSelf == true }
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -133,16 +138,19 @@ struct PersonEditorView: View {
             Form {
                 photoSection
 
-                Section("Name & Folder") {
-                    TextField("Name", text: $name)
-                    Picker("Folder", selection: $selectedGroup) {
-                        Text("None").tag(PersonGroup?.none)
-                        ForEach(groups) { group in
-                            Text(group.name).tag(Optional(group))
+                Section(isSelfProfile ? "Your Name" : "Name & Folder") {
+                    TextField(isSelfProfile ? "Your name" : "Name", text: $name)
+                    if !isSelfProfile {
+                        Picker("Folder", selection: $selectedGroup) {
+                            Text("None").tag(PersonGroup?.none)
+                            ForEach(groups) { group in
+                                Text(group.name).tag(Optional(group))
+                            }
                         }
                     }
                 }
 
+                if !isSelfProfile {
                 Section {
                     Picker("Shown in", selection: $isBusiness) {
                         Text("Memento Personal").tag(false)
@@ -174,6 +182,7 @@ struct PersonEditorView: View {
                     Text(isBusiness
                         ? "Places them on your corporate ladder. Other… is custom and won't join the ladder."
                         : "For relatives only — places them on your family tree. Leave “Not set” for non-family; Other… is custom and won't join the tree.")
+                }
                 }
 
                 Section("Birthday") {
@@ -254,7 +263,9 @@ struct PersonEditorView: View {
 
                 Section("Background") {
                     TextField("Hometown", text: $hometown)
-                    TextField("How we met", text: $howWeMet, axis: .vertical)
+                    if !isSelfProfile {
+                        TextField("How we met", text: $howWeMet, axis: .vertical)
+                    }
                 }
 
                 Section("Food & Drink") {
@@ -319,15 +330,17 @@ struct PersonEditorView: View {
 
                 importantDatesSection
 
-                Section {
-                    Toggle("Mark as deceased", isOn: $isDeceased)
-                } header: {
-                    Text("Remembrance")
-                } footer: {
-                    Text("Grays their profile and hides birthday countdowns.")
+                if !isSelfProfile {
+                    Section {
+                        Toggle("Mark as deceased", isOn: $isDeceased)
+                    } header: {
+                        Text("Remembrance")
+                    } footer: {
+                        Text("Grays their profile and hides birthday countdowns.")
+                    }
                 }
             }
-            .navigationTitle(person == nil ? "New Person" : "Edit Person")
+            .navigationTitle(person == nil ? "New Person" : (isSelfProfile ? "My Profile" : "Edit Person"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

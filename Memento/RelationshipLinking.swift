@@ -127,14 +127,18 @@ enum FamilyEdgeBuilder {
 /// Called from `PersonEditorView.save()`.
 enum FamilyEdgeSync {
     static func apply(around subject: Person, context: ModelContext) {
-        guard !subject.isSelf, !subject.isGhost else { return }
+        // The subject may be the hidden self node — "My Profile" edits its
+        // partner/children/family fields through the same editor, and those
+        // feed the pedigree directly. Only step 1 (the self↔subject label)
+        // is meaningless for the self node itself.
+        guard !subject.isGhost else { return }
         let people = (try? context.fetch(FetchDescriptor<Person>())) ?? []
 
         // 1) "They're your…" → the self↔subject edge. The editor's label is
         // authoritative for this one link: changing "Mother" to "Daughter"
         // must stop drawing her as a parent. Business labels chart the
         // corporate ladder, not the family tree.
-        if !subject.isBusiness, let selfNode = people.first(where: { $0.isSelf }) {
+        if !subject.isSelf, !subject.isBusiness, let selfNode = people.first(where: { $0.isSelf }) {
             syncSelfEdge(subject: subject, selfNode: selfNode, context: context)
         }
 
