@@ -132,7 +132,8 @@ struct PersonDetailView: View {
                 data: person.profilePhotoData,
                 name: person.name,
                 size: 104,
-                desaturated: person.isDeceased
+                desaturated: person.isDeceased,
+                business: person.isBusiness
             )
             .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 3))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 3)

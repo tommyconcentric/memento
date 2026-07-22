@@ -417,7 +417,8 @@ struct PersonEditorView: View {
                     AvatarView(
                         data: photoData,
                         name: name.trimmed.isEmpty ? "?" : name,
-                        size: 96
+                        size: 96,
+                        business: isBusiness
                     )
                     PhotosPicker(selection: $photoItem, matching: .images) {
                         Text(photoData == nil ? "Add Photo" : "Change Photo")

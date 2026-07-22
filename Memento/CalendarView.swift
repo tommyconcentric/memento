@@ -140,7 +140,8 @@ struct CalendarView: View {
                             data: event.person.profilePhotoData,
                             name: event.person.name,
                             size: 18,
-                            desaturated: event.person.isDeceased
+                            desaturated: event.person.isDeceased,
+                            business: event.person.isBusiness
                         )
                     }
                 }
@@ -249,7 +250,8 @@ struct CalendarView: View {
                     data: event.person.profilePhotoData,
                     name: event.person.name,
                     size: 40,
-                    desaturated: event.person.isDeceased
+                    desaturated: event.person.isDeceased,
+                    business: event.person.isBusiness
                 )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(event.person.name)

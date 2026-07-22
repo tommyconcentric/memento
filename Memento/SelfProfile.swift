@@ -183,7 +183,7 @@ struct MyProfileSheet: View {
                     Button {
                         showingEditor = true
                     } label: {
-                        AvatarView(data: person.profilePhotoData, name: displayName, size: 110)
+                        AvatarView(data: person.profilePhotoData, name: displayName, size: 110, business: isBusinessWorkspace)
                             .overlay(Circle().stroke(Theme.gold.opacity(0.7), lineWidth: 2))
                     }
                     .buttonStyle(.plain)
@@ -295,11 +295,17 @@ struct ProfileImportSheet: View {
         }
     }
 
+    /// Added people join whichever workspace is open (see `add()`); the
+    /// preview avatar wears the matching palette.
+    private var joinsBusinessWorkspace: Bool {
+        UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    AvatarView(data: nil, name: profile.name, size: 84)
+                    AvatarView(data: nil, name: profile.name, size: 84, business: joinsBusinessWorkspace)
                     Text(profile.name)
                         .font(.system(.title2, design: .serif, weight: .semibold))
                     Text("Shared Memento profile")

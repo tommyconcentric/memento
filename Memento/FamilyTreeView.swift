@@ -536,7 +536,8 @@ struct PedigreeTreeView: View {
         AvatarView(data: person.profilePhotoData,
                    name: person.isSelf ? "You" : person.name,
                    size: FamilyTreeLayout.nodeR * 2,
-                   desaturated: person.isDeceased)
+                   desaturated: person.isDeceased,
+                   business: person.isBusiness)
             // Gilt ring with a fine bark rule floating outside, matching
             // the classic chart's framed-portrait look.
             .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.55),
@@ -806,7 +807,8 @@ struct FamilyNodeView: View {
                 data: node.photoData,
                 name: node.name,
                 size: node.isFocus ? 62 : 52,
-                desaturated: node.isDeceased
+                desaturated: node.isDeceased,
+                business: node.linkedPerson?.isBusiness ?? corporate
             )
             .overlay {
                 Circle().stroke(

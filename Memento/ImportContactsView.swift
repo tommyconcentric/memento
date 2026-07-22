@@ -69,6 +69,12 @@ struct ImportContactsView: View {
         candidates.filter(\.include).count
     }
 
+    /// Imports join whichever workspace is open — preview avatars in the
+    /// matching palette.
+    private var importsAsBusiness: Bool {
+        UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
+    }
+
     private var newCandidateCount: Int {
         candidates.filter { !$0.alreadyExists }.count
     }
@@ -262,7 +268,7 @@ struct ImportContactsView: View {
                 ForEach($candidates) { $candidate in
                     Toggle(isOn: $candidate.include) {
                         HStack(spacing: 12) {
-                            AvatarView(data: candidate.photoData, name: candidate.name, size: 40)
+                            AvatarView(data: candidate.photoData, name: candidate.name, size: 40, business: importsAsBusiness)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(candidate.name)
                                     .font(.body.weight(.medium))

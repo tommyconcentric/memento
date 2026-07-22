@@ -104,10 +104,11 @@ struct PeopleListView: View {
         }
     }
 
-    private func row(for person: Person) -> some View {
+    private func row(for person: Person, isLast: Bool) -> some View {
         PersonRow(
             person: person,
             isSelected: selectedPerson?.persistentModelID == person.persistentModelID,
+            showsDivider: !isLast,
             onDelete: { personPendingDelete = person },
             onTogglePin: { togglePin(person) }
         )
@@ -124,7 +125,7 @@ struct PeopleListView: View {
             if !pinned.isEmpty {
                 Section {
                     ForEach(pinned) { person in
-                        row(for: person)
+                        row(for: person, isLast: person.persistentModelID == pinned.last?.persistentModelID)
                     }
                 } header: {
                     Label("Pinned", systemImage: "pin.fill")
@@ -138,7 +139,7 @@ struct PeopleListView: View {
                 if !members.isEmpty {
                     Section {
                         ForEach(members) { person in
-                            row(for: person)
+                            row(for: person, isLast: person.persistentModelID == members.last?.persistentModelID)
                         }
                     } header: {
                         Text("\(group.name) · \(members.count)")
@@ -150,7 +151,7 @@ struct PeopleListView: View {
             if !ungrouped.isEmpty {
                 Section("Ungrouped") {
                     ForEach(ungrouped) { person in
-                        row(for: person)
+                        row(for: person, isLast: person.persistentModelID == ungrouped.last?.persistentModelID)
                     }
                 }
             }
@@ -266,7 +267,8 @@ struct PeopleListView: View {
             AvatarView(
                 data: selfNodes.canonicalSelfNode?.profilePhotoData,
                 name: myProfileDisplayName,
-                size: 48
+                size: 48,
+                business: workspace == .business
             )
             .overlay(Circle().strokeBorder(workspace.accent.opacity(0.45), lineWidth: 1.5))
         }
@@ -460,6 +462,8 @@ struct PeopleListView: View {
 struct PersonRow: View {
     let person: Person
     var isSelected = false
+    /// The last row of a section skips its divider, like a system list.
+    var showsDivider = true
     var onDelete: () -> Void
     var onTogglePin: () -> Void
 
@@ -493,7 +497,8 @@ struct PersonRow: View {
                 data: person.profilePhotoData,
                 name: person.name,
                 size: 48,
-                desaturated: person.isDeceased
+                desaturated: person.isDeceased,
+                business: person.isBusiness
             )
             // Belt and braces against the accent fill: even a photo that
             // happens to be selection-blue keeps a visible edge.
@@ -547,11 +552,20 @@ struct PersonRow: View {
         // Generous row height: 3pt of breathing room read as cramped, and
         // left the first row's avatar hugging its card's top edge.
         .padding(.vertical, 9)
-        // The default separator starts past the avatar and all but
-        // disappears — full-width and warm-tinted, it gives unselected
-        // rows a discernible boundary.
-        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
-        .listRowSeparatorTint(Theme.bark.opacity(0.25))
+        // The boundary between rows is drawn by hand: SwiftUI's list
+        // separators simply don't render on macOS ("Designed for iPad"),
+        // so the system separator is hidden everywhere and this hairline —
+        // starting under the text, tinted with the workspace's own
+        // neutral — renders identically on iPhone, iPad and the Mac.
+        .listRowSeparator(.hidden)
+        .overlay(alignment: .bottom) {
+            if showsDivider && !isSelected {
+                Rectangle()
+                    .fill((person.isBusiness ? Theme.graphite : Theme.bark).opacity(0.2))
+                    .frame(height: 0.8)
+                    .padding(.leading, 62)
+            }
+        }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button(action: onTogglePin) {
                 Label(person.isPinned ? "Unpin" : "Pin", systemImage: person.isPinned ? "pin.slash" : "pin")
