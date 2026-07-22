@@ -213,6 +213,12 @@ struct NoteComposerView: View {
 
         let target: NoteEntry
         if let note {
+            // A CloudKit sync from another device can delete the note out
+            // from under the editor; don't write into the dead model.
+            guard !note.isDeleted else {
+                dismiss()
+                return
+            }
             target = note
         } else {
             let newNote = NoteEntry()
@@ -233,21 +239,54 @@ struct NoteComposerView: View {
             context.delete(photo)
         }
 
+        // Reindex everything the note keeps — drafts and the held-out
+        // unsynced photos alike. Reindexing only the drafts would leave each
+        // unsynced photo's stale sortOrder colliding with a reassigned draft
+        // index, scrambling the order once its bytes arrive; instead each
+        // unsynced photo is slotted back in at its original relative
+        // position. (Drafts can't be reordered, so kept drafts still ascend
+        // in the note's original photo order and a straight merge works.)
+        let originalRank = Dictionary(
+            uniqueKeysWithValues: target.sortedPhotos.enumerated()
+                .map { ($1.persistentModelID, $0) }
+        )
+        var pendingUnsynced = existing
+            .filter { unsyncedPhotoIDs.contains($0.persistentModelID) }
+            .sorted { (originalRank[$0.persistentModelID] ?? .max) < (originalRank[$1.persistentModelID] ?? .max) }
+        var nextOrder = 0
+        func placeUnsynced(before rank: Int) {
+            while let photo = pendingUnsynced.first,
+                  (originalRank[photo.persistentModelID] ?? .max) < rank {
+                photo.sortOrder = nextOrder
+                nextOrder += 1
+                pendingUnsynced.removeFirst()
+            }
+        }
+
         // Update kept photos and add new ones, preserving order.
-        for (index, draft) in drafts.enumerated() {
+        for draft in drafts {
             if let id = draft.existingID {
+                placeUnsynced(before: originalRank[id] ?? .max)
                 if let photo = existing.first(where: { $0.persistentModelID == id }) {
                     photo.caption = draft.caption.trimmed
-                    photo.sortOrder = index
+                    photo.sortOrder = nextOrder
+                    nextOrder += 1
                 }
             } else {
+                // Newly added photos land after every photo the note had.
+                placeUnsynced(before: .max)
                 let photo = EventPhoto(
                     imageData: draft.data,
                     caption: draft.caption.trimmed,
-                    sortOrder: index
+                    sortOrder: nextOrder
                 )
+                nextOrder += 1
                 target.photosArray.append(photo)
             }
+        }
+        for photo in pendingUnsynced {
+            photo.sortOrder = nextOrder
+            nextOrder += 1
         }
 
         try? context.save()

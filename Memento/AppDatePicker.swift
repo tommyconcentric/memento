@@ -12,12 +12,33 @@ struct AppDatePicker: View {
     var business = false
 
     @State private var isExpanded: Bool
+    // When a caller passes `expanded`, the header's collapse/expand writes
+    // through to the caller's state instead of the private one — the
+    // editor's year-less birthday row needs to know when the calendar
+    // closes so it can take the header's place back.
+    private var externalExpanded: Binding<Bool>?
 
-    init(title: String, date: Binding<Date>, business: Bool = false, initiallyExpanded: Bool = false) {
+    init(title: String, date: Binding<Date>, business: Bool = false,
+         initiallyExpanded: Bool = false, expanded: Binding<Bool>? = nil) {
         self.title = title
         self._date = date
         self.business = business
         self._isExpanded = State(initialValue: initiallyExpanded)
+        self.externalExpanded = expanded
+    }
+
+    private var expandedNow: Bool {
+        externalExpanded?.wrappedValue ?? isExpanded
+    }
+
+    private func toggleExpanded() {
+        withAnimation(.snappy(duration: 0.22)) {
+            if let externalExpanded {
+                externalExpanded.wrappedValue.toggle()
+            } else {
+                isExpanded.toggle()
+            }
+        }
     }
 
     /// The picker runs in the device calendar so its numbers agree with the
@@ -49,7 +70,7 @@ struct AppDatePicker: View {
     var body: some View {
         VStack(spacing: 0) {
             Button {
-                withAnimation(.snappy(duration: 0.22)) { isExpanded.toggle() }
+                toggleExpanded()
             } label: {
                 HStack {
                     Text(title)
@@ -61,13 +82,13 @@ struct AppDatePicker: View {
                     Image(systemName: "chevron.down")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(accent)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .rotationEffect(.degrees(expandedNow ? 180 : 0))
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            if isExpanded {
+            if expandedNow {
                 calendarBody
                     .padding(.top, 10)
             }

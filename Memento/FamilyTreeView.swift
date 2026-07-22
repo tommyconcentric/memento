@@ -197,7 +197,7 @@ struct FamilyGraph {
 
     struct SiblingGroup: Identifiable {
         let id = UUID()
-        let parents: [Person]   // the one or two shared parents
+        let parents: [Person]   // the one or more shared parents
         let children: [Person]  // full siblings — they share this exact parent set
     }
 
@@ -354,28 +354,37 @@ struct FamilyTreeLayout {
 
         var descents: [Descent] = []
         for grp in graph.siblingGroups {
-            let parentPts = grp.parents.compactMap(point)
+            // Placed co-parents, left to right, so the joining bar and its
+            // midpoint follow the drawn order rather than the edge order.
+            let placedParents = grp.parents
+                .compactMap { p in point(p).map { (person: p, point: $0) } }
+                .sorted { $0.point.x < $1.point.x }
+            let parentPts = placedParents.map(\.point)
             guard !parentPts.isEmpty else { continue }
-            // Two co-parents with no recorded partnership still get a
-            // joining bar — without one, their shared trunk would hang
-            // from the empty space between them, touching neither.
-            if grp.parents.count == 2, parentPts.count == 2 {
-                let key: Set = [ObjectIdentifier(grp.parents[0]), ObjectIdentifier(grp.parents[1])]
+            // Co-parents with no recorded partnership still get a joining
+            // bar — without one, their shared trunk would hang from the
+            // empty space between them, touching neither. Three or more
+            // co-parents (say bio mother + bio father + step-parent) get a
+            // bar spanning them all, one segment per adjacent pair.
+            for (a, b) in zip(placedParents, placedParents.dropFirst()) {
+                let key: Set = [ObjectIdentifier(a.person), ObjectIdentifier(b.person)]
                 if seen.insert(key).inserted {
-                    coupleBars.append(CoupleBar(a: parentPts[0], b: parentPts[1], dashed: false))
+                    coupleBars.append(CoupleBar(a: a.point, b: b.point, dashed: false))
                 }
             }
-            let centreAnchor = CGPoint(
-                x: parentPts.map(\.x).reduce(0, +) / CGFloat(parentPts.count),
+            let midAnchor = CGPoint(
+                x: (parentPts[0].x + parentPts[parentPts.count - 1].x) / 2,
                 y: parentPts.map(\.y).reduce(0, +) / CGFloat(parentPts.count))
-            // A single parent's trunk hangs from the *bottom edge* of their
-            // portrait — from the centre it would show through the ring
-            // halo around the circle. A couple's anchor stays at centre
-            // height: it sits on the (possibly just-added) bar between the
-            // two portraits.
-            let anchor = grp.parents.count == 1
-                ? CGPoint(x: centreAnchor.x, y: centreAnchor.y + nodeR + 3)
-                : centreAnchor
+            // A couple's anchor stays at centre height: it sits on the
+            // (possibly just-added) bar between the two portraits. But a
+            // trunk starting within a portrait's span — a single parent,
+            // or an odd co-parent count whose bar midpoint lands behind
+            // the middle portrait — hangs from the *bottom edge* instead:
+            // from centre height it would show through the ring halo
+            // around the circle (the nodeR + 3 trim rule).
+            let anchor = parentPts.contains(where: { abs($0.x - midAnchor.x) < nodeR + 3 })
+                ? CGPoint(x: midAnchor.x, y: midAnchor.y + nodeR + 3)
+                : midAnchor
             let stubs: [ChildStub] = grp.children.compactMap { kid in
                 guard let pt = point(kid) else { return nil }
                 let dashed = kid.parentEdges.contains { e in
@@ -653,6 +662,11 @@ struct FamilyTreeContent: View {
                         style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
                     )
             }
+            // The anchors are live, so a crowded lane scrolled sideways
+            // reports portrait centres past the chart's edges — clip so
+            // their stubs and the spanning bar never stroke beyond the
+            // plate onto the surrounding page.
+            .clipped()
             .allowsHitTesting(false)
         }
     }
@@ -969,6 +983,9 @@ struct MyFamilyTreeView: View {
                 }
             }
             .background(workspace.background)
+            // Cards on this screen (the ladder plate) must wear the same
+            // workspace surfaces as the background behind them.
+            .environment(\.cardWorkspace, workspace)
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1142,10 +1159,23 @@ struct PersonFamilySection: View {
 
     private func node(named rawName: String, relation: String) -> TreeNode {
         let name = rawName.trimmed
-        let match = people.first {
+        // Link only on an unambiguous match — same convention as
+        // handleDrop and applyReciprocalLinks. With two profiles sharing
+        // this name, guessing would lend the wrong person's photo,
+        // deceased state and tap-through profile to the row, so an
+        // ambiguous name renders unlinked instead.
+        // Real profiles are matched first, hidden graph nodes only as a
+        // fallback — an invisible ghost sharing a contact's name must not
+        // spoil the one-match rule for the real profile (the same split
+        // applyReciprocalLinks and import's duplicate check make).
+        let named = people.filter {
             $0.persistentModelID != person.persistentModelID &&
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
+        let real = named.filter { !$0.isSelf && !$0.isGhost }
+        let match = real.count == 1
+            ? real.first
+            : (real.isEmpty && named.count == 1 ? named.first : nil)
         // Hidden graph nodes (the "You" self node, name-only ghosts) lend
         // their photo to the chart but never a navigation link — a tappable
         // self node would expose Delete Person, which cascades away every
@@ -1162,10 +1192,22 @@ struct PersonFamilySection: View {
         )
     }
 
+    /// Presets read naturally lowercased mid-sentence ("Your mother");
+    /// custom text renders verbatim so names and acronyms survive — the
+    /// same rule Quick Info's relationship row applies, both vocabularies
+    /// checked because a workspace flip can leave either kind of label.
+    private var relationshipChipText: String {
+        let relation = person.relationshipToUser
+        let isPreset = (FamilyRelation.presets + BusinessRelation.presets).contains {
+            $0.compare(relation, options: .caseInsensitive) == .orderedSame
+        }
+        return "Your \(isPreset ? relation.lowercased() : relation)"
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             if !person.relationshipToUser.trimmed.isEmpty {
-                Label("Your \(person.relationshipToUser.lowercased())", systemImage: "person.2.fill")
+                Label(relationshipChipText, systemImage: "person.2.fill")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Theme.bougainvillea)
                     .padding(.horizontal, 12)

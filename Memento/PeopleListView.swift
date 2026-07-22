@@ -82,6 +82,15 @@ struct PeopleListView: View {
                 MyProfileSheet(person: selfNode)
             }
         }
+        // The editor's "Shown in" picker can move the open person to the
+        // other workspace; the sidebar filter drops them instantly, which
+        // would strand a Business-styled detail under a Personal list (or
+        // vice versa). Keep the switcher's invariant — the selection never
+        // crosses workspaces — by clearing it when the person moves.
+        .onChange(of: selectedPerson?.isBusiness) {
+            guard let person = selectedPerson, person.workspace != workspace else { return }
+            selectedPerson = nil
+        }
     }
 
     private func row(for person: Person, isLast: Bool) -> some View {
