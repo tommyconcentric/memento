@@ -16,6 +16,9 @@ struct PeopleListView: View {
     // place instead of the row instantly jumping back to its folder.
     @State private var recentlyUnpinned: Set<PersistentIdentifier> = []
     @State private var showingAddPerson = false
+    // Row deletion asks first, matching the detail view's confirmation —
+    // deleting a person permanently destroys their notes and photos.
+    @State private var personPendingDelete: Person?
     @State private var showingFolders = false
     @State private var showingSettings = false
     @State private var showingTree = false
@@ -103,7 +106,7 @@ struct PeopleListView: View {
         PersonRow(
             person: person,
             isSelected: selectedPerson?.persistentModelID == person.persistentModelID,
-            onDelete: { delete(person) },
+            onDelete: { personPendingDelete = person },
             onTogglePin: { togglePin(person) }
         )
         .tag(person)
@@ -152,6 +155,20 @@ struct PeopleListView: View {
         }
         .onDisappear {
             recentlyUnpinned.removeAll()
+        }
+        .confirmationDialog(
+            personPendingDelete.map { "Delete \($0.name)?" } ?? "",
+            isPresented: Binding(
+                get: { personPendingDelete != nil },
+                set: { if !$0 { personPendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: personPendingDelete
+        ) { person in
+            Button("Delete", role: .destructive) { delete(person) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("All notes and photos for this person will be deleted too.")
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)

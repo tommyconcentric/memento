@@ -410,6 +410,47 @@ struct PedigreeTreeView: View {
                 .onChanged { value in scale = (pinchStart * value).clamped(to: 0.4...2.5) }
                 .onEnded { _ in pinchStart = scale }
         )
+        // Click-reachable zoom: pinch works on touch screens and trackpads,
+        // but a mouse on the Mac has no pinch input at all — without these
+        // buttons, Mac mouse users could never zoom the pedigree.
+        .overlay(alignment: .bottomTrailing) { zoomControls }
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 0) {
+            Button {
+                adjustZoom(-0.25)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+                    .frame(width: 40, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Zoom out")
+            Divider().frame(height: 18)
+            Button {
+                adjustZoom(0.25)
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+                    .frame(width: 40, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Zoom in")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.accentColor)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        )
+        .padding(12)
+    }
+
+    private func adjustZoom(_ delta: CGFloat) {
+        withAnimation(.snappy(duration: 0.2)) {
+            scale = (scale + delta).clamped(to: 0.4...2.5)
+        }
+        pinchStart = scale
     }
 
     private func draw(_ ctx: inout GraphicsContext) {
@@ -771,8 +812,8 @@ struct MyFamilyTreeView: View {
     }
     @State private var pendingMove: MoveRequest?
     @State private var showingSelfLinks = false
-    // Opt-in preview of the edge-driven pedigree while it's being built; the
-    // classic generation chart stays the default until it's finished.
+    // The edge-driven pedigree is the default; the classic generation chart
+    // stays available behind this toggle.
     @AppStorage("useNewFamilyTree") private var useNewTree = true
 
     private var pedigreeLayout: FamilyTreeLayout? {

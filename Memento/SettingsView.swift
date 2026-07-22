@@ -257,6 +257,15 @@ struct SettingsView: View {
             for member in try context.fetch(FetchDescriptor<FamilyMember>()) { context.delete(member) }
             for field in try context.fetch(FetchDescriptor<ContactField>()) { context.delete(field) }
             for project in try context.fetch(FetchDescriptor<Project>()) { context.delete(project) }
+            for edge in try context.fetch(FetchDescriptor<Parentage>()) { context.delete(edge) }
+            for edge in try context.fetch(FetchDescriptor<Partnership>()) { context.delete(edge) }
+            // The hidden "You" node the family tree roots on went down with
+            // everything else. Recreate it now rather than waiting for the
+            // next launch — until then the tree's "Add Family" editor would
+            // open as a blank sheet.
+            let selfNode = Person(name: "You")
+            selfNode.isSelf = true
+            context.insert(selfNode)
             try context.save()
             resetNote = nil
         } catch {
