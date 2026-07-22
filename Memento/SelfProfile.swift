@@ -157,8 +157,14 @@ struct MyProfileSheet: View {
     let person: Person
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
     @State private var showingEditor = false
+    @State private var showingTree = false
     @State private var shareURL: URL?
+
+    private var isBusinessWorkspace: Bool {
+        storedWorkspace == Workspace.business.rawValue
+    }
 
     /// The self node starts life as a hidden "You" — treat that as unset.
     private var hasRealName: Bool {
@@ -202,13 +208,26 @@ struct MyProfileSheet: View {
                     }
 
                     VStack(spacing: 10) {
+                        // The tree lives with your profile — it's your
+                        // family it draws. (Business opens the ladder.)
+                        Button {
+                            showingTree = true
+                        } label: {
+                            Label(
+                                isBusinessWorkspace ? "Corporate Ladder" : "My Family Tree",
+                                systemImage: isBusinessWorkspace ? "building.2" : "tree"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+
                         Button {
                             showingEditor = true
                         } label: {
                             Label("Edit My Profile", systemImage: "pencil")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
 
                         if let shareURL {
                             ShareLink(
@@ -243,6 +262,9 @@ struct MyProfileSheet: View {
             }
             .sheet(isPresented: $showingEditor, onDismiss: regenerateShareFile) {
                 PersonEditorView(person: person)
+            }
+            .sheet(isPresented: $showingTree) {
+                MyFamilyTreeView()
             }
             .onAppear(perform: regenerateShareFile)
         }

@@ -541,10 +541,14 @@ struct PersonOrGhostPicker: View {
     }
 }
 
-/// Live editor for one person's place in the family graph: their parents,
-/// partners and children, each an add/remove/kind control. Applies straight
-/// to the store (no draft) — the same immediate model the tree's drag-to-
-/// reparent uses.
+/// Editor for one person's place in the family graph: their parents,
+/// partners and children. Draft-based, matching the app's cancel-safe
+/// editor convention: nothing touches the store until Save, X asks before
+/// discarding changes, and a saved banner confirms the commit. Saving also
+/// back-fills the affected *profiles* (relationship-to-you labels, family
+/// member rows) so the tree and the profiles can't disagree — and clears
+/// the fields that would otherwise resurrect a removed link on the next
+/// editor save.
 struct FamilyLinksEditor: View {
     let subject: Person
 
@@ -553,82 +557,161 @@ struct FamilyLinksEditor: View {
     @Query private var allPeople: [Person]
 
     private enum Role: String, Identifiable { case parent, partner, child; var id: String { rawValue } }
-    @State private var adding: Role?
 
-    private var possessive: String { subject.isSelf ? "Your" : "\(subject.name)’s" }
+    struct DraftParentage: Identifiable {
+        let id = UUID()
+        var person: Person
+        var kind: String
+        var existing: Parentage?
+    }
+    struct DraftPartnership: Identifiable {
+        let id = UUID()
+        var person: Person
+        var kind: String
+        var existing: Partnership?
+    }
+
+    @State private var adding: Role?
+    @State private var loadedInitial = false
+    @State private var draftParents: [DraftParentage] = []
+    @State private var draftChildren: [DraftParentage] = []
+    @State private var draftPartners: [DraftPartnership] = []
+    @State private var initialParentEdges: [Parentage] = []
+    @State private var initialChildEdges: [Parentage] = []
+    @State private var initialPartnerEdges: [Partnership] = []
+    // Ghosts minted by "add as a name" during this session — real store
+    // objects already, so a discard must delete them again.
+    @State private var createdGhosts: [Person] = []
+    @State private var confirmingDiscard = false
+    @State private var showingSavedBanner = false
+
+    private var possessive: String { subject.isSelf ? "Your" : "\(subject.name)\u{2019}s" }
+
+    private var hasChanges: Bool {
+        let removedParent = initialParentEdges.contains { edge in !draftParents.contains { $0.existing === edge } }
+        let removedChild = initialChildEdges.contains { edge in !draftChildren.contains { $0.existing === edge } }
+        let removedPartner = initialPartnerEdges.contains { edge in !draftPartners.contains { $0.existing === edge } }
+        let dirtyParent = draftParents.contains { $0.existing == nil || $0.existing?.kind != $0.kind }
+        let dirtyChild = draftChildren.contains { $0.existing == nil || $0.existing?.kind != $0.kind }
+        let dirtyPartner = draftPartners.contains { $0.existing == nil || $0.existing?.kind != $0.kind }
+        return removedParent || removedChild || removedPartner || dirtyParent || dirtyChild || dirtyPartner
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                parentsSection
-                partnersSection
-                childrenSection
+                section(title: "\(possessive) parents", drafts: $draftParents,
+                        kinds: ParentageKind.allCases.map(\.rawValue), addLabel: "Add parent", role: .parent)
+                section(title: "\(possessive) partner", drafts: $draftPartners,
+                        kinds: PartnershipKind.allCases.map(\.rawValue), addLabel: "Add partner", role: .partner)
+                section(title: "\(possessive) children", drafts: $draftChildren,
+                        kinds: ParentageKind.allCases.map(\.rawValue), addLabel: "Add child", role: .child)
             }
             .navigationTitle(subject.isSelf ? "Your Family" : "Family Links")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        attemptClose()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Close")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: saveChanges)
+                        .disabled(!hasChanges)
+                }
+            }
+            // Swiping the sheet away must go through the same discard check
+            // as the X button.
+            .interactiveDismissDisabled(hasChanges)
+            .alert("Discard Changes?", isPresented: $confirmingDiscard) {
+                Button("Discard Changes", role: .destructive) { discardAndClose() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("Your family tree has unsaved changes. Closing now will discard them.")
+            }
+            .overlay(alignment: .top) {
+                if showingSavedBanner {
+                    Label("Your changes have been saved", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.olive)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(.quaternary, lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
             .sheet(item: $adding) { role in
                 PersonOrGhostPicker(
                     title: role == .parent ? "Add a Parent" : role == .partner ? "Add a Partner" : "Add a Child",
                     excludeIDs: excludeIDs(for: role),
-                    onPick: { link(role, to: $0) },
-                    onCreate: { link(role, to: resolveGhost(named: $0)) }
+                    onPick: { addDraft(role, person: $0) },
+                    onCreate: { name in
+                        if let ghost = resolveGhost(named: name) { addDraft(role, person: ghost) }
+                    }
                 )
             }
+            .onAppear(perform: loadInitialIfNeeded)
         }
     }
 
-    // MARK: Sections
+    // MARK: Sections & rows
 
-    private var parentsSection: some View {
+    private func section(title: String, drafts: Binding<[DraftParentage]>,
+                         kinds: [String], addLabel: String, role: Role) -> some View {
         Section {
-            ForEach(subject.parentEdges, id: \.persistentModelID) { edge in
-                if let parent = edge.parent {
-                    personRow(parent, kindMenu: parentageKindMenu(edge)) { context.delete(edge); save() }
+            ForEach(drafts) { $draft in
+                linkRow(person: draft.person, kind: $draft.kind, kinds: kinds) {
+                    drafts.wrappedValue.removeAll { $0.id == draft.id }
                 }
             }
-            addButton("Add parent", role: .parent)
-        } header: { Text("\(possessive) parents") }
+            addButton(addLabel, role: role)
+        } header: { Text(title) }
     }
 
-    private var childrenSection: some View {
+    private func section(title: String, drafts: Binding<[DraftPartnership]>,
+                         kinds: [String], addLabel: String, role: Role) -> some View {
         Section {
-            ForEach(subject.childEdges, id: \.persistentModelID) { edge in
-                if let child = edge.child {
-                    personRow(child, kindMenu: parentageKindMenu(edge)) { context.delete(edge); save() }
+            ForEach(drafts) { $draft in
+                linkRow(person: draft.person, kind: $draft.kind, kinds: kinds) {
+                    drafts.wrappedValue.removeAll { $0.id == draft.id }
                 }
             }
-            addButton("Add child", role: .child)
-        } header: { Text("\(possessive) children") }
+            addButton(addLabel, role: role)
+        } header: { Text(title) }
     }
 
-    private var partnersSection: some View {
-        Section {
-            ForEach(subject.partnerEdges, id: \.edge.persistentModelID) { pair in
-                personRow(pair.other, kindMenu: partnershipKindMenu(pair.edge)) { context.delete(pair.edge); save() }
-            }
-            addButton("Add partner", role: .partner)
-        } header: { Text("\(possessive) partner") }
-    }
-
-    // MARK: Row + controls
-
-    private func personRow(_ person: Person, kindMenu: some View, onRemove: @escaping () -> Void) -> some View {
+    private func linkRow(person: Person, kind: Binding<String>, kinds: [String],
+                         onRemove: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             AvatarView(data: person.profilePhotoData, name: person.name, size: 36, desaturated: person.isDeceased)
             VStack(alignment: .leading, spacing: 1) {
                 Text(person.name)
                 if person.isGhost {
-                    Button("Make a full contact") { person.isGhost = false; save() }
+                    // Immediate, not part of the draft: promoting a ghost to
+                    // a listed contact is its own action, not a tree edit.
+                    Button("Make a full contact") { person.isGhost = false; try? context.save() }
                         .font(.caption)
                         .buttonStyle(.plain)
                         .foregroundStyle(Theme.aegean)
                 }
             }
             Spacer()
-            kindMenu
+            Menu {
+                ForEach(kinds, id: \.self) { option in
+                    Button(option.capitalized) { kind.wrappedValue = option }
+                }
+            } label: {
+                Text(kind.wrappedValue.capitalized).font(.caption).foregroundStyle(.secondary)
+            }
             // Click-reachable removal: swipe is the only other affordance,
             // and a Mac mouse can't perform it.
             Button(role: .destructive, action: onRemove) {
@@ -649,61 +732,237 @@ struct FamilyLinksEditor: View {
         }
     }
 
-    private func parentageKindMenu(_ edge: Parentage) -> some View {
-        Menu {
-            ForEach(ParentageKind.allCases, id: \.self) { kind in
-                Button(kind.rawValue.capitalized) { edge.kind = kind.rawValue; save() }
-            }
-        } label: {
-            Text(edge.kind.capitalized).font(.caption).foregroundStyle(.secondary)
+    // MARK: Drafts
+
+    private func loadInitialIfNeeded() {
+        guard !loadedInitial else { return }
+        loadedInitial = true
+        reloadFromStore()
+    }
+
+    private func reloadFromStore() {
+        initialParentEdges = subject.parentEdges.filter { $0.parent != nil }
+        initialChildEdges = subject.childEdges.filter { $0.child != nil }
+        initialPartnerEdges = subject.partnerEdges.map(\.edge)
+        draftParents = initialParentEdges.compactMap { edge in
+            edge.parent.map { DraftParentage(person: $0, kind: edge.kind, existing: edge) }
+        }
+        draftChildren = initialChildEdges.compactMap { edge in
+            edge.child.map { DraftParentage(person: $0, kind: edge.kind, existing: edge) }
+        }
+        draftPartners = subject.partnerEdges.map { pair in
+            DraftPartnership(person: pair.other, kind: pair.edge.kind, existing: pair.edge)
         }
     }
 
-    private func partnershipKindMenu(_ edge: Partnership) -> some View {
-        Menu {
-            ForEach(PartnershipKind.allCases, id: \.self) { kind in
-                Button(kind.rawValue.capitalized) { edge.kind = kind.rawValue; save() }
-            }
-        } label: {
-            Text(edge.kind.capitalized).font(.caption).foregroundStyle(.secondary)
+    private func addDraft(_ role: Role, person: Person) {
+        guard person !== subject else { return }
+        switch role {
+        case .parent: draftParents.append(DraftParentage(person: person, kind: ParentageKind.bio.rawValue, existing: nil))
+        case .child: draftChildren.append(DraftParentage(person: person, kind: ParentageKind.bio.rawValue, existing: nil))
+        case .partner: draftPartners.append(DraftPartnership(person: person, kind: PartnershipKind.partner.rawValue, existing: nil))
         }
     }
-
-    // MARK: Actions
 
     private func excludeIDs(for role: Role) -> Set<PersistentIdentifier> {
         var ids: Set<PersistentIdentifier> = [subject.persistentModelID]
         switch role {
         case .parent:
-            // Exclude existing children too — offering one as a parent
-            // invites an A⇄B parentage cycle the pedigree can only draw
-            // as contradictory descent loops.
-            ids.formUnion(subject.parents.map(\.persistentModelID))
-            ids.formUnion(subject.children.map(\.persistentModelID))
+            // Exclude draft children too — offering one as a parent invites
+            // an A\u{21c4}B parentage cycle the pedigree can only draw as
+            // contradictory descent loops.
+            ids.formUnion(draftParents.map(\.person.persistentModelID))
+            ids.formUnion(draftChildren.map(\.person.persistentModelID))
         case .child:
-            ids.formUnion(subject.children.map(\.persistentModelID))
-            ids.formUnion(subject.parents.map(\.persistentModelID))
+            ids.formUnion(draftChildren.map(\.person.persistentModelID))
+            ids.formUnion(draftParents.map(\.person.persistentModelID))
         case .partner:
-            ids.formUnion(subject.partnerEdges.map(\.other.persistentModelID))
+            ids.formUnion(draftPartners.map(\.person.persistentModelID))
         }
         return ids
     }
 
-    private func link(_ role: Role, to other: Person?) {
-        guard let other, other !== subject else { return }
-        switch role {
-        case .parent: context.insert(Parentage(parent: other, child: subject, kind: .bio))
-        case .child: context.insert(Parentage(parent: subject, child: other, kind: .bio))
-        case .partner: context.insert(Partnership(a: subject, b: other, kind: .partner))
-        }
-        save()
-    }
-
     private func resolveGhost(named rawName: String) -> Person? {
-        resolveOrCreateGhost(named: rawName, in: context, among: allPeople)
+        let before = Set(allPeople.map(ObjectIdentifier.init))
+        guard let person = resolveOrCreateGhost(named: rawName, in: context, among: allPeople) else { return nil }
+        if !before.contains(ObjectIdentifier(person)) {
+            createdGhosts.append(person)
+        }
+        return person
     }
 
-    private func save() { try? context.save() }
+    // MARK: Close / discard
+
+    private func attemptClose() {
+        if hasChanges {
+            confirmingDiscard = true
+        } else {
+            discardAndClose()
+        }
+    }
+
+    private func discardAndClose() {
+        // Ghosts minted this session were inserted immediately (they need
+        // identities for the draft rows); with the draft discarded they are
+        // edgeless orphans — delete them again.
+        for ghost in createdGhosts where ghost.isGhost
+            && ghost.edgesAsParentArray.isEmpty && ghost.edgesAsChildArray.isEmpty
+            && ghost.partnershipsAsAArray.isEmpty && ghost.partnershipsAsBArray.isEmpty {
+            context.delete(ghost)
+        }
+        if !createdGhosts.isEmpty { try? context.save() }
+        dismiss()
+    }
+
+    // MARK: Save
+
+    private func saveChanges() {
+        // Removals first (with profile-field cleanup so the next editor
+        // save can't resurrect the link from stale text).
+        for edge in initialParentEdges where !draftParents.contains(where: { $0.existing === edge }) {
+            clearBackfill(for: edge.parent, role: .parent)
+            context.delete(edge)
+        }
+        for edge in initialChildEdges where !draftChildren.contains(where: { $0.existing === edge }) {
+            clearBackfill(for: edge.child, role: .child)
+            context.delete(edge)
+        }
+        for edge in initialPartnerEdges where !draftPartners.contains(where: { $0.existing === edge }) {
+            clearBackfill(for: edge.a === subject ? edge.b : edge.a, role: .partner)
+            context.delete(edge)
+        }
+
+        // Kind updates and additions.
+        for draft in draftParents {
+            if let existing = draft.existing {
+                if existing.kind != draft.kind { existing.kind = draft.kind }
+            } else {
+                context.insert(Parentage(parent: draft.person, child: subject,
+                                         kind: ParentageKind(rawValue: draft.kind) ?? .bio))
+                backfill(added: draft.person, role: .parent, kindRaw: draft.kind)
+            }
+        }
+        for draft in draftChildren {
+            if let existing = draft.existing {
+                if existing.kind != draft.kind { existing.kind = draft.kind }
+            } else {
+                context.insert(Parentage(parent: subject, child: draft.person,
+                                         kind: ParentageKind(rawValue: draft.kind) ?? .bio))
+                backfill(added: draft.person, role: .child, kindRaw: draft.kind)
+            }
+        }
+        for draft in draftPartners {
+            if let existing = draft.existing {
+                if existing.kind != draft.kind { existing.kind = draft.kind }
+            } else {
+                context.insert(Partnership(a: subject, b: draft.person,
+                                           kind: PartnershipKind(rawValue: draft.kind) ?? .partner))
+                backfill(added: draft.person, role: .partner, kindRaw: draft.kind)
+            }
+        }
+
+        createdGhosts = []
+        try? context.save()
+        reloadFromStore()
+
+        withAnimation(.snappy(duration: 0.25)) { showingSavedBanner = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.2))
+            withAnimation(.easeOut(duration: 0.3)) { showingSavedBanner = false }
+        }
+    }
+
+    /// The neutral label a link writes onto profiles ("Parent", not a
+    /// guessed "Mother").
+    private func genericLabel(role: Role, kindRaw: String) -> String {
+        switch role {
+        case .parent:
+            switch ParentageKind(rawValue: kindRaw) ?? .bio {
+            case .bio: return "Parent"
+            case .adopted: return "Adoptive parent"
+            case .foster: return "Foster parent"
+            case .step: return "Stepparent"
+            }
+        case .child:
+            switch ParentageKind(rawValue: kindRaw) ?? .bio {
+            case .bio: return "Child"
+            case .adopted: return "Adopted child"
+            case .foster: return "Foster child"
+            case .step: return "Stepchild"
+            }
+        case .partner:
+            return (PartnershipKind(rawValue: kindRaw) ?? .partner) == .former ? "Ex-partner" : "Partner"
+        }
+    }
+
+    /// Saved links land on the profiles too: the subject gains a family
+    /// member row, a real (non-ghost) counterpart gains the reciprocal row,
+    /// and — when the subject is the self node — the other person's
+    /// "relationship to you" label is set unless a specific fitting label
+    /// ("Mother") is already there. Custom unchartable labels are left
+    /// alone.
+    private func backfill(added other: Person, role: Role, kindRaw: String) {
+        let generic = genericLabel(role: role, kindRaw: kindRaw)
+        if !subject.isGhost,
+           !subject.familyMembersArray.contains(where: {
+               $0.name.compare(other.name, options: .caseInsensitive) == .orderedSame
+           }) {
+            subject.familyMembersArray.append(FamilyMember(name: other.name, relation: generic))
+        }
+        if !other.isGhost, !subject.isSelf,
+           !other.familyMembersArray.contains(where: {
+               $0.name.compare(subject.name, options: .caseInsensitive) == .orderedSame
+           }) {
+            other.familyMembersArray.append(FamilyMember(name: subject.name, relation: FamilyRelation.inverse(of: generic)))
+        }
+        if subject.isSelf, !other.isGhost {
+            let l = other.relationshipToUser.trimmed.lowercased()
+            let fits: Bool
+            switch role {
+            case .parent: fits = FamilyEdgeBuilder.isDirectParentTerm(l)
+            case .child: fits = FamilyEdgeBuilder.isDirectChildTerm(l)
+            case .partner: fits = FamilyEdgeBuilder.isPartnerTerm(l)
+            }
+            if l.isEmpty || (FamilyRelation.isChartable(other.relationshipToUser) && !fits) {
+                other.relationshipToUser = generic
+            }
+        }
+    }
+
+    /// A removed link clears the profile fields that fed it — otherwise
+    /// FamilyEdgeSync would faithfully rebuild the edge from the stale
+    /// text on the very next editor save.
+    private func clearBackfill(for other: Person?, role: Role) {
+        guard let other else { return }
+        if role == .partner,
+           subject.partnerName.compare(other.name, options: .caseInsensitive) == .orderedSame {
+            subject.partnerName = ""
+        }
+        for member in subject.familyMembersArray where
+            member.name.compare(other.name, options: .caseInsensitive) == .orderedSame
+            && matchesRole(member.relation, role: role) {
+            context.delete(member)
+        }
+        if subject.isSelf {
+            let l = other.relationshipToUser.trimmed.lowercased()
+            let mapsHere: Bool
+            switch role {
+            case .parent: mapsHere = FamilyEdgeBuilder.isDirectParentTerm(l)
+            case .child: mapsHere = FamilyEdgeBuilder.isDirectChildTerm(l)
+            case .partner: mapsHere = FamilyEdgeBuilder.isPartnerTerm(l)
+            }
+            if mapsHere { other.relationshipToUser = "" }
+        }
+    }
+
+    private func matchesRole(_ relation: String, role: Role) -> Bool {
+        let l = relation.trimmed.lowercased()
+        switch role {
+        case .parent: return FamilyEdgeBuilder.isDirectParentTerm(l)
+        case .child: return FamilyEdgeBuilder.isDirectChildTerm(l)
+        case .partner: return FamilyEdgeBuilder.isPartnerTerm(l)
+        }
+    }
 }
 
 /// Finds a non-self profile/ghost by case-insensitive name, or creates a new

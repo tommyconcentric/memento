@@ -61,12 +61,6 @@ enum FamilyRelation {
         return 0
     }
 
-    /// Labels that belong to a generation lane (for the drag-to-move chooser).
-    static func labels(forGeneration generation: Int) -> [String] {
-        let matching = presets.filter { Self.generation(of: $0) == generation }
-        return matching.isEmpty ? ["Family"] : matching
-    }
-
     /// Only preset relations earn a place on the family tree. Custom
     /// "Other…" relationships stay off the chart by design — and keyword
     /// sniffing is no substitute, since a custom label like "childhood
@@ -241,12 +235,18 @@ struct FamilyGraph {
             }
         }
 
-        // Sibling groups: bucket children by the sorted ids of their parents.
+        // Sibling groups: bucket children by their exact parent set, keyed
+        // on object identity — persistentModelID's string form isn't
+        // guaranteed distinct for unsaved models, and a collision would
+        // silently merge unrelated sibling groups.
         var buckets: [String: (parents: [Person], children: [Person])] = [:]
         for person in people where isPlaced(person) {
             let parents = person.parents.filter(isPlaced)
             guard !parents.isEmpty else { continue }
-            let key = parents.map { "\($0.persistentModelID)" }.sorted().joined(separator: "|")
+            let key = parents
+                .map { String(UInt(bitPattern: ObjectIdentifier($0).hashValue)) }
+                .sorted()
+                .joined(separator: "|")
             buckets[key, default: (parents, [])].children.append(person)
         }
         let siblingGroups = buckets.values.map { SiblingGroup(parents: $0.parents, children: $0.children) }
@@ -345,19 +345,37 @@ struct FamilyTreeLayout {
 
         let nodes: [Node] = placed.compactMap { p in point(p).map { Node(id: p.persistentModelID, person: p, point: $0) } }
 
-        var seen = Set<Set<PersistentIdentifier>>()
-        let coupleBars: [CoupleBar] = graph.couples.compactMap { c in
-            let key: Set = [c.a.persistentModelID, c.b.persistentModelID]
+        var seen = Set<Set<ObjectIdentifier>>()
+        var coupleBars: [CoupleBar] = graph.couples.compactMap { c in
+            let key: Set = [ObjectIdentifier(c.a), ObjectIdentifier(c.b)]
             guard seen.insert(key).inserted, let pa = point(c.a), let pb = point(c.b) else { return nil }
             return CoupleBar(a: pa, b: pb, dashed: c.kind.isDashed)
         }
 
-        let descents: [Descent] = graph.siblingGroups.compactMap { grp in
+        var descents: [Descent] = []
+        for grp in graph.siblingGroups {
             let parentPts = grp.parents.compactMap(point)
-            guard !parentPts.isEmpty else { return nil }
-            let anchor = CGPoint(
+            guard !parentPts.isEmpty else { continue }
+            // Two co-parents with no recorded partnership still get a
+            // joining bar — without one, their shared trunk would hang
+            // from the empty space between them, touching neither.
+            if grp.parents.count == 2, parentPts.count == 2 {
+                let key: Set = [ObjectIdentifier(grp.parents[0]), ObjectIdentifier(grp.parents[1])]
+                if seen.insert(key).inserted {
+                    coupleBars.append(CoupleBar(a: parentPts[0], b: parentPts[1], dashed: false))
+                }
+            }
+            let centreAnchor = CGPoint(
                 x: parentPts.map(\.x).reduce(0, +) / CGFloat(parentPts.count),
                 y: parentPts.map(\.y).reduce(0, +) / CGFloat(parentPts.count))
+            // A single parent's trunk hangs from the *bottom edge* of their
+            // portrait — from the centre it would show through the ring
+            // halo around the circle. A couple's anchor stays at centre
+            // height: it sits on the (possibly just-added) bar between the
+            // two portraits.
+            let anchor = grp.parents.count == 1
+                ? CGPoint(x: centreAnchor.x, y: centreAnchor.y + nodeR + 3)
+                : centreAnchor
             let stubs: [ChildStub] = grp.children.compactMap { kid in
                 guard let pt = point(kid) else { return nil }
                 let dashed = kid.parentEdges.contains { e in
@@ -365,13 +383,15 @@ struct FamilyTreeLayout {
                 }
                 return ChildStub(point: pt, dashed: dashed)
             }
-            return Descent(anchor: anchor, children: stubs)
+            descents.append(Descent(anchor: anchor, children: stubs))
         }
 
         let maxX = nodes.map(\.point.x).max() ?? 0
         let maxY = nodes.map(\.point.y).max() ?? 0
+        // +24 gives the bottom row's name labels (drawn as overlays below
+        // the circles, outside the layout frames) room inside the plate.
         return .init(nodes: nodes, coupleBars: coupleBars, descents: descents,
-                     size: CGSize(width: maxX + margin + nodeR, height: maxY + margin + nodeR))
+                     size: CGSize(width: maxX + margin + nodeR, height: maxY + margin + nodeR + 24))
     }
 }
 
@@ -388,15 +408,7 @@ struct PedigreeTreeView: View {
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
-            ZStack(alignment: .topLeading) {
-                Canvas { ctx, _ in draw(&ctx) }
-                ForEach(layout.nodes) { node in
-                    pedigreeNode(node.person)
-                        .position(node.point)
-                }
-            }
-            .frame(width: max(layout.size.width, 1), height: max(layout.size.height, 1))
-            .background(treeParchmentGradient)
+            chartBody
             .scaleEffect(scale, anchor: .topLeading)
             // Reserve the scaled footprint so the ScrollView can reach every
             // corner when zoomed in.
@@ -414,6 +426,20 @@ struct PedigreeTreeView: View {
         // but a mouse on the Mac has no pinch input at all — without these
         // buttons, Mac mouse users could never zoom the pedigree.
         .overlay(alignment: .bottomTrailing) { zoomControls }
+    }
+
+    /// The chart itself, split out of the ScrollView so it can also be
+    /// rendered headlessly (ImageRenderer) for verification.
+    var chartBody: some View {
+        ZStack(alignment: .topLeading) {
+            Canvas { ctx, _ in draw(&ctx) }
+            ForEach(layout.nodes) { node in
+                pedigreeNode(node.person)
+                    .position(node.point)
+            }
+        }
+        .frame(width: max(layout.size.width, 1), height: max(layout.size.height, 1))
+        .background(treeParchmentGradient)
     }
 
     private var zoomControls: some View {
@@ -453,9 +479,20 @@ struct PedigreeTreeView: View {
         pinchStart = scale
     }
 
+    /// Where lines meet portraits: at the outer bark rule (circle radius
+    /// + 3), never the centre — a centre-anchored segment shows through
+    /// the transparent halo between the avatar's edge and its outer ring.
+    private static let lineEnd = FamilyTreeLayout.nodeR + 3
+
     private func draw(_ ctx: inout GraphicsContext) {
         for bar in layout.coupleBars {
-            var p = Path(); p.move(to: bar.a); p.addLine(to: bar.b)
+            // Trim the couple bar back to each portrait's frame edge.
+            let dx = bar.b.x - bar.a.x, dy = bar.b.y - bar.a.y
+            let length = max(hypot(dx, dy), 0.001)
+            let t = min(Self.lineEnd / length, 0.49)
+            var p = Path()
+            p.move(to: CGPoint(x: bar.a.x + dx * t, y: bar.a.y + dy * t))
+            p.addLine(to: CGPoint(x: bar.b.x - dx * t, y: bar.b.y - dy * t))
             ctx.stroke(p, with: .color(lineColor), style: stroke(bar.dashed))
         }
         for d in layout.descents where !d.children.isEmpty {
@@ -469,7 +506,7 @@ struct PedigreeTreeView: View {
             ctx.stroke(bus, with: .color(lineColor), style: stroke(false))
             for stub in d.children {
                 var s = Path(); s.move(to: CGPoint(x: stub.point.x, y: busY))
-                s.addLine(to: CGPoint(x: stub.point.x, y: stub.point.y - FamilyTreeLayout.nodeR))
+                s.addLine(to: CGPoint(x: stub.point.x, y: stub.point.y - Self.lineEnd))
                 ctx.stroke(s, with: .color(lineColor), style: stroke(stub.dashed))
             }
         }
@@ -491,23 +528,29 @@ struct PedigreeTreeView: View {
     }
 
     private func portrait(_ person: Person) -> some View {
-        VStack(spacing: 3) {
-            AvatarView(data: person.profilePhotoData,
-                       name: person.isSelf ? "You" : person.name,
-                       size: FamilyTreeLayout.nodeR * 2,
-                       desaturated: person.isDeceased)
-                // Gilt ring with a fine bark rule floating outside, matching
-                // the classic chart's framed-portrait look.
-                .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.55),
-                                         lineWidth: person.isSelf ? 2.5 : 1.5))
-                .overlay(Circle().stroke(Theme.bark.opacity(person.isSelf ? 0.6 : 0.35), lineWidth: 0.5).padding(-3))
-                .padding(3)
-            Text(person.isSelf ? "You" : person.name)
-                .font(.system(.caption2, design: .serif).weight(person.isSelf ? .semibold : .regular))
-                .foregroundStyle(person.isGhost ? Color.secondary : .primary)
-                .lineLimit(1)
-                .frame(width: 96)
-        }
+        // The view's geometric frame is the circle alone, so `.position`
+        // puts the circle's CENTRE exactly on the layout point every line
+        // aims at. Folding the name into the frame (the old VStack) shifted
+        // every circle up by half the label's height — lines stopped short
+        // of some portraits and cut through the ring halo of others.
+        AvatarView(data: person.profilePhotoData,
+                   name: person.isSelf ? "You" : person.name,
+                   size: FamilyTreeLayout.nodeR * 2,
+                   desaturated: person.isDeceased)
+            // Gilt ring with a fine bark rule floating outside, matching
+            // the classic chart's framed-portrait look.
+            .overlay(Circle().stroke(accent.opacity(person.isSelf ? 0.9 : 0.55),
+                                     lineWidth: person.isSelf ? 2.5 : 1.5))
+            .overlay(Circle().stroke(Theme.bark.opacity(person.isSelf ? 0.6 : 0.35), lineWidth: 0.5).padding(-3))
+            // The name hangs below as an overlay, outside layout.
+            .overlay(alignment: .bottom) {
+                Text(person.isSelf ? "You" : person.name)
+                    .font(.system(.caption2, design: .serif).weight(person.isSelf ? .semibold : .regular))
+                    .foregroundStyle(person.isGhost ? Color.secondary : .primary)
+                    .lineLimit(1)
+                    .frame(width: 96)
+                    .offset(y: 22)
+            }
     }
 }
 
@@ -812,9 +855,6 @@ struct MyFamilyTreeView: View {
     }
     @State private var pendingMove: MoveRequest?
     @State private var showingSelfLinks = false
-    // The edge-driven pedigree is the default; the classic generation chart
-    // stays available behind this toggle.
-    @AppStorage("useNewFamilyTree") private var useNewTree = true
 
     private var pedigreeLayout: FamilyTreeLayout? {
         guard let selfNode = people.canonicalSelfNode else { return nil }
@@ -830,18 +870,16 @@ struct MyFamilyTreeView: View {
     /// instead of relatives placed by generation.
     private var isLadder: Bool { workspace == .business }
 
+    /// The ladder's population: business contacts with a chartable working
+    /// relationship. (The family pedigree draws from edges, not labels.)
     private var labeled: [Person] {
         people.filter {
             let label = $0.relationshipToUser.trimmed
-            guard !label.isEmpty, $0.isBusiness == isLadder else { return false }
+            guard !label.isEmpty, $0.isBusiness else { return false }
             // Custom "Other…" relationships describe someone without
             // placing them on the chart.
-            return isLadder ? BusinessRelation.isChartable(label) : FamilyRelation.isChartable(label)
+            return BusinessRelation.isChartable(label)
         }
-    }
-
-    private func placement(of label: String) -> Int {
-        isLadder ? BusinessRelation.level(of: label) : FamilyRelation.generation(of: label)
     }
 
     private var rows: [TreeRow] {
@@ -853,7 +891,7 @@ struct MyFamilyTreeView: View {
                 linkedPerson: person,
                 isDeceased: person.isDeceased,
                 isFocus: false,
-                generation: placement(of: person.relationshipToUser)
+                generation: BusinessRelation.level(of: person.relationshipToUser)
             )
         }
         nodes.append(TreeNode(
@@ -863,14 +901,14 @@ struct MyFamilyTreeView: View {
         return buildTreeRows(
             nodes: nodes,
             subjectTitle: "You",
-            ensureGenerations: isLadder ? [-1, 0, 1] : [-2, -1, 0, 1, 2],
-            titleFor: isLadder ? { BusinessRelation.rowTitle(for: $0) } : nil
+            ensureGenerations: [-1, 0, 1],
+            titleFor: { BusinessRelation.rowTitle(for: $0) }
         )
     }
 
-    /// Shown when the new tree is on but you've recorded no family yet — the
-    /// pedigree would otherwise be a lone "You". Points at the same editor the
-    /// menu's "Edit Family Links" opens.
+    /// Shown when you've recorded no family yet — the pedigree would
+    /// otherwise be a lone "You". Points at the same editor the toolbar's
+    /// "Edit Family Links" opens.
     private var newTreeEmptyState: some View {
         ContentUnavailableView {
             Label("No Family Yet", systemImage: "tree")
@@ -887,43 +925,13 @@ struct MyFamilyTreeView: View {
     var body: some View {
         NavigationStack {
             Group {
-            if useNewTree && !isLadder {
-                if let layout = pedigreeLayout, layout.nodes.count > 1 {
+                if isLadder {
+                    ladderBody
+                } else if let layout = pedigreeLayout, layout.nodes.count > 1 {
                     PedigreeTreeView(layout: layout, accent: workspace.accent)
                 } else {
                     newTreeEmptyState
                 }
-            } else {
-            ScrollView {
-                if labeled.isEmpty {
-                    ContentUnavailableView {
-                        Label(
-                            isLadder ? "No Ladder Yet" : "No Tree Yet",
-                            systemImage: isLadder ? "building.2" : "tree"
-                        )
-                    } description: {
-                        Text(isLadder
-                            ? "Set \"Working Relationship to You\" on your business contacts in Edit Person — manager, client, direct report — and your corporate ladder builds itself."
-                            : "Set \"Family Relationship to You\" on your relatives in Edit Person — mother, brother, grandson — and your tree grows itself. Friends and colleagues can be left unset.")
-                    }
-                    .padding(.top, 60)
-                } else {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(isLadder
-                            ? "Tap anyone to open their profile. Hold a person and drag them to another rung to change how you work together."
-                            : "Tap anyone to open their profile. Hold a person and drag them to another row to change how you're related.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        FamilyTreeContent(rows: rows, dragEnabled: true, corporate: isLadder) { name, generation in
-                            handleDrop(name: name, generation: generation)
-                        }
-                        .historicalTreePlate(corporate: isLadder)
-                        .mementoCard(padding: 10)
-                    }
-                    .padding()
-                }
-            }
-            }
             }
             .background(workspace.background)
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
@@ -931,13 +939,8 @@ struct MyFamilyTreeView: View {
             .toolbar {
                 if !isLadder {
                     ToolbarItem(placement: .cancellationAction) {
-                        Menu {
-                            Button("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted") {
-                                showingSelfLinks = true
-                            }
-                            Toggle("New tree layout", isOn: $useNewTree)
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                        Button("Edit Family Links", systemImage: "point.3.connected.trianglepath.dotted") {
+                            showingSelfLinks = true
                         }
                     }
                 }
@@ -961,29 +964,46 @@ struct MyFamilyTreeView: View {
                 titleVisibility: .visible,
                 presenting: pendingMove
             ) { move in
-                let choices = isLadder
-                    ? BusinessRelation.labels(forLevel: move.generation)
-                    : FamilyRelation.labels(forGeneration: move.generation)
-                ForEach(choices, id: \.self) { label in
+                ForEach(BusinessRelation.labels(forLevel: move.generation), id: \.self) { label in
                     Button(label) { apply(label: label, to: move.person) }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { move in
-                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong in that \(isLadder ? "rung" : "row") are offered.")
+                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong on that rung are offered.")
             }
         }
     }
 
-    /// The lane name as the dialog should say it — the generation-0 lane is
-    /// labeled "You & your generation", not rowTitle's "You & their
-    /// generation".
-    private func destinationName(for generation: Int) -> String {
-        if isLadder {
-            return generation == 0 ? "your rung" : BusinessRelation.rowTitle(for: generation).lowercased()
+    /// The Business ladder keeps the classic lane chart — reporting lines
+    /// are labels, not graph edges, and drag-between-rungs suits them.
+    private var ladderBody: some View {
+        ScrollView {
+            if labeled.isEmpty {
+                ContentUnavailableView {
+                    Label("No Ladder Yet", systemImage: "building.2")
+                } description: {
+                    Text("Set \"Working Relationship to You\" on your business contacts in Edit Person — manager, client, direct report — and your corporate ladder builds itself.")
+                }
+                .padding(.top, 60)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Tap anyone to open their profile. Hold a person and drag them to another rung to change how you work together.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    FamilyTreeContent(rows: rows, dragEnabled: true, corporate: true) { name, level in
+                        handleDrop(name: name, generation: level)
+                    }
+                    .historicalTreePlate(corporate: true)
+                    .mementoCard(padding: 10)
+                }
+                .padding()
+            }
         }
-        return generation == 0
-            ? "your generation"
-            : FamilyRelation.rowTitle(for: generation, subject: "You").lowercased()
+    }
+
+    /// The rung name as the dialog should say it.
+    private func destinationName(for level: Int) -> String {
+        level == 0 ? "your rung" : BusinessRelation.rowTitle(for: level).lowercased()
     }
 
     private func handleDrop(name: String, generation: Int) {
@@ -995,7 +1015,7 @@ struct MyFamilyTreeView: View {
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
         guard matches.count == 1, let person = matches.first else { return }
-        guard placement(of: person.relationshipToUser) != generation else { return }
+        guard BusinessRelation.level(of: person.relationshipToUser) != generation else { return }
         pendingMove = MoveRequest(person: person, generation: generation)
     }
 
