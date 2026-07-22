@@ -271,11 +271,16 @@ struct RootView: View {
                 StressSeeder.seedIfRequested(context)
                 #endif
                 FamilyGraphMigration.runIfNeeded(context)
+                // Two devices migrating/editing before first sync can mint
+                // the same ghost (and its edges) twice — CloudKit merges
+                // the records but never dedups them.
+                FamilyGraphMaintenance.dedupe(context)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     mergeDuplicateBuiltInGroups()
                     ensureSelfNode()
+                    FamilyGraphMaintenance.dedupe(context)
                 }
             }
     }
