@@ -983,6 +983,9 @@ struct MyFamilyTreeView: View {
                 }
             }
             .background(workspace.background)
+            // Cards on this screen (the ladder plate) must wear the same
+            // workspace surfaces as the background behind them.
+            .environment(\.cardWorkspace, workspace)
             .navigationTitle(isLadder ? "Corporate Ladder" : "My Family Tree")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1182,10 +1185,22 @@ struct PersonFamilySection: View {
         )
     }
 
+    /// Presets read naturally lowercased mid-sentence ("Your mother");
+    /// custom text renders verbatim so names and acronyms survive — the
+    /// same rule Quick Info's relationship row applies, both vocabularies
+    /// checked because a workspace flip can leave either kind of label.
+    private var relationshipChipText: String {
+        let relation = person.relationshipToUser
+        let isPreset = (FamilyRelation.presets + BusinessRelation.presets).contains {
+            $0.compare(relation, options: .caseInsensitive) == .orderedSame
+        }
+        return "Your \(isPreset ? relation.lowercased() : relation)"
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             if !person.relationshipToUser.trimmed.isEmpty {
-                Label("Your \(person.relationshipToUser.lowercased())", systemImage: "person.2.fill")
+                Label(relationshipChipText, systemImage: "person.2.fill")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Theme.bougainvillea)
                     .padding(.horizontal, 12)
