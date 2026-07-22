@@ -595,7 +595,8 @@ struct FamilyTreeContent: View {
     var corporate = false
     /// False for image export: ImageRenderer doesn't render the content of
     /// UIKit-backed ScrollViews, so exported lanes lay their people out in
-    /// plain rows instead (the export is given a wide fixed frame).
+    /// plain rows instead (the export frames itself at `exportWidth`, wide
+    /// enough for its widest row).
     var scrollableLanes = true
     var onDropInGeneration: ((String, Int) -> Void)? = nil
 
@@ -607,7 +608,22 @@ struct FamilyTreeContent: View {
     private var ruleColor: Color { corporate ? Theme.graphite : Theme.bark }
     // Total horizontal inset the lane adds around its scroll area; the
     // node row fills the chart width minus this so centring lines up.
-    private let laneHorizontalPadding: CGFloat = 16
+    private static let laneHorizontalPadding: CGFloat = 16
+    private static let nodeSpacing: CGFloat = 12
+
+    /// The frame width an export needs so its widest generation fits.
+    /// The in-app chart hides an overflowing row behind its horizontal
+    /// ScrollView; the export lays lanes out flat, and the fixed-width
+    /// portrait cells can't compress — a narrower frame slices the
+    /// outermost people off both edges of the PNG.
+    static func exportWidth(for rows: [TreeRow], minimum: CGFloat) -> CGFloat {
+        let widestRow = rows.map { row in
+            let count = CGFloat(row.nodes.count)
+            return count * FamilyNodeView.cellWidth + max(count - 1, 0) * nodeSpacing
+        }.max() ?? 0
+        // + the lane's padding and the node row's own 2pt on each side.
+        return max(minimum, widestRow + laneHorizontalPadding + 4)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -721,7 +737,7 @@ struct FamilyTreeContent: View {
                         // ScrollView takes over. (maxWidth: .infinity is
                         // inert inside a horizontal ScrollView, which sizes
                         // content to its natural width.)
-                        .frame(minWidth: max(0, laneWidth - laneHorizontalPadding), alignment: .center)
+                        .frame(minWidth: max(0, laneWidth - Self.laneHorizontalPadding), alignment: .center)
                 }
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             } else {
@@ -736,7 +752,7 @@ struct FamilyTreeContent: View {
     }
 
     private func nodeRow(_ row: TreeRow) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Self.nodeSpacing) {
             ForEach(row.nodes) { node in
                 FamilyNodeView(
                     node: node,
@@ -782,6 +798,10 @@ struct FamilyNodeView: View {
     let node: TreeNode
     var dragPayload: String? = nil
     var corporate = false
+
+    /// Fixed portrait-cell width; `FamilyTreeContent.exportWidth` sums it
+    /// to size exports, so keep the two in step.
+    static let cellWidth: CGFloat = 88
 
     private var ringColor: Color { corporate ? Theme.steel : Theme.gold }
     private var frameColor: Color { corporate ? Theme.graphite : Theme.bark }
@@ -845,7 +865,7 @@ struct FamilyNodeView: View {
                     .lineLimit(1)
             }
         }
-        .frame(width: 88)
+        .frame(width: Self.cellWidth)
         // Report this node's frame so the chart can route connector lines
         // from the bottom of each parent's row to the top of each child's.
         .anchorPreference(key: NodeAnchorKey.self, value: .bounds) {
@@ -1037,9 +1057,10 @@ struct MyFamilyTreeView: View {
     private func exportTreeImage() {
         if isLadder {
             guard !labeled.isEmpty else { return }
-            let content = FamilyTreeContent(rows: rows, corporate: true, scrollableLanes: false)
+            let exportRows = rows
+            let content = FamilyTreeContent(rows: exportRows, corporate: true, scrollableLanes: false)
                 .historicalTreePlate(corporate: true)
-                .frame(width: 780)
+                .frame(width: FamilyTreeContent.exportWidth(for: exportRows, minimum: 780))
             exportedTree = TreeImageExport.export(content, background: workspace.background, filename: "Corporate Ladder")
         } else {
             guard let layout = pedigreeLayout, layout.nodes.count > 1 else { return }
@@ -1095,14 +1116,26 @@ struct PersonFamilySection: View {
             )
         ]
 
-        if !person.partnerName.trimmed.isEmpty {
-            result.append(node(named: person.partnerName, relation: "Partner"))
-        }
-        for child in childNames(of: person) {
-            result.append(node(named: child, relation: "Child"))
+        // The same relative can arrive from two sources — a FamilyMember
+        // row and the free-text partner/children fields (reciprocal links
+        // and the links editor write rows without filling those fields,
+        // which the user may later fill by hand). Dedupe by the same
+        // case-insensitive name identity the chart links profiles by,
+        // preferring the FamilyMember row: its preset relation ("Wife",
+        // "Son") is more specific than the fields' generic Partner/Child.
+        var seenNames = Set<String>()
+        func appendUnique(_ rawName: String, relation: String) {
+            guard seenNames.insert(rawName.trimmed.lowercased()).inserted else { return }
+            result.append(node(named: rawName, relation: relation))
         }
         for member in person.familyMembersArray where !member.name.trimmed.isEmpty {
-            result.append(node(named: member.name, relation: member.relation))
+            appendUnique(member.name, relation: member.relation)
+        }
+        if !person.partnerName.trimmed.isEmpty {
+            appendUnique(person.partnerName, relation: "Partner")
+        }
+        for child in childNames(of: person) {
+            appendUnique(child, relation: "Child")
         }
         return result
     }
@@ -1166,9 +1199,10 @@ struct PersonFamilySection: View {
                     // on the plate — same export the big tree offers.
                     .overlay(alignment: .topTrailing) {
                         Button {
-                            let content = FamilyTreeContent(rows: buildTreeRows(nodes: nodes, subjectTitle: person.name), scrollableLanes: false)
+                            let exportRows = buildTreeRows(nodes: nodes, subjectTitle: person.name)
+                            let content = FamilyTreeContent(rows: exportRows, scrollableLanes: false)
                                 .historicalTreePlate()
-                                .frame(width: 720)
+                                .frame(width: FamilyTreeContent.exportWidth(for: exportRows, minimum: 720))
                             exportedTree = TreeImageExport.export(
                                 content,
                                 background: Theme.background,

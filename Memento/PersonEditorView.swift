@@ -765,7 +765,12 @@ struct PersonEditorView: View {
         func find(_ name: String) -> Person? {
             let trimmed = name.trimmed
             guard !trimmed.isEmpty else { return nil }
+            // Only real profiles can carry the reciprocal — the self node
+            // and ghosts have no visible profile to show it on, and a
+            // hidden ghost sharing the name must not spoil the one-match
+            // rule below (the picker that stored this name hides both).
             let matches = everyone.filter {
+                !$0.isSelf && !$0.isGhost &&
                 $0.persistentModelID != target.persistentModelID &&
                 $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
             }
