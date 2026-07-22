@@ -60,14 +60,22 @@ enum CalendarSyncManager {
         guard UserDefaults.standard.bool(forKey: enabledKey) else { return }
 
         var events: [EventSnapshot] = []
-        // Hidden graph nodes (self/ghost) are excluded, matching the in-app
-        // calendar.
-        for person in people where !person.isDeceased && !person.isSelf && !person.isGhost {
+        // Ghost nodes (name-only relatives) are excluded, matching the
+        // in-app calendar. The hidden self node's dates sync too — the My
+        // Profile editor accepts them — titled "Your …" rather than the
+        // node's name (which may still be the "You" placeholder).
+        for person in people where !person.isDeceased && !person.isGhost {
             if let birthday = person.birthday {
-                events.append(EventSnapshot(title: "🎂 \(person.name)'s Birthday", date: birthday))
+                events.append(EventSnapshot(
+                    title: person.isSelf ? "🎂 Your Birthday" : "🎂 \(person.name)'s Birthday",
+                    date: birthday
+                ))
             }
             for item in person.importantDatesArray {
-                events.append(EventSnapshot(title: "\(item.label) — \(person.name)", date: item.date))
+                events.append(EventSnapshot(
+                    title: person.isSelf ? "Your \(item.label)" : "\(item.label) — \(person.name)",
+                    date: item.date
+                ))
             }
         }
 
@@ -124,8 +132,15 @@ enum CalendarSyncManager {
         generationLock.unlock()
         syncQueue.async {
             guard let calendar = existingCalendar() else { return }
-            try? store.removeCalendar(calendar, commit: true)
-            UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
+            do {
+                try store.removeCalendar(calendar, commit: true)
+                UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
+            } catch {
+                // Removal can fail (e.g. Calendar access was revoked).
+                // Keep the identifier so re-enabling sync — or a later
+                // toggle-off — still targets the real calendar instead of
+                // stranding it in the user's account forever.
+            }
         }
     }
 
@@ -133,7 +148,9 @@ enum CalendarSyncManager {
     /// to a one-time title match only when a previous version already
     /// synced (lastSync > 0) before identifiers were stored — for those
     /// installs the same-titled calendar is the one this app created. A
-    /// fresh setup never adopts a same-titled calendar it didn't create.
+    /// fresh setup never adopts here, so a toggle-off can't remove a
+    /// calendar this app never claimed; *enabling* sync adopts via
+    /// `findOrCreateCalendar`'s source-restricted title match instead.
     nonisolated private static func existingCalendar() -> EKCalendar? {
         let defaults = UserDefaults.standard
         if let identifier = defaults.string(forKey: calendarIdentifierKey) {
@@ -149,12 +166,6 @@ enum CalendarSyncManager {
     nonisolated private static func findOrCreateCalendar() -> EKCalendar? {
         if let existing = existingCalendar() { return existing }
 
-        let calendar = EKCalendar(for: .event, eventStore: store)
-        calendar.title = calendarTitle
-        // Theme.aegean's components inlined: Theme statics are
-        // main-actor-isolated and this runs on the sync queue.
-        calendar.cgColor = UIColor(red: 0.118, green: 0.431, blue: 0.624, alpha: 1).cgColor
-
         // Prefer an iCloud source so the calendar (and its shown/hidden
         // state) follows the user across their own devices, same as
         // Memento's own CloudKit-synced data.
@@ -162,6 +173,31 @@ enum CalendarSyncManager {
             ?? store.defaultCalendarForNewEvents?.source
             ?? store.sources.first { $0.sourceType == .local }
         guard let source else { return nil }
+
+        // The stored identifier is device-local (UserDefaults), but the
+        // calendar itself lives in the iCloud source precisely so it
+        // reaches all of the user's devices — so a second device (or this
+        // one after a reinstall) has no identifier while the calendar
+        // already exists. Adopt a same-titled writable calendar from the
+        // source we would create in, rather than standing up a duplicate
+        // "Memento" beside it that every device then maintains in
+        // parallel. Restricting adoption to that one source keeps this
+        // from hijacking a user's own "Memento" calendar in some other
+        // account.
+        if let adopted = store.calendars(for: .event).first(where: {
+            $0.title == calendarTitle
+                && $0.source?.sourceIdentifier == source.sourceIdentifier
+                && $0.allowsContentModifications
+        }) {
+            UserDefaults.standard.set(adopted.calendarIdentifier, forKey: calendarIdentifierKey)
+            return adopted
+        }
+
+        let calendar = EKCalendar(for: .event, eventStore: store)
+        calendar.title = calendarTitle
+        // Theme.aegean's components inlined: Theme statics are
+        // main-actor-isolated and this runs on the sync queue.
+        calendar.cgColor = UIColor(red: 0.118, green: 0.431, blue: 0.624, alpha: 1).cgColor
         calendar.source = source
 
         do {
@@ -176,11 +212,24 @@ enum CalendarSyncManager {
     /// Full rebuild rather than diffing — simpler and avoids needing to
     /// persist per-date EventKit identifiers back into SwiftData.
     nonisolated private static func removeAllEvents(in calendar: EKCalendar) {
-        let start = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
+        // EventKit silently truncates an events predicate to four years
+        // from its start date, so one six-year predicate would stop
+        // matching at now+3y — leaving the Feb-29 branch's far-future
+        // concrete events (out to ~4.6 years ahead) unmatched and
+        // re-added as one more duplicate on every rebuild. Walk the
+        // window in three-year chunks so every span stays under the cap.
         let end = Calendar.current.date(byAdding: .year, value: 5, to: .now) ?? .now
-        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: [calendar])
-        for event in store.events(matching: predicate) {
-            try? store.remove(event, span: .futureEvents, commit: false)
+        var chunkStart = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
+        while chunkStart < end {
+            let chunkEnd = min(Calendar.current.date(byAdding: .year, value: 3, to: chunkStart) ?? end, end)
+            let predicate = store.predicateForEvents(withStart: chunkStart, end: chunkEnd, calendars: [calendar])
+            for event in store.events(matching: predicate) {
+                // A recurring series can surface occurrences in more than
+                // one chunk (removals are uncommitted until the rebuild's
+                // single commit); re-removing just throws, and is swallowed.
+                try? store.remove(event, span: .futureEvents, commit: false)
+            }
+            chunkStart = chunkEnd
         }
     }
 
