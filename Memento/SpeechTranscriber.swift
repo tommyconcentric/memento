@@ -19,6 +19,11 @@ final class SpeechTranscriber {
     private var task: SFSpeechRecognitionTask?
     private var finalizedText = ""
     private var consecutiveErrors = 0
+    // Bumped by every start() and stop(). start() re-checks it after its
+    // permission await: a stop (composer dismissed mid-prompt) or a second
+    // start (double-click) that arrived during the wait aborts the stale
+    // start before it can hot-mic an empty screen or double-tap the input.
+    private var startGeneration = 0
 
     // MARK: - Permissions
 
@@ -36,6 +41,8 @@ final class SpeechTranscriber {
 
     @MainActor
     func start() async {
+        startGeneration += 1
+        let generation = startGeneration
         errorMessage = nil
         transcript = ""
         finalizedText = ""
@@ -45,6 +52,10 @@ final class SpeechTranscriber {
             errorMessage = "Allow microphone and speech recognition access for Memento in Settings."
             return
         }
+        // The permission prompt can outlive the composer (or a second tap
+        // can supersede this start) — never start the engine for a request
+        // nobody is waiting on.
+        guard generation == startGeneration else { return }
 
         guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else {
             errorMessage = "Speech recognition isn't available right now."
@@ -86,6 +97,9 @@ final class SpeechTranscriber {
 
     @MainActor
     func stop() {
+        // Always invalidate a pending start, even when nothing is running
+        // yet — the guard below must not swallow that.
+        startGeneration += 1
         guard isRecording || audioEngine.isRunning else { return }
         isRecording = false
         audioEngine.stop()
@@ -101,6 +115,10 @@ final class SpeechTranscriber {
 
     @MainActor
     private func startRecognitionSegment() {
+        // Retire the previous segment explicitly — its callbacks are
+        // already ignored (request-identity guard below), but the task
+        // shouldn't keep transcribing a request nothing reads.
+        task?.cancel()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         // Keep the audio on the phone when the device supports it — more
@@ -112,7 +130,14 @@ final class SpeechTranscriber {
 
         task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor [weak self] in
-                self?.process(result: result, error: error)
+                // A task can deliver its final result in one callback and
+                // its terminal error in a later one; once a new segment has
+                // replaced this request, that late error must not finalize
+                // the new segment's partial and spawn a duplicate task on
+                // top of it — two live tasks alternate-writing `transcript`
+                // and garble the note.
+                guard let self, self.request === request else { return }
+                self.process(result: result, error: error)
             }
         }
     }

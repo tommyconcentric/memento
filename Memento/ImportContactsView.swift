@@ -474,7 +474,17 @@ struct ImportContactsView: View {
         }
         let headers = rows[0].map { $0.lowercased() }
         func columnIndex(matching options: [String]) -> Int? {
-            headers.firstIndex { header in options.contains { header.contains($0) } }
+            // An exact header wins outright. Among substring matches,
+            // Google-style exports pair "Phone 1 - Type" with
+            // "Phone 1 - Value" — binding the first "phone" hit meant
+            // every import stored junk like "Mobile" as the number.
+            if let exact = headers.firstIndex(where: { options.contains($0) }) { return exact }
+            let candidates = headers.indices.filter { index in
+                options.contains { headers[index].contains($0) }
+            }
+            return candidates.first { headers[$0].contains("value") }
+                ?? candidates.first { !headers[$0].contains("type") }
+                ?? candidates.first
         }
         guard let nameIndex = columnIndex(matching: ["name"]) else {
             errorMessage = "Couldn't find a \"name\" column in that CSV."

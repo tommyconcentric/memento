@@ -187,6 +187,7 @@ struct AppLockView: View {
     let onUnlock: () -> Void
 
     @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var entered = ""
     @State private var shakeTick: CGFloat = 0
     @State private var biometricAttempted = false
@@ -227,11 +228,29 @@ struct AppLockView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
+        // The lock window is created at the moment of *locking* — usually
+        // while the app is leaving the foreground. An onAppear-only prompt
+        // would fire (and be consumed) right then, latch, and never re-run
+        // when the user actually comes back — so the advertised auto-unlock
+        // effectively never happened on reopen. Attempt only while active,
+        // and re-arm on every departure so each return gets one prompt.
         .onAppear {
-            guard autoAttemptsBiometrics, useBiometrics, !biometricAttempted else { return }
-            biometricAttempted = true
-            attemptBiometricUnlock()
+            autoAttemptBiometricsIfReady()
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                autoAttemptBiometricsIfReady()
+            } else {
+                biometricAttempted = false
+            }
+        }
+    }
+
+    private func autoAttemptBiometricsIfReady() {
+        guard autoAttemptsBiometrics, useBiometrics, !biometricAttempted,
+              scenePhase == .active else { return }
+        biometricAttempted = true
+        attemptBiometricUnlock()
     }
 
     private func checkPIN() {
