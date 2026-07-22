@@ -13,6 +13,11 @@ enum CalendarSyncManager {
     static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
     static let lastSyncKey = "appleCalendarLastSync"
     private static let calendarIdentifierKey = "appleCalendarIdentifier"
+    // True when the stored identifier points at a calendar this app
+    // *adopted* rather than created (see `findOrCreateCalendar`). An
+    // adopted calendar may hold the user's own events, so rebuilds touch
+    // only app-generated events in it and toggle-off never deletes it.
+    private static let calendarAdoptedKey = "appleCalendarAdopted"
     private static let calendarTitle = "Memento"
     // EKEventStore is documented thread-safe; the rebuild runs on syncQueue
     // so a 250-contact full rebuild (measured at multiple seconds) doesn't
@@ -98,7 +103,10 @@ enum CalendarSyncManager {
         guard UserDefaults.standard.bool(forKey: enabledKey),
               let calendar = findOrCreateCalendar() else { return }
 
-        removeAllEvents(in: calendar)
+        removeAllEvents(
+            in: calendar,
+            onlyAppGenerated: UserDefaults.standard.bool(forKey: calendarAdoptedKey)
+        )
         for event in events {
             addYearlyEvent(title: event.title, date: event.date, calendar: calendar)
         }
@@ -117,10 +125,13 @@ enum CalendarSyncManager {
         }
     }
 
-    /// Deletes the app-created "Memento" calendar and everything in it —
-    /// call when the user turns the sync toggle off. Only ever removes the
-    /// calendar whose identifier this app stored; deleting by title could
-    /// destroy a user's own calendar that happens to share the name.
+    /// Called when the user turns the sync toggle off. A calendar this app
+    /// *created* is deleted outright with everything in it; a calendar it
+    /// merely *adopted* (see `findOrCreateCalendar`) belongs to the user,
+    /// so only the app-generated events are stripped and the calendar
+    /// itself stays. Either way only the calendar whose identifier this
+    /// app stored is ever touched; acting by title could destroy a user's
+    /// own calendar that happens to share the name.
     static func removeCalendar() {
         // Invalidate queued rebuilds, then run the removal ON the sync
         // queue so it serializes behind any rebuild already executing —
@@ -132,14 +143,29 @@ enum CalendarSyncManager {
         generationLock.unlock()
         syncQueue.async {
             guard let calendar = existingCalendar() else { return }
-            do {
-                try store.removeCalendar(calendar, commit: true)
-                UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
-            } catch {
-                // Removal can fail (e.g. Calendar access was revoked).
-                // Keep the identifier so re-enabling sync — or a later
-                // toggle-off — still targets the real calendar instead of
-                // stranding it in the user's account forever.
+            let defaults = UserDefaults.standard
+            if defaults.bool(forKey: calendarAdoptedKey) {
+                removeAllEvents(in: calendar, onlyAppGenerated: true)
+                do {
+                    try store.commit()
+                    defaults.removeObject(forKey: calendarIdentifierKey)
+                    defaults.removeObject(forKey: calendarAdoptedKey)
+                } catch {
+                    // Keep both keys so a retry still knows which calendar
+                    // holds this app's events — and that it must never be
+                    // deleted.
+                }
+            } else {
+                do {
+                    try store.removeCalendar(calendar, commit: true)
+                    defaults.removeObject(forKey: calendarIdentifierKey)
+                    defaults.removeObject(forKey: calendarAdoptedKey)
+                } catch {
+                    // Removal can fail (e.g. Calendar access was revoked).
+                    // Keep the identifier so re-enabling sync — or a later
+                    // toggle-off — still targets the real calendar instead
+                    // of stranding it in the user's account forever.
+                }
             }
         }
     }
@@ -182,14 +208,18 @@ enum CalendarSyncManager {
         // source we would create in, rather than standing up a duplicate
         // "Memento" beside it that every device then maintains in
         // parallel. Restricting adoption to that one source keeps this
-        // from hijacking a user's own "Memento" calendar in some other
-        // account.
+        // away from same-titled calendars in other accounts — and because
+        // the adopted calendar could still be one the *user* made by hand,
+        // it's marked adopted: rebuilds then remove only app-generated
+        // events from it (`isAppGeneratedTitle`) and toggle-off strips
+        // those events instead of deleting the calendar.
         if let adopted = store.calendars(for: .event).first(where: {
             $0.title == calendarTitle
                 && $0.source?.sourceIdentifier == source.sourceIdentifier
                 && $0.allowsContentModifications
         }) {
             UserDefaults.standard.set(adopted.calendarIdentifier, forKey: calendarIdentifierKey)
+            UserDefaults.standard.set(true, forKey: calendarAdoptedKey)
             return adopted
         }
 
@@ -203,15 +233,38 @@ enum CalendarSyncManager {
         do {
             try store.saveCalendar(calendar, commit: true)
             UserDefaults.standard.set(calendar.calendarIdentifier, forKey: calendarIdentifierKey)
+            // A calendar this app minted is provably its own — full-window
+            // rebuilds and delete-on-toggle-off apply.
+            UserDefaults.standard.removeObject(forKey: calendarAdoptedKey)
             return calendar
         } catch {
             return nil
         }
     }
 
+    /// Whether an event title has one of the exact shapes this manager
+    /// writes (see the snapshot loop in `refresh` — update this list
+    /// alongside any title format change):
+    ///   "🎂 <name>'s Birthday"     — someone's birthday
+    ///   "🎂 Your Birthday"         — the self node's birthday
+    ///   "<label> — <name>"         — someone's important date (em dash)
+    ///   "Your <label>"             — a self important date
+    /// Scopes removals in an *adopted* calendar to app-generated events;
+    /// everything else in such a calendar is the user's own content.
+    nonisolated private static func isAppGeneratedTitle(_ title: String?) -> Bool {
+        guard let title else { return false }
+        if title == "🎂 Your Birthday" { return true }
+        if title.hasPrefix("🎂 ") && title.hasSuffix("'s Birthday") { return true }
+        if title.hasPrefix("Your ") { return true }
+        if title.contains(" — ") { return true }
+        return false
+    }
+
     /// Full rebuild rather than diffing — simpler and avoids needing to
-    /// persist per-date EventKit identifiers back into SwiftData.
-    nonisolated private static func removeAllEvents(in calendar: EKCalendar) {
+    /// persist per-date EventKit identifiers back into SwiftData. In an
+    /// adopted calendar (`onlyAppGenerated`) the wipe is scoped to titles
+    /// this app writes; a calendar the app created is cleared wholesale.
+    nonisolated private static func removeAllEvents(in calendar: EKCalendar, onlyAppGenerated: Bool) {
         // EventKit silently truncates an events predicate to four years
         // from its start date, so one six-year predicate would stop
         // matching at now+3y — leaving the Feb-29 branch's far-future
@@ -224,6 +277,7 @@ enum CalendarSyncManager {
             let chunkEnd = min(Calendar.current.date(byAdding: .year, value: 3, to: chunkStart) ?? end, end)
             let predicate = store.predicateForEvents(withStart: chunkStart, end: chunkEnd, calendars: [calendar])
             for event in store.events(matching: predicate) {
+                if onlyAppGenerated && !isAppGeneratedTitle(event.title) { continue }
                 // A recurring series can surface occurrences in more than
                 // one chunk (removals are uncommitted until the rebuild's
                 // single commit); re-removing just throws, and is swallowed.
