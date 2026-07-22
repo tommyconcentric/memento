@@ -37,6 +37,7 @@ struct SettingsView: View {
     @State private var resetNote: String?
 
     @State private var showingImport = false
+    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
 
     var body: some View {
         NavigationStack {
@@ -96,6 +97,18 @@ struct SettingsView: View {
                     Text("Contacts")
                 } footer: {
                     Text("Import contacts with their names, photos, birthdays and details.")
+                }
+
+                Section {
+                    Picker("Date format", selection: $dateFormatRaw) {
+                        ForEach(AppDateFormat.allCases) { format in
+                            Text(format.label).tag(format.rawValue)
+                        }
+                    }
+                } header: {
+                    Text("Dates")
+                } footer: {
+                    Text("Used everywhere Memento shows a date. System follows your device's region settings.")
                 }
 
                 Section {
@@ -314,7 +327,7 @@ struct SettingsView: View {
     private var lastSyncedText: String {
         guard lastSyncTimestamp > 0 else { return "Not synced yet." }
         let date = Date(timeIntervalSince1970: lastSyncTimestamp)
-        return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))."
+        return "Last synced \(date.appFormatted()) \(date.formatted(date: .omitted, time: .shortened))."
     }
 
     /// Turning the lock on requires setting a PIN first; turning it off

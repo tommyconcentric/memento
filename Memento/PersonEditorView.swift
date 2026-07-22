@@ -188,8 +188,7 @@ struct PersonEditorView: View {
                 Section("Birthday") {
                     Toggle("Set a birthday", isOn: $hasBirthday.animation())
                     if hasBirthday {
-                        DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
-                            .datePickerStyle(.compact)
+                        AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness)
                     }
                 }
 
@@ -509,7 +508,7 @@ struct PersonEditorView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         TextField("Label (e.g. Wedding anniversary)", text: $draft.label)
-                        DatePicker("Date", selection: $draft.date, displayedComponents: .date)
+                        AppDatePicker(title: "Date", date: $draft.date, business: isBusiness)
                     }
                     rowDeleteButton(label: "Remove this date") {
                         draftDates.removeAll { $0.id == draft.id }

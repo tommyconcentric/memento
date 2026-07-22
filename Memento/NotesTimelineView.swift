@@ -101,6 +101,7 @@ struct NotesTimelineView: View {
 
 struct NoteCard: View {
     let note: NoteEntry
+    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
     var onPhotoTap: (EventPhoto) -> Void
     var onOpen: () -> Void
     var onEdit: () -> Void
@@ -109,10 +110,7 @@ struct NoteCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Label(
-                    note.eventDate.formatted(date: .abbreviated, time: .omitted),
-                    systemImage: "calendar"
-                )
+                Label(note.eventDate.appFormatted(), systemImage: "calendar")
                 if !note.location.isEmpty {
                     Label(note.location, systemImage: "mappin.and.ellipse")
                         .lineLimit(1)
@@ -207,10 +205,7 @@ struct NoteDetailSheet: View {
                     }
 
                     HStack(spacing: 12) {
-                        Label(
-                            note.eventDate.formatted(date: .long, time: .omitted),
-                            systemImage: "calendar"
-                        )
+                        Label(note.eventDate.appFormatted(.long), systemImage: "calendar")
                         if !note.location.isEmpty {
                             Label(note.location, systemImage: "mappin.and.ellipse")
                         }
@@ -301,7 +296,7 @@ struct PhotoViewerSheet: View {
                     }
                     if let note = photo.note {
                         let detail = [
-                            note.eventDate.formatted(date: .long, time: .omitted),
+                            note.eventDate.appFormatted(.long),
                             note.location
                         ]
                         .filter { !$0.isEmpty }

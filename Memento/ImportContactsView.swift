@@ -321,7 +321,7 @@ struct ImportContactsView: View {
             parts.append(candidate.phones.count > 1 ? "\(phone) +\(candidate.phones.count - 1)" : phone)
         }
         if let birthday = candidate.birthday {
-            parts.append("🎂 " + birthday.formatted(.dateTime.day().month(.abbreviated)))
+            parts.append("🎂 " + birthday.appFormattedMonthDay())
         }
         return parts.joined(separator: " · ")
     }

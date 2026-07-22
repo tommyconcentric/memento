@@ -8,6 +8,7 @@ struct QuickInfoView: View {
     var onEdit: () -> Void
 
     @Environment(\.modelContext) private var context
+    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
 
     var body: some View {
         VStack(spacing: 16) {
@@ -238,8 +239,8 @@ struct QuickInfoView: View {
         // Year-less birthdays from contact import carry a placeholder year
         // the user never entered — show only the month and day.
         let dateText = birthday.hasPlaceholderYear
-            ? birthday.formatted(.dateTime.month(.abbreviated).day())
-            : birthday.formatted(date: .abbreviated, time: .omitted)
+            ? birthday.appFormattedMonthDay()
+            : birthday.appFormatted()
         if person.isDeceased {
             return dateText
         }
@@ -255,7 +256,7 @@ struct QuickInfoView: View {
     }
 
     private func dateText(_ date: Date) -> String {
-        var value = date.formatted(date: .abbreviated, time: .omitted)
+        var value = date.appFormatted()
         if !person.isDeceased, let days = Date.daysUntilNextOccurrence(of: date), days <= 60 {
             value += days == 0 ? " · today" : " · in \(days)d"
         }

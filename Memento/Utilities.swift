@@ -68,6 +68,91 @@ extension Date {
     }
 }
 
+// MARK: - App-wide date format (Settings → Dates)
+
+/// The user's chosen rendering for every date the app *displays*. Wire
+/// formats (profile cards' fixed POSIX parse format) and system input
+/// controls (DatePickers) are deliberately untouched.
+enum AppDateFormat: String, CaseIterable, Identifiable {
+    case system, dayMonthYear, monthDayYear, iso8601, dayMonthName, monthNameDay
+
+    static let storageKey = "appDateFormat"
+
+    static var current: AppDateFormat {
+        AppDateFormat(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .system
+    }
+
+    var id: String { rawValue }
+
+    /// Shown in the Settings picker: each option demonstrates itself with
+    /// today's date.
+    var label: String {
+        if let pattern = fullPattern {
+            return Self.cachedFormatter(pattern).string(from: .now)
+        }
+        return "System — \(Date.now.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    /// Explicit patterns; nil means "follow the device's region settings".
+    var fullPattern: String? {
+        switch self {
+        case .system: return nil
+        case .dayMonthYear: return "dd/MM/yyyy"
+        case .monthDayYear: return "MM/dd/yyyy"
+        case .iso8601: return "yyyy-MM-dd"
+        case .dayMonthName: return "d MMM yyyy"
+        case .monthNameDay: return "MMM d, yyyy"
+        }
+    }
+
+    /// The year-less variant, for placeholder-year birthdays.
+    var monthDayPattern: String? {
+        switch self {
+        case .system: return nil
+        case .dayMonthYear: return "dd/MM"
+        case .monthDayYear: return "MM/dd"
+        case .iso8601: return "MM-dd"
+        case .dayMonthName: return "d MMM"
+        case .monthNameDay: return "MMM d"
+        }
+    }
+
+    private static var formatterCache: [String: DateFormatter] = [:]
+    static func cachedFormatter(_ pattern: String) -> DateFormatter {
+        if let cached = formatterCache[pattern] { return cached }
+        let formatter = DateFormatter()
+        formatter.dateFormat = pattern
+        formatterCache[pattern] = formatter
+        return formatter
+    }
+}
+
+extension Date {
+    /// How verbose the *system* rendering should be when no explicit
+    /// format is chosen; an explicit format always wins.
+    enum AppFormatFallback { case abbreviated, long, complete }
+
+    func appFormatted(_ fallback: AppFormatFallback = .abbreviated) -> String {
+        if let pattern = AppDateFormat.current.fullPattern {
+            return AppDateFormat.cachedFormatter(pattern).string(from: self)
+        }
+        switch fallback {
+        case .abbreviated: return formatted(date: .abbreviated, time: .omitted)
+        case .long: return formatted(date: .long, time: .omitted)
+        case .complete: return formatted(date: .complete, time: .omitted)
+        }
+    }
+
+    /// Month + day only — placeholder-year birthdays must never show the
+    /// sentinel year.
+    func appFormattedMonthDay() -> String {
+        if let pattern = AppDateFormat.current.monthDayPattern {
+            return AppDateFormat.cachedFormatter(pattern).string(from: self)
+        }
+        return formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
 // MARK: - Image compression
 
 extension UIImage {
