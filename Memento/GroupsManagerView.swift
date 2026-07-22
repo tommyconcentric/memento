@@ -13,6 +13,7 @@ struct GroupsManagerView: View {
     @State private var showingRename = false
     @State private var renameTarget: PersonGroup?
     @State private var renameText = ""
+    @State private var showingRenameCollision = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +71,11 @@ struct GroupsManagerView: View {
                 Button("Save", action: renameGroup)
                 Button("Cancel", role: .cancel) {}
             }
+            .alert("Name Already Used", isPresented: $showingRenameCollision) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Another starter folder is already called “\(renameText.trimmed)”. Give this one a different name.")
+            }
         }
     }
 
@@ -88,6 +94,22 @@ struct GroupsManagerView: View {
         guard let target = renameTarget else { return }
         let trimmed = renameText.trimmed
         guard !trimmed.isEmpty else { return }
+        // Two built-in folders sharing a name is the exact shape the
+        // duplicate-seed sweep (mergeDuplicateBuiltInGroups) folds on the
+        // next activation — it would silently delete whichever copy is
+        // empty. Refuse the collision here instead of letting a rename
+        // make a folder vanish later.
+        if target.isBuiltIn {
+            let collides = groups.contains { other in
+                other.isBuiltIn
+                    && other.persistentModelID != target.persistentModelID
+                    && other.name.trimmed.lowercased() == trimmed.lowercased()
+            }
+            if collides {
+                showingRenameCollision = true
+                return
+            }
+        }
         target.name = trimmed
         try? context.save()
     }

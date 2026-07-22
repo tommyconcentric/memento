@@ -100,7 +100,11 @@ enum LockScreenPresenter {
 
 private struct PINDotsView: View {
     let filled: Int
-    var shake: Bool = false
+    // A running failure count, not a Bool: ShakeEffect only animates when
+    // its animatableData *changes*, so each failure must move the travel
+    // by a full unit — collapsing to true/false pins it at 1 after the
+    // first failure and every later wrong PIN would shake nothing.
+    var shakeTick: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 18) {
@@ -111,7 +115,7 @@ private struct PINDotsView: View {
                     .frame(width: 16, height: 16)
             }
         }
-        .modifier(ShakeEffect(travel: shake ? 1 : 0))
+        .modifier(ShakeEffect(travel: shakeTick))
     }
 }
 
@@ -191,6 +195,7 @@ struct AppLockView: View {
     @State private var entered = ""
     @State private var shakeTick: CGFloat = 0
     @State private var biometricAttempted = false
+    @State private var biometricNote: String?
 
     var body: some View {
         VStack(spacing: 32) {
@@ -201,7 +206,7 @@ struct AppLockView: View {
             Text("Memento is Locked")
                 .font(.system(.title2, design: .serif).weight(.semibold))
 
-            PINDotsView(filled: entered.count, shake: shakeTick > 0)
+            PINDotsView(filled: entered.count, shakeTick: shakeTick)
 
             NumberPad(
                 onDigit: { digit in
@@ -222,6 +227,12 @@ struct AppLockView: View {
                         .font(.subheadline)
                 }
                 .padding(.top, 4)
+                if let biometricNote {
+                    Text(biometricNote)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.terracotta)
+                        .multilineTextAlignment(.center)
+                }
             }
             Spacer()
         }
@@ -272,13 +283,34 @@ struct AppLockView: View {
     private func attemptBiometricUnlock() {
         let context = LAContext()
         var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else { return }
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            // Locked out (too many failed scans) or no longer enrolled: the
+            // hardware check that shows the button can't see either state,
+            // so without this the button (and the auto-attempt) is a silent
+            // no-op that reads as broken. The PIN is the source of truth,
+            // so don't widen the unlock to the device passcode
+            // (.deviceOwnerAuthentication) — explain and point at the pad.
+            biometricNote = Self.biometricUnavailableMessage(for: error)
+            return
+        }
+        biometricNote = nil
         context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
             localizedReason: "Unlock Memento"
         ) { success, _ in
             guard success else { return }
             Task { @MainActor in onUnlock() }
+        }
+    }
+
+    private static func biometricUnavailableMessage(for error: NSError?) -> String {
+        switch error.flatMap({ LAError.Code(rawValue: $0.code) }) {
+        case .biometryLockout:
+            return "\(AppLock.biometryName) is locked after too many tries — enter your PIN."
+        case .biometryNotEnrolled:
+            return "\(AppLock.biometryName) isn't set up on this device — enter your PIN."
+        default:
+            return "\(AppLock.biometryName) isn't available right now — enter your PIN."
         }
     }
 }
@@ -304,7 +336,7 @@ struct PINSetupView: View {
                 Text(stage == .enter ? "Enter a 4-digit PIN" : "Confirm your PIN")
                     .font(.system(.title3, design: .serif).weight(.semibold))
 
-                PINDotsView(filled: entered.count, shake: shakeTick > 0)
+                PINDotsView(filled: entered.count, shakeTick: shakeTick)
 
                 if let errorMessage {
                     Text(errorMessage)
