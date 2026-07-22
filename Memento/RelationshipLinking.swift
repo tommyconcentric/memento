@@ -116,6 +116,15 @@ enum FamilyEdgeBuilder {
         guard !linked else { return }
         context.insert(Partnership(a: a, b: b, kind: kind))
     }
+
+    /// True when any direct edge already links the pair — either parentage
+    /// direction, or a partnership in either orientation.
+    static func areLinked(_ a: Person, _ b: Person) -> Bool {
+        a.edgesAsParentArray.contains { $0.child === b }
+            || a.edgesAsChildArray.contains { $0.parent === b }
+            || a.partnershipsAsAArray.contains { $0.b === b }
+            || a.partnershipsAsBArray.contains { $0.a === b }
+    }
 }
 
 // MARK: - Editor save → edges (keeps the pedigree in step with the editor)
@@ -175,10 +184,17 @@ enum FamilyEdgeSync {
             // The text stays as text.
             guard realNameCounts[key, default: 0] <= 1 else { return nil }
             if let existing = byName[key] { return existing }
-            // The user's own name means the user — resolve to the hidden
-            // self node rather than minting a ghost twin of it (reciprocal
-            // links routinely write the user's name into these fields).
-            if let selfNode, selfNode.name.trimmed.lowercased() == key { return selfNode }
+            // A name matching the user's own is either mirror text of an
+            // existing You-link (reciprocal links write it) or a namesake.
+            // Keep the mirror case on the self node; otherwise don't
+            // guess — a ghost twin of "you" is never right, and charting
+            // a You-edge from plain text would fabricate one when a
+            // namesake was meant. (On My Profile itself the name falls
+            // through: a child named after the user is a namesake, minted
+            // as a ghost like any other.)
+            if !subject.isSelf, let selfNode, selfNode.name.trimmed.lowercased() == key {
+                return FamilyEdgeBuilder.areLinked(subject, selfNode) ? selfNode : nil
+            }
             let ghost = Person(name: name)
             ghost.isGhost = true
             context.insert(ghost)
@@ -218,18 +234,26 @@ enum FamilyEdgeSync {
     /// same-named person makes the match a guess, and an edge *between* the
     /// pair proves they're genuinely different people (no one is their own
     /// parent or partner — a son named after his father stays a ghost).
+    /// Matching by name alone can still hand a relative's edges to an
+    /// unrelated newcomer who happens to share the name — accepted, because
+    /// name-identity is the family features' convention throughout (the
+    /// classic chart links profiles the same way).
     private static func reconcileNamesakeGhost(with subject: Person, people: [Person], context: ModelContext) {
+        // Business contacts stay out of it entirely: ghosts are family-tree
+        // nodes, and a new business contact (or a corporate-ladder drag,
+        // which also passes through apply) must never absorb a family
+        // ghost that merely shares its name.
+        guard !subject.isBusiness else { return }
         let key = subject.name.trimmed.lowercased()
         guard !key.isEmpty else { return }
         let namesakes = people.filter {
             $0 !== subject && !$0.isSelf && $0.name.trimmed.lowercased() == key
         }
         guard namesakes.count == 1, let ghost = namesakes.first, ghost.isGhost else { return }
-        let linkedToSubject = ghost.edgesAsParentArray.contains { $0.child === subject }
-            || ghost.edgesAsChildArray.contains { $0.parent === subject }
-            || ghost.partnershipsAsAArray.contains { $0.b === subject }
-            || ghost.partnershipsAsBArray.contains { $0.a === subject }
-        guard !linkedToSubject else { return }
+        // A nil-ended edge can be a row still syncing in — wait for it to
+        // resolve rather than let the re-point drop it.
+        guard !FamilyEdgeBuilder.areLinked(ghost, subject),
+              !FamilyGraphMaintenance.hasNilEndedEdge(ghost) else { return }
         FamilyGraphMaintenance.repointEdges(from: ghost, onto: subject, context: context)
         context.delete(ghost)
     }
@@ -342,7 +366,7 @@ enum FamilyGraphMigration {
             byName[key] = p
         }
 
-        func node(for rawName: String) -> Person? {
+        func node(for rawName: String, around subject: Person) -> Person? {
             let name = rawName.trimmed
             guard !name.isEmpty else { return nil }
             let key = name.lowercased()
@@ -352,10 +376,13 @@ enum FamilyGraphMigration {
             // The text stays as text.
             guard realNameCounts[key, default: 0] <= 1 else { return nil }
             if let existing = byName[key] { return existing }
-            // The user's own name means the user — the self node, not a
-            // ghost twin of it (reciprocal links wrote the user's name into
-            // these fields on older versions too).
-            if selfNode.name.trimmed.lowercased() == key { return selfNode }
+            // A name matching the user's own is either mirror text of a
+            // You-link (step 1 just built those from the labels) or a
+            // namesake — keep the mirror case on the self node, otherwise
+            // don't guess (the same rule FamilyEdgeSync applies).
+            if !subject.isSelf, selfNode.name.trimmed.lowercased() == key {
+                return FamilyEdgeBuilder.areLinked(subject, selfNode) ? selfNode : nil
+            }
             let ghost = Person(name: name)
             ghost.isGhost = true
             context.insert(ghost)
@@ -387,11 +414,11 @@ enum FamilyGraphMigration {
 
         // 2) Each person's own partner / children / family-member fields.
         for p in people where !p.isSelf && !p.isGhost {
-            if let partner = node(for: p.partnerName) {
+            if let partner = node(for: p.partnerName, around: p) {
                 addPartnership(p, partner, kind: .partner)
             }
             for childName in childNames(of: p) {
-                if let child = node(for: childName) {
+                if let child = node(for: childName, around: p) {
                     addParentage(parent: p, child: child, kind: .bio)
                 }
             }
@@ -400,13 +427,13 @@ enum FamilyGraphMigration {
                 // Term check before name resolution, so an unchartable
                 // relation (sibling, cousin…) doesn't mint an orphan ghost.
                 if isPartnerTerm(l) {
-                    guard let other = node(for: member.name) else { continue }
+                    guard let other = node(for: member.name, around: p) else { continue }
                     addPartnership(p, other, kind: partnershipKind(l))
                 } else if isDirectParentTerm(l) {
-                    guard let other = node(for: member.name) else { continue }
+                    guard let other = node(for: member.name, around: p) else { continue }
                     addParentage(parent: other, child: p, kind: parentageKind(l))
                 } else if isDirectChildTerm(l) {
-                    guard let other = node(for: member.name) else { continue }
+                    guard let other = node(for: member.name, around: p) else { continue }
                     addParentage(parent: p, child: other, kind: parentageKind(l))
                 }
             }
@@ -434,10 +461,21 @@ enum FamilyGraphMigration {
 /// `SelfNodeMaintenance` covers only self nodes, the built-in-groups merge
 /// only folders. Idempotent; run from `RootView` alongside those.
 enum FamilyGraphMaintenance {
+    /// A nil end can be an edge row synced in ahead of its person — any
+    /// pass that folds or deletes must wait for it to resolve.
+    static func hasNilEndedEdge(_ person: Person) -> Bool {
+        person.edgesAsParentArray.contains { $0.child == nil }
+            || person.edgesAsChildArray.contains { $0.parent == nil }
+            || person.partnershipsAsAArray.contains { $0.b == nil }
+            || person.partnershipsAsBArray.contains { $0.a == nil }
+    }
+
     /// Re-points every family edge on `donor` onto `keeper`. An edge the
     /// keeper already carries — or one that would self-link — is dropped
     /// rather than duplicated, the same guard `SelfNodeMaintenance.ensure`
-    /// applies when folding duplicate self nodes.
+    /// applies when folding duplicate self nodes. A nil-ended donor edge
+    /// is dropped too, so callers that must preserve possibly-mid-sync
+    /// rows screen with `hasNilEndedEdge` first.
     static func repointEdges(from donor: Person, onto keeper: Person, context: ModelContext) {
         for edge in donor.edgesAsParentArray {
             if let child = edge.child, child !== keeper,
@@ -475,13 +513,46 @@ enum FamilyGraphMaintenance {
         }
     }
 
+    /// True when the extra ghost is a pure duplicate of the keeper: it
+    /// carries at least one edge, none of its edges are nil-ended, and
+    /// every one of them — same far end, same kind — already sits on the
+    /// keeper. Deleting such a ghost provably loses nothing.
+    private static func isPureDuplicate(_ extra: Person, of keeper: Person) -> Bool {
+        let hasAnyEdge = !extra.edgesAsParentArray.isEmpty || !extra.edgesAsChildArray.isEmpty
+            || !extra.partnershipsAsAArray.isEmpty || !extra.partnershipsAsBArray.isEmpty
+        guard hasAnyEdge, !hasNilEndedEdge(extra) else { return false }
+        for edge in extra.edgesAsParentArray {
+            guard let child = edge.child, keeper.edgesAsParentArray.contains(where: {
+                $0.child === child && $0.kind == edge.kind
+            }) else { return false }
+        }
+        for edge in extra.edgesAsChildArray {
+            guard let parent = edge.parent, keeper.edgesAsChildArray.contains(where: {
+                $0.parent === parent && $0.kind == edge.kind
+            }) else { return false }
+        }
+        for pair in extra.partnerEdges {
+            guard keeper.partnershipsAsAArray.contains(where: { $0.b === pair.other && $0.kind == pair.edge.kind })
+                || keeper.partnershipsAsBArray.contains(where: { $0.a === pair.other && $0.kind == pair.edge.kind })
+            else { return false }
+        }
+        return true
+    }
+
     static func dedupe(_ context: ModelContext) {
         guard let people = try? context.fetch(FetchDescriptor<Person>()) else { return }
         let parentages = (try? context.fetch(FetchDescriptor<Parentage>())) ?? []
         let partnerships = (try? context.fetch(FetchDescriptor<Partnership>())) ?? []
         var changed = false
 
-        // 1) Same-name ghosts fold into one. The keeper is picked
+        // 1) Same-name ghost twins collapse — but only pure duplicates
+        // (see isPureDuplicate). An edgeless ghost is never touched (it
+        // may be a draft row in an open family-links editor, inserted
+        // before Save), and a ghost carrying any edge the keeper lacks is
+        // a deliberate namesake — a bio-father and step-father pair both
+        // survive. Two genuinely distinct same-name people with identical
+        // edges do fold: by name alone they can't be told from the
+        // cross-device twins this exists to clean up. The keeper is picked
         // deterministically (earliest created, like canonicalSelfNode) so
         // every device folds toward the same survivor instead of two
         // devices syncing away each other's pick.
@@ -492,9 +563,13 @@ enum FamilyGraphMaintenance {
             ghostsByName[key, default: []].append(p)
         }
         for copies in ghostsByName.values where copies.count > 1 {
-            guard let keeper = copies.min(by: { ($0.createdAt, $0.name) < ($1.createdAt, $1.name) }) else { continue }
-            for extra in copies where extra !== keeper {
-                repointEdges(from: extra, onto: keeper, context: context)
+            guard let keeper = copies.min(by: { ($0.createdAt, $0.name) < ($1.createdAt, $1.name) }),
+                  !hasNilEndedEdge(keeper) else { continue }
+            for extra in copies where extra !== keeper && isPureDuplicate(extra, of: keeper) {
+                for edge in extra.edgesAsParentArray { context.delete(edge) }
+                for edge in extra.edgesAsChildArray { context.delete(edge) }
+                for edge in extra.partnershipsAsAArray { context.delete(edge) }
+                for edge in extra.partnershipsAsBArray { context.delete(edge) }
                 context.delete(extra)
                 changed = true
             }
