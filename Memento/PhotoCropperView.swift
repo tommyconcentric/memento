@@ -28,6 +28,14 @@ struct PhotoCropperView: View {
                     .offset(clamped(offset, base: base, side: side))
 
                 // Live preview: darken everything outside the circle.
+                // This layer must NOT ignore the safe area: the sheet's
+                // asymmetric insets on iPhone (0 top, home-indicator bottom)
+                // would re-center the mask — and its punched-out circle — in
+                // the expanded bounds, sliding the bright hole below the
+                // stroked ring and the region crop() captures. Laid out in
+                // the same geo bounds as the ring, the two stay concentric;
+                // the uncovered safe-area strips stay solid black via the
+                // outer .background(Color.black).
                 let frameShape = Circle()
                 Color.black.opacity(0.55)
                     .mask {
@@ -40,7 +48,6 @@ struct PhotoCropperView: View {
                             .compositingGroup()
                     }
                     .allowsHitTesting(false)
-                    .ignoresSafeArea()
 
                 frameShape
                     .stroke(.white.opacity(0.9), lineWidth: 2)
