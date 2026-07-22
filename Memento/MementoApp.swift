@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 @main
 struct MementoApp: App {
@@ -212,6 +213,7 @@ struct RootView: View {
                 Text("Memento can open profile cards shared from another Memento — this text file isn't one.")
             }
             .onAppear {
+                retireLogoColorScheme()
                 seedDefaultGroupsIfNeeded()
                 mergeDuplicateBuiltInGroups()
                 ensureSelfNode()
@@ -230,6 +232,19 @@ struct RootView: View {
 
     private func ensureSelfNode() {
         SelfNodeMaintenance.ensure(context, selfNodes: selfNodes)
+    }
+
+    /// The icon-recolor feature is gone. One-time cleanup: forget any stored
+    /// scheme and restore the primary Home Screen icon, so every logo —
+    /// in-app and on the Home Screen — is the default again.
+    private func retireLogoColorScheme() {
+        if UserDefaults.standard.object(forKey: "logoColorScheme") != nil {
+            UserDefaults.standard.removeObject(forKey: "logoColorScheme")
+        }
+        if UIApplication.shared.supportsAlternateIcons,
+           UIApplication.shared.alternateIconName != nil {
+            UIApplication.shared.setAlternateIconName(nil)
+        }
     }
 
     private func seedDefaultGroupsIfNeeded() {
