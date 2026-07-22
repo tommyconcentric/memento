@@ -453,12 +453,34 @@ struct ImportContactsView: View {
             let data = try Data(contentsOf: url)
             if url.pathExtension.lowercased() == "json" {
                 parseFacebookJSON(data)
+            } else if let text = decodeImportText(data) {
+                parseCSV(text)
             } else {
-                parseCSV(String(decoding: data, as: UTF8.self))
+                errorMessage = "That file's text encoding wasn't recognized. Re-export it as UTF-8 and try again."
             }
         } catch {
             errorMessage = "Couldn't read that file: \(error.localizedDescription)"
         }
+    }
+
+    /// CSVs don't declare their encoding, and Excel/Outlook on Windows
+    /// commonly save "ANSI" (Windows-1252) — decoding that with the
+    /// never-failing repairing UTF-8 decoder turned every accented
+    /// character into U+FFFD, corrupting names for good and defeating
+    /// duplicate matching. Strict UTF-8 first, then a UTF-16 byte-order
+    /// mark, then the common Windows single-byte encodings.
+    private func decodeImportText(_ data: Data) -> String? {
+        if let utf8 = String(data: data, encoding: .utf8) {
+            // Excel's "CSV UTF-8" variant writes a byte-order mark; keep
+            // it out of the first header cell.
+            return utf8.hasPrefix("\u{FEFF}") ? String(utf8.dropFirst()) : utf8
+        }
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            // .utf16 honors (and strips) the byte-order mark.
+            return String(data: data, encoding: .utf16)
+        }
+        return String(data: data, encoding: .windowsCP1252)
+            ?? String(data: data, encoding: .isoLatin1)
     }
 
     private func parseFacebookJSON(_ data: Data) {
@@ -495,7 +517,21 @@ struct ImportContactsView: View {
                 ?? candidates.first { !headers[$0].contains("type") }
                 ?? candidates.first
         }
-        guard let nameIndex = columnIndex(matching: ["name"]) else {
+        // A combined "Name" column wins outright (Google's export leads
+        // with one). Outlook-style exports instead split the name across
+        // "First Name" / "Middle Name" / "Last Name" — the substring
+        // fallback would bind "First Name" alone and import every contact
+        // as a bare given name, so find the parts and join them per row.
+        let hasCombinedNameColumn = headers.contains("name")
+        let namePartIndices: [Int] = hasCombinedNameColumn ? [] : [
+            ["first name", "given name"],
+            ["middle name", "additional name"],
+            ["last name", "family name", "surname"]
+        ].compactMap { options in
+            headers.firstIndex { header in options.contains { header.contains($0) } }
+        }
+        let nameIndex = columnIndex(matching: ["name"])
+        guard nameIndex != nil || namePartIndices.count > 1 else {
             errorMessage = "Couldn't find a \"name\" column in that CSV."
             return
         }
@@ -518,7 +554,9 @@ struct ImportContactsView: View {
                 guard let index, index < fields.count else { return "" }
                 return fields[index]
             }
-            let name = value(nameIndex)
+            let name = namePartIndices.count > 1
+                ? namePartIndices.map { value($0) }.filter { !$0.isEmpty }.joined(separator: " ")
+                : value(nameIndex)
             guard !name.isEmpty else { continue }
             var candidate = ImportCandidate(name: name)
             candidate.phones = uniqueValues([value(phoneIndex)])
@@ -661,6 +699,18 @@ struct ImportContactsView: View {
     private func parseBirthday(_ string: String, slashOrder: SlashDateOrder) -> Date? {
         let trimmed = string.trimmed
         guard !trimmed.isEmpty else { return nil }
+        // Google's CSV export writes a year-less birthday as "--MM-DD"
+        // (e.g. "--04-15"); keep it via the placeholder year, exactly as
+        // the Contacts path does for year-less CNContact birthdays.
+        if trimmed.hasPrefix("--") {
+            let parts = trimmed.dropFirst(2).split(separator: "-")
+            guard parts.count == 2,
+                  let month = Int(parts[0]), (1...12).contains(month),
+                  let day = Int(parts[1]), (1...31).contains(day) else { return nil }
+            return Date.gregorian.date(
+                from: DateComponents(year: Date.placeholderYear, month: month, day: day)
+            )
+        }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         // ISO first — it's unambiguous — then both slash readings in the
@@ -672,9 +722,22 @@ struct ImportContactsView: View {
             : ["MM/dd/yyyy", "dd/MM/yyyy"]
         for format in ["yyyy-MM-dd"] + slashFormats + ["d MMMM yyyy"] {
             formatter.dateFormat = format
-            if let date = formatter.date(from: trimmed) { return date }
+            if let date = formatter.date(from: trimmed) { return pivotingTwoDigitYear(date) }
         }
         return nil
+    }
+
+    /// `yyyy` parses a two-digit year as the literal number, so "5/6/90"
+    /// landed in the year 90 AD. A two-digit year in a birthday means the
+    /// recent past: pivot it into the century that keeps it at or before
+    /// today (90 → 1990, 08 → 2008 — never a future year).
+    private func pivotingTwoDigitYear(_ date: Date) -> Date {
+        var comps = Date.gregorian.dateComponents([.year, .month, .day], from: date)
+        guard let year = comps.year, year < 100 else { return date }
+        let currentYear = Date.gregorian.component(.year, from: .now)
+        let pivoted = 2000 + year
+        comps.year = pivoted > currentYear ? pivoted - 100 : pivoted
+        return Date.gregorian.date(from: comps) ?? date
     }
 
     // MARK: - Shared
