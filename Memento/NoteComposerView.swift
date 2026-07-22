@@ -54,6 +54,11 @@ struct NoteComposerView: View {
                         axis: .vertical
                     )
                     .lineLimit(4...12)
+                    // Read-only while dictating: the field is rebuilt from
+                    // the live transcript on every partial result, so
+                    // anything typed mid-dictation would be silently wiped
+                    // by the next one.
+                    .disabled(transcriber.isRecording)
 
                     Button {
                         if transcriber.isRecording {
@@ -174,6 +179,12 @@ struct NoteComposerView: View {
 
     private func appendPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
+        // Clear the selection synchronously, before the slow transferable
+        // loads — while it stayed populated, reopening the picker mid-load
+        // re-offered the same items and a second onChange appended them
+        // all again, duplicating every photo. (The clear re-fires onChange
+        // with an empty array; the guard above swallows it.)
+        pickerItems = []
         isLoadingPhotos = true
         Task { @MainActor in
             for item in items {
@@ -183,7 +194,6 @@ struct NoteComposerView: View {
                     drafts.append(DraftPhoto(data: compressed, caption: ""))
                 }
             }
-            pickerItems = []
             isLoadingPhotos = false
         }
     }

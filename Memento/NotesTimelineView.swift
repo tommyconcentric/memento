@@ -8,9 +8,23 @@ struct NotesTimelineView: View {
 
     @Environment(\.modelContext) private var context
     @State private var showingComposer = false
-    @State private var noteBeingEdited: NoteEntry?
-    @State private var noteBeingRead: NoteEntry?
+    // Reading and editing share one sheet whose content swaps — two
+    // sibling .sheet(item:) modifiers racing a dismissal against a
+    // presentation intermittently dropped the editor after tapping Edit
+    // in the reading sheet.
+    @State private var activeNoteSheet: ActiveNoteSheet?
     @State private var viewerPhoto: EventPhoto?
+
+    enum ActiveNoteSheet: Identifiable {
+        case reading(NoteEntry)
+        case editing(NoteEntry)
+        var id: String {
+            switch self {
+            case .reading(let note): return "read-\(note.persistentModelID.hashValue)"
+            case .editing(let note): return "edit-\(note.persistentModelID.hashValue)"
+            }
+        }
+    }
     // Deleting a note asks first — it permanently destroys the entry and
     // its photos, and the menu item sits one slip below "Edit Note".
     @State private var notePendingDelete: NoteEntry?
@@ -38,8 +52,8 @@ struct NotesTimelineView: View {
                     NoteCard(
                         note: note,
                         onPhotoTap: { viewerPhoto = $0 },
-                        onOpen: { noteBeingRead = note },
-                        onEdit: { noteBeingEdited = note },
+                        onOpen: { activeNoteSheet = .reading(note) },
+                        onEdit: { activeNoteSheet = .editing(note) },
                         onDelete: { notePendingDelete = note }
                     )
                 }
@@ -48,13 +62,14 @@ struct NotesTimelineView: View {
         .sheet(isPresented: $showingComposer) {
             NoteComposerView(person: person, note: nil)
         }
-        .sheet(item: $noteBeingEdited) { note in
-            NoteComposerView(person: person, note: note)
-        }
-        .sheet(item: $noteBeingRead) { note in
-            NoteDetailSheet(note: note) {
-                noteBeingRead = nil
-                noteBeingEdited = note
+        .sheet(item: $activeNoteSheet) { sheet in
+            switch sheet {
+            case .reading(let note):
+                NoteDetailSheet(note: note) {
+                    activeNoteSheet = .editing(note)
+                }
+            case .editing(let note):
+                NoteComposerView(person: person, note: note)
             }
         }
         .sheet(item: $viewerPhoto) { photo in
@@ -245,7 +260,10 @@ struct NoteDetailSheet: View {
             .navigationTitle("Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                // Edit is deliberately NOT the cancellation action — Esc/⌘.
+                // bind to that slot, and "cancel opens the editor" is
+                // exactly inverted from what an escape key should do.
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Edit", action: onEdit)
                 }
                 ToolbarItem(placement: .confirmationAction) {

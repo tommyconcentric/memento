@@ -99,6 +99,12 @@ enum CalendarSyncManager {
         // @AppStorage (which has no Date overload); written on the main
         // queue so the observation fires where SwiftUI expects.
         DispatchQueue.main.async {
+            // A rebuild that raced the off-toggle must not write a fresh
+            // timestamp over the zero the off-handler just stored — a
+            // nonzero lastSync with no stored identifier re-arms the
+            // legacy title-adoption path against calendars this app
+            // never created.
+            guard UserDefaults.standard.bool(forKey: enabledKey) else { return }
             UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: lastSyncKey)
         }
     }
@@ -108,9 +114,19 @@ enum CalendarSyncManager {
     /// calendar whose identifier this app stored; deleting by title could
     /// destroy a user's own calendar that happens to share the name.
     static func removeCalendar() {
-        guard let calendar = existingCalendar() else { return }
-        try? store.removeCalendar(calendar, commit: true)
-        UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
+        // Invalidate queued rebuilds, then run the removal ON the sync
+        // queue so it serializes behind any rebuild already executing —
+        // removing from the main thread mid-rebuild let the rebuild
+        // recreate and repopulate a zombie calendar after the toggle was
+        // already off.
+        generationLock.lock()
+        latestGeneration += 1
+        generationLock.unlock()
+        syncQueue.async {
+            guard let calendar = existingCalendar() else { return }
+            try? store.removeCalendar(calendar, commit: true)
+            UserDefaults.standard.removeObject(forKey: calendarIdentifierKey)
+        }
     }
 
     /// Resolves the app's calendar by its persisted identifier. Falls back
