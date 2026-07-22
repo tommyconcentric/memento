@@ -23,7 +23,6 @@ struct PeopleListView: View {
     @State private var personPendingDelete: Person?
     @State private var showingFolders = false
     @State private var showingSettings = false
-    @State private var showingTree = false
     @State private var showingCalendar = false
     @State private var showingMyProfile = false
     @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
@@ -46,7 +45,7 @@ struct PeopleListView: View {
     /// True while any sheet covers the list — the moment the user has
     /// "navigated away" and pending unpins can settle into their folders.
     private var isCoveredBySheet: Bool {
-        showingAddPerson || showingFolders || showingSettings || showingTree
+        showingAddPerson || showingFolders || showingSettings
             || showingCalendar || showingMyProfile
     }
 
@@ -94,9 +93,6 @@ struct PeopleListView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
-        }
-        .sheet(isPresented: $showingTree) {
-            MyFamilyTreeView()
         }
         .sheet(isPresented: $showingCalendar) {
             CalendarView()
@@ -254,7 +250,6 @@ struct PeopleListView: View {
                 // them direct, generously tappable, and balanced at any
                 // sidebar width.
                 HStack(spacing: 10) {
-                    treeButton
                     calendarButton
                     foldersButton
                     settingsButton
@@ -314,22 +309,8 @@ struct PeopleListView: View {
         )
     }
 
-    /// Tree and calendar live in the pinned bar alongside the switcher and
-    /// "+", not the toolbar: the split-view sidebar can only fit a few
-    /// toolbar icons before demoting the rest into SwiftUI's auto-generated
-    /// "…" overflow menu, which flashes and shows nothing when tapped on
-    /// macOS ("Designed for iPad"). This bar never overflows, so they stay
-    /// direct, tappable icons on every OS.
-    private var treeButton: some View {
-        Button {
-            showingTree = true
-        } label: {
-            secondaryPinnedIcon(workspace == .business ? "building.2" : "tree")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(workspace == .business ? "Corporate ladder" : "My family tree")
-    }
-
+    /// The pinned bar's tiles (the family tree moved into My Profile — it's
+    /// your family it draws): calendar, folders, settings.
     private var calendarButton: some View {
         Button {
             showingCalendar = true
