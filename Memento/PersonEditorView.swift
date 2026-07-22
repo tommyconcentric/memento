@@ -387,6 +387,11 @@ struct PersonEditorView: View {
                 }
             }
             .navigationTitle(person == nil ? "New Person" : (isSelfProfile ? "My Profile" : "Edit Person"))
+            // No swipe-to-dismiss: leaving the editor is an explicit choice
+            // between Cancel (discards every draft edit — nothing touches
+            // the store until Save) and Save. An accidental swipe silently
+            // throwing away a half-filled form is the failure mode.
+            .interactiveDismissDisabled()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
