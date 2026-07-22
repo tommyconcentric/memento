@@ -13,10 +13,6 @@ struct PeopleListView: View {
 
     @State private var selectedPerson: Person?
     @State private var searchText = ""
-    // People unpinned from the list stay in the Pinned section until the
-    // user leaves the list, so a stray tap on the pin is easy to undo in
-    // place instead of the row instantly jumping back to its folder.
-    @State private var recentlyUnpinned: Set<PersistentIdentifier> = []
     @State private var showingAddPerson = false
     // Row deletion asks first, matching the detail view's confirmation —
     // deleting a person permanently destroys their notes and photos.
@@ -35,17 +31,6 @@ struct PeopleListView: View {
         // Hidden family-tree nodes (the "You" self node and un-profiled ghost
         // relatives) carry edges but are never listed as contacts.
         people.filter { $0.isBusiness == (workspace == .business) && !$0.isSelf && !$0.isGhost }
-    }
-
-    /// True while any sheet covers the list — the moment the user has
-    /// "navigated away" and pending unpins can settle into their folders.
-    private var isCoveredBySheet: Bool {
-        showingAddPerson || showingFolders || showingSettings
-            || showingCalendar || showingMyProfile
-    }
-
-    private func showsInPinnedSection(_ person: Person) -> Bool {
-        person.isPinned || recentlyUnpinned.contains(person.persistentModelID)
     }
 
     private var filteredPeople: [Person] {
@@ -97,11 +82,6 @@ struct PeopleListView: View {
                 MyProfileSheet(person: selfNode)
             }
         }
-        .onChange(of: isCoveredBySheet) { _, covered in
-            if covered {
-                recentlyUnpinned.removeAll()
-            }
-        }
     }
 
     private func row(for person: Person, isLast: Bool) -> some View {
@@ -121,7 +101,7 @@ struct PeopleListView: View {
         List(selection: $selectedPerson) {
             // Pinned people ride at the very top, across every folder, until
             // unpinned — handy for someone you're about to see.
-            let pinned = filteredPeople.filter { showsInPinnedSection($0) }
+            let pinned = filteredPeople.filter { $0.isPinned }
             if !pinned.isEmpty {
                 Section {
                     ForEach(pinned) { person in
@@ -134,7 +114,7 @@ struct PeopleListView: View {
 
             ForEach(groups) { group in
                 let members = filteredPeople.filter {
-                    !showsInPinnedSection($0) && $0.group?.persistentModelID == group.persistentModelID
+                    !$0.isPinned && $0.group?.persistentModelID == group.persistentModelID
                 }
                 if !members.isEmpty {
                     Section {
@@ -147,7 +127,7 @@ struct PeopleListView: View {
                 }
             }
 
-            let ungrouped = filteredPeople.filter { !showsInPinnedSection($0) && $0.group == nil }
+            let ungrouped = filteredPeople.filter { !$0.isPinned && $0.group == nil }
             if !ungrouped.isEmpty {
                 Section("Ungrouped") {
                     ForEach(ungrouped) { person in
@@ -155,9 +135,6 @@ struct PeopleListView: View {
                     }
                 }
             }
-        }
-        .onDisappear {
-            recentlyUnpinned.removeAll()
         }
         .confirmationDialog(
             personPendingDelete.map { "Delete \($0.name)?" } ?? "",
@@ -391,7 +368,6 @@ struct PeopleListView: View {
                     guard option != workspace else { return }
                     storedWorkspace = option.rawValue
                     selectedPerson = nil
-                    recentlyUnpinned.removeAll()
                 } label: {
                     Label(option.title, systemImage: option.icon)
                         // Both segments use one font (Business's sans) rather
@@ -446,13 +422,7 @@ struct PeopleListView: View {
     }
 
     private func togglePin(_ person: Person) {
-        if person.isPinned {
-            person.isPinned = false
-            recentlyUnpinned.insert(person.persistentModelID)
-        } else {
-            person.isPinned = true
-            recentlyUnpinned.remove(person.persistentModelID)
-        }
+        person.isPinned.toggle()
         try? context.save()
     }
 }
