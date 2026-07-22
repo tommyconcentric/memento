@@ -25,12 +25,7 @@ struct PeopleListView: View {
     @State private var showingSettings = false
     @State private var showingCalendar = false
     @State private var showingMyProfile = false
-    @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
-
-    private var logoColorScheme: LogoColorScheme {
-        LogoColorScheme(rawValue: storedColorScheme) ?? .default
-    }
 
     private var workspace: Workspace {
         Workspace(rawValue: storedWorkspace) ?? .personal
@@ -427,7 +422,7 @@ struct PeopleListView: View {
     private var detailPlaceholder: some View {
         ContentUnavailableView {
             VStack(spacing: 14) {
-                LogoMark(size: 56, colorScheme: logoColorScheme)
+                LogoMark(size: 56)
                 Text("Pick Someone")
                     .font(.system(.title3, design: workspace.displayFontDesign, weight: .semibold))
             }
