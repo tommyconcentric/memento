@@ -440,7 +440,7 @@ struct PersonPickerSheet: View {
                     dismiss()
                 } label: {
                     HStack(spacing: 12) {
-                        AvatarView(data: p.profilePhotoData, name: p.name, size: 40, desaturated: p.isDeceased)
+                        AvatarView(data: p.profilePhotoData, name: p.name, size: 40, desaturated: p.isDeceased, business: p.isBusiness)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(p.name)
                                 .font(.body.weight(.medium))
@@ -521,7 +521,7 @@ struct PersonOrGhostPicker: View {
                         dismiss()
                     } label: {
                         HStack(spacing: 12) {
-                            AvatarView(data: p.profilePhotoData, name: p.name, size: 36, desaturated: p.isDeceased)
+                            AvatarView(data: p.profilePhotoData, name: p.name, size: 36, desaturated: p.isDeceased, business: p.isBusiness)
                             Text(p.name).foregroundStyle(.primary)
                             if p.isGhost {
                                 Spacer()
@@ -692,7 +692,7 @@ struct FamilyLinksEditor: View {
     private func linkRow(person: Person, kind: Binding<String>, kinds: [String],
                          onRemove: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
-            AvatarView(data: person.profilePhotoData, name: person.name, size: 36, desaturated: person.isDeceased)
+            AvatarView(data: person.profilePhotoData, name: person.name, size: 36, desaturated: person.isDeceased, business: person.isBusiness)
             VStack(alignment: .leading, spacing: 1) {
                 Text(person.name)
                 if person.isGhost {
