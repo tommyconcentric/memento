@@ -30,6 +30,10 @@ struct PersonEditorView: View {
     // Quick info
     @State private var hasBirthday = false
     @State private var birthday = Calendar.current.date(from: DateComponents(year: 1990, month: 1, day: 1)) ?? .now
+    // A year-less imported birthday carries the sentinel placeholder year
+    // (see Date.placeholderYear) that displays must hide; the row shows
+    // month/day only until the user opens the calendar to edit it.
+    @State private var editingYearlessBirthday = false
     @State private var partnerName = ""
     @State private var childrenNames = ""
     @State private var otherFamily = ""
@@ -185,10 +189,21 @@ struct PersonEditorView: View {
                 }
                 }
 
-                Section("Birthday") {
+                Section {
                     Toggle("Set a birthday", isOn: $hasBirthday.animation())
                     if hasBirthday {
-                        AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness)
+                        if birthday.hasPlaceholderYear && !editingYearlessBirthday {
+                            yearlessBirthdayRow
+                        } else {
+                            AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness,
+                                          initiallyExpanded: editingYearlessBirthday)
+                        }
+                    }
+                } header: {
+                    Text("Birthday")
+                } footer: {
+                    if hasBirthday && birthday.hasPlaceholderYear {
+                        Text("No year is recorded — only the day and month are kept. Pick a year in the calendar to add one.")
                     }
                 }
 
@@ -574,6 +589,33 @@ struct PersonEditorView: View {
         } footer: {
             Text("Work you share. Mark Completed when it wraps; it stays as history.")
         }
+    }
+
+    /// Collapsed birthday row for a year-less imported date: the same
+    /// anatomy as `AppDatePicker`'s collapsed row, but rendering only the
+    /// month and day — the sentinel year is a stand-in the user never
+    /// entered, and showing it would present a fabricated birth year as
+    /// saved data. Tapping opens the real calendar to adjust the date
+    /// (or add a genuine year).
+    private var yearlessBirthdayRow: some View {
+        let accent = isBusiness ? Theme.graphite : Theme.aegean
+        return Button {
+            withAnimation(.snappy(duration: 0.22)) { editingYearlessBirthday = true }
+        } label: {
+            HStack {
+                Text("Birthday")
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(birthday.appFormattedMonthDay())
+                    .foregroundStyle(accent)
+                    .fontWeight(.medium)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(accent)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var importantDatesSection: some View {
