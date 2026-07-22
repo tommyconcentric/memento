@@ -551,7 +551,14 @@ struct PersonRow: View {
         }
         // Generous row height: 3pt of breathing room read as cramped, and
         // left the first row's avatar hugging its card's top edge.
-        .padding(.vertical, 9)
+        .padding(.vertical, 10)
+        // Zero the list's own vertical insets: they differ per platform
+        // (iOS adds ~11pt each side, the Mac idiom nearly none), which put
+        // the drawn divider close under a row's text but far above the
+        // next row's. With the row's geometry fully ours, the divider sits
+        // exactly on the boundary — the same 10pt from both neighbours,
+        // everywhere.
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         // The boundary between rows is drawn by hand: SwiftUI's list
         // separators simply don't render on macOS ("Designed for iPad"),
         // so the system separator is hidden everywhere and this hairline —
