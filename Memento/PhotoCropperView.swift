@@ -80,6 +80,14 @@ struct PhotoCropperView: View {
                     .frame(maxWidth: 420)
                 }
             }
+            // The zoomed image's rigid frame would otherwise inflate the
+            // ZStack past the screen (a ZStack reports the union of its
+            // children, and GeometryReader pins content top-leading), which
+            // dragged the crop circle and toolbar off-center. Pinning the
+            // stack to the view's size keeps everything screen-centered at
+            // any zoom; clipping hides the overflowing image edges.
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
             .contentShape(Rectangle())
             .gesture(
                 dragGesture(base: base, side: side)

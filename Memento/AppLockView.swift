@@ -240,7 +240,14 @@ struct AppLockView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 autoAttemptBiometricsIfReady()
-            } else {
+            } else if phase == .background {
+                // Re-arm only on a genuine departure. The Face ID/Touch ID
+                // system dialog itself dips this scene to .inactive and back
+                // to .active — re-arming on that dip meant every Cancel
+                // re-presented the prompt instantly, an endless loop standing
+                // between the user and the PIN pad. Real backgrounding always
+                // passes through .background, so each true return still gets
+                // its one auto-prompt (the button covers everything else).
                 biometricAttempted = false
             }
         }
