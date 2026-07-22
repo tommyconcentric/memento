@@ -1121,6 +1121,22 @@ struct FamilyLinksEditor: View {
             }
         }
 
+        // A ghost minted this session whose draft row was removed again
+        // before Save was inserted into the store immediately — committing
+        // it would leave an invisible edgeless orphan (no delete UI reaches
+        // ghosts, and dedupe deliberately skips edgeless ones) that spoils
+        // name-ambiguity checks forever. Same sweep as discardAndClose,
+        // limited to ghosts no draft row references anymore.
+        let draftedPeople = Set(
+            (draftParents.map(\.person) + draftChildren.map(\.person) + draftPartners.map(\.person))
+                .map(ObjectIdentifier.init)
+        )
+        for ghost in createdGhosts where ghost.isGhost
+            && !draftedPeople.contains(ObjectIdentifier(ghost))
+            && ghost.edgesAsParentArray.isEmpty && ghost.edgesAsChildArray.isEmpty
+            && ghost.partnershipsAsAArray.isEmpty && ghost.partnershipsAsBArray.isEmpty {
+            context.delete(ghost)
+        }
         createdGhosts = []
         try? context.save()
         reloadFromStore()
