@@ -504,6 +504,14 @@ struct ImportContactsView: View {
         let emailIndex = columnIndex(matching: ["email", "e-mail"])
         let addressIndex = columnIndex(matching: ["address"])
 
+        // Slash birthdays ("03/07/1990") are ambiguous row by row but a
+        // single export uses one convention throughout, so settle
+        // day/month order once from the whole file before parsing.
+        let slashOrder = slashDateOrder(inferringFrom: rows.dropFirst().map { fields in
+            guard let birthdayIndex, birthdayIndex < fields.count else { return "" }
+            return fields[birthdayIndex]
+        })
+
         var results: [ImportCandidate] = []
         for fields in rows.dropFirst() {
             func value(_ index: Int?) -> String {
@@ -516,7 +524,7 @@ struct ImportContactsView: View {
             candidate.phones = uniqueValues([value(phoneIndex)])
             candidate.emails = uniqueValues([value(emailIndex)])
             candidate.addresses = uniqueValues([value(addressIndex)])
-            candidate.birthday = parseBirthday(value(birthdayIndex))
+            candidate.birthday = parseBirthday(value(birthdayIndex), slashOrder: slashOrder)
             results.append(candidate)
         }
         guard !results.isEmpty else {
@@ -592,12 +600,77 @@ struct ImportContactsView: View {
         return rows
     }
 
-    private func parseBirthday(_ string: String) -> Date? {
+    /// Which side of a numeric slash date holds the day — the one genuinely
+    /// ambiguous birthday shape a CSV can contain.
+    private enum SlashDateOrder {
+        case dayFirst    // "03/07/1990" is 3 July (UK/EU exports)
+        case monthFirst  // "03/07/1990" is March 7 (US/Outlook exports)
+    }
+
+    /// A CSV is one export, so it uses one date convention throughout —
+    /// which means a single row valid in only one reading (a day over 12,
+    /// e.g. "25/12/1990") pins the order for every row in the file. A file
+    /// whose rows are all ambiguous (every value ≤ 12) follows the device
+    /// region's day/month order rather than a hardcoded guess.
+    private func slashDateOrder(inferringFrom strings: [String]) -> SlashDateOrder {
+        var dayFirstEvidence = false
+        var monthFirstEvidence = false
+        for string in strings {
+            guard let (first, second) = slashDateComponents(string) else { continue }
+            let readsAsDayFirst = (1...31).contains(first) && (1...12).contains(second)
+            let readsAsMonthFirst = (1...12).contains(first) && (1...31).contains(second)
+            // Only a value valid in exactly one reading is evidence —
+            // junk numbers pin nothing.
+            if readsAsDayFirst && !readsAsMonthFirst { dayFirstEvidence = true }
+            if readsAsMonthFirst && !readsAsDayFirst { monthFirstEvidence = true }
+        }
+        switch (dayFirstEvidence, monthFirstEvidence) {
+        case (true, false): return .dayFirst
+        case (false, true): return .monthFirst
+        // No evidence either way — or contradictory rows, which is no
+        // single convention at all. The locale breaks the tie; either
+        // way each unambiguous row still lands correctly via the
+        // runner-up format in parseBirthday.
+        default: return localeSlashOrder
+        }
+    }
+
+    /// The device region's day/month order (en_US puts the month first;
+    /// most of the world, the day).
+    private var localeSlashOrder: SlashDateOrder {
+        let template = DateFormatter.dateFormat(fromTemplate: "dM", options: 0, locale: .current) ?? "d/M"
+        if let month = template.firstIndex(of: "M"),
+           let day = template.firstIndex(of: "d"),
+           month < day {
+            return .monthFirst
+        }
+        return .dayFirst
+    }
+
+    /// The two leading numbers of a three-part slash date, e.g.
+    /// "03/07/1990" → (3, 7). Anything else — ISO dates, month names,
+    /// junk — returns nil.
+    private func slashDateComponents(_ string: String) -> (first: Int, second: Int)? {
+        let parts = string.trimmed.split(separator: "/")
+        guard parts.count == 3,
+              let first = Int(parts[0]),
+              let second = Int(parts[1]) else { return nil }
+        return (first, second)
+    }
+
+    private func parseBirthday(_ string: String, slashOrder: SlashDateOrder) -> Date? {
         let trimmed = string.trimmed
         guard !trimmed.isEmpty else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        for format in ["yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy", "d MMMM yyyy"] {
+        // ISO first — it's unambiguous — then both slash readings in the
+        // file's inferred order. The runner-up still runs: a row only it
+        // fits has a day over 12 in the pinned format's month slot, so
+        // the runner-up reading is the correct one for that row.
+        let slashFormats = slashOrder == .dayFirst
+            ? ["dd/MM/yyyy", "MM/dd/yyyy"]
+            : ["MM/dd/yyyy", "dd/MM/yyyy"]
+        for format in ["yyyy-MM-dd"] + slashFormats + ["d MMMM yyyy"] {
             formatter.dateFormat = format
             if let date = formatter.date(from: trimmed) { return date }
         }
