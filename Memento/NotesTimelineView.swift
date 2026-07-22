@@ -11,6 +11,9 @@ struct NotesTimelineView: View {
     @State private var noteBeingEdited: NoteEntry?
     @State private var noteBeingRead: NoteEntry?
     @State private var viewerPhoto: EventPhoto?
+    // Deleting a note asks first — it permanently destroys the entry and
+    // its photos, and the menu item sits one slip below "Edit Note".
+    @State private var notePendingDelete: NoteEntry?
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 14) {
@@ -37,7 +40,7 @@ struct NotesTimelineView: View {
                         onPhotoTap: { viewerPhoto = $0 },
                         onOpen: { noteBeingRead = note },
                         onEdit: { noteBeingEdited = note },
-                        onDelete: { delete(note) }
+                        onDelete: { notePendingDelete = note }
                     )
                 }
             }
@@ -56,6 +59,20 @@ struct NotesTimelineView: View {
         }
         .sheet(item: $viewerPhoto) { photo in
             PhotoViewerSheet(photo: photo)
+        }
+        .confirmationDialog(
+            "Delete this note?",
+            isPresented: Binding(
+                get: { notePendingDelete != nil },
+                set: { if !$0 { notePendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: notePendingDelete
+        ) { note in
+            Button("Delete", role: .destructive) { delete(note) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The note and its photos will be deleted.")
         }
     }
 

@@ -61,6 +61,169 @@ extension FamilyRelation {
     }
 }
 
+// MARK: - Label → edge vocabulary (shared by the migration and editor sync)
+
+/// The keyword math that decides whether a relationship label describes a
+/// *direct* edge (parent, child, partner) and which kind, plus idempotent
+/// edge insertion. Shared by the one-time migration and `FamilyEdgeSync`
+/// so the two can never drift apart on what "Mother" means.
+enum FamilyEdgeBuilder {
+    // A direct parent/child is a plain mother/father/child term — not a
+    // grandparent, aunt/uncle, niece/nephew, in-law, or godparent, all of
+    // which contain those words but sit off the direct line.
+    static func isIndirect(_ l: String) -> Bool {
+        l.contains("grand") || l.contains("great") || l.contains("aunt")
+            || l.contains("uncle") || l.contains("niece") || l.contains("nephew")
+            || l.contains("in-law") || l.contains("god") || l.contains("cousin")
+    }
+    static func isDirectParentTerm(_ l: String) -> Bool {
+        !isIndirect(l) && (l.contains("mother") || l.contains("father") || l.contains("parent"))
+    }
+    static func isDirectChildTerm(_ l: String) -> Bool {
+        !isIndirect(l) && (l.contains("daughter") || l.contains("son") || l.contains("child"))
+    }
+    static func isPartnerTerm(_ l: String) -> Bool {
+        l.contains("wife") || l.contains("husband") || l.contains("spouse")
+            || l.contains("partner") || l.contains("girlfriend") || l.contains("boyfriend")
+            || l.contains("fianc")
+    }
+    static func parentageKind(_ l: String) -> ParentageKind {
+        if l.contains("step") { return .step }
+        if l.contains("adopt") { return .adopted }
+        if l.contains("foster") { return .foster }
+        return .bio
+    }
+    static func partnershipKind(_ l: String) -> PartnershipKind {
+        if l.hasPrefix("ex-") || l.hasPrefix("ex ") || l.contains("former") { return .former }
+        if l.contains("fianc") { return .engaged }
+        if l.contains("wife") || l.contains("husband") || l.contains("spouse") { return .married }
+        return .partner
+    }
+
+    /// Inserts a parent→child edge unless one already links the pair.
+    static func addParentage(parent: Person, child: Person, kind: ParentageKind, context: ModelContext) {
+        guard parent !== child,
+              !parent.edgesAsParentArray.contains(where: { $0.child === child }) else { return }
+        context.insert(Parentage(parent: parent, child: child, kind: kind))
+    }
+
+    /// Inserts a couple edge unless one already links the pair (in either
+    /// direction — partnerships are undirected).
+    static func addPartnership(_ a: Person, _ b: Person, kind: PartnershipKind, context: ModelContext) {
+        guard a !== b else { return }
+        let linked = a.partnershipsAsAArray.contains { $0.b === b }
+            || a.partnershipsAsBArray.contains { $0.a === b }
+        guard !linked else { return }
+        context.insert(Partnership(a: a, b: b, kind: kind))
+    }
+}
+
+// MARK: - Editor save → edges (keeps the pedigree in step with the editor)
+
+/// The one-time migration seeds edges from the free-text fields, but only
+/// once — without this, any relationship set in the person editor *after*
+/// that first launch would show on the classic chart yet never reach the
+/// (default) edge-driven pedigree, which reads only `Parentage`/`Partnership`.
+/// Called from `PersonEditorView.save()`.
+enum FamilyEdgeSync {
+    static func apply(around subject: Person, context: ModelContext) {
+        guard !subject.isSelf, !subject.isGhost else { return }
+        let people = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+
+        // 1) "They're your…" → the self↔subject edge. The editor's label is
+        // authoritative for this one link: changing "Mother" to "Daughter"
+        // must stop drawing her as a parent. Business labels chart the
+        // corporate ladder, not the family tree.
+        if !subject.isBusiness, let selfNode = people.first(where: { $0.isSelf }) {
+            syncSelfEdge(subject: subject, selfNode: selfNode, context: context)
+        }
+
+        // 2) Partner / children / named family members — add-only, mirroring
+        // migration step 2, so a routine editor save never tears down edges
+        // hand-built in the family links editor.
+        func node(for rawName: String) -> Person? {
+            resolveOrCreateGhost(named: rawName, in: context, among: people)
+        }
+        if let partner = node(for: subject.partnerName) {
+            FamilyEdgeBuilder.addPartnership(subject, partner, kind: .partner, context: context)
+        }
+        for childName in childNames(of: subject) {
+            if let child = node(for: childName) {
+                FamilyEdgeBuilder.addParentage(parent: subject, child: child, kind: .bio, context: context)
+            }
+        }
+        for member in subject.familyMembersArray {
+            let l = member.relation.trimmed.lowercased()
+            // Term check before name resolution, so an unchartable relation
+            // (sibling, cousin…) doesn't mint an orphan ghost.
+            if FamilyEdgeBuilder.isPartnerTerm(l) {
+                guard let other = node(for: member.name) else { continue }
+                FamilyEdgeBuilder.addPartnership(subject, other, kind: FamilyEdgeBuilder.partnershipKind(l), context: context)
+            } else if FamilyEdgeBuilder.isDirectParentTerm(l) {
+                guard let other = node(for: member.name) else { continue }
+                FamilyEdgeBuilder.addParentage(parent: other, child: subject, kind: FamilyEdgeBuilder.parentageKind(l), context: context)
+            } else if FamilyEdgeBuilder.isDirectChildTerm(l) {
+                guard let other = node(for: member.name) else { continue }
+                FamilyEdgeBuilder.addParentage(parent: subject, child: other, kind: FamilyEdgeBuilder.parentageKind(l), context: context)
+            }
+        }
+    }
+
+    private enum DirectLink { case parent, child, partner }
+
+    private static func syncSelfEdge(subject: Person, selfNode: Person, context: ModelContext) {
+        let label = subject.relationshipToUser.trimmed
+        // Only preset labels chart (custom "Other…" text never does), and
+        // only direct terms map to an edge — "Aunt" or "Grandmother" can't
+        // be placed without inventing the person in between, so existing
+        // hand-built edges are left alone. Likewise when the label is
+        // cleared: absence of a label is not evidence the link is wrong.
+        guard FamilyRelation.isChartable(label) else { return }
+        let l = label.lowercased()
+        let desired: DirectLink
+        if FamilyEdgeBuilder.isPartnerTerm(l) { desired = .partner }
+        else if FamilyEdgeBuilder.isDirectParentTerm(l) { desired = .parent }
+        else if FamilyEdgeBuilder.isDirectChildTerm(l) { desired = .child }
+        else { return }
+
+        // Drop self↔subject edges the new label contradicts…
+        if desired != .parent {
+            for edge in subject.edgesAsParentArray where edge.child === selfNode { context.delete(edge) }
+        }
+        if desired != .child {
+            for edge in subject.edgesAsChildArray where edge.parent === selfNode { context.delete(edge) }
+        }
+        if desired != .partner {
+            for edge in subject.partnershipsAsAArray where edge.b === selfNode { context.delete(edge) }
+            for edge in subject.partnershipsAsBArray where edge.a === selfNode { context.delete(edge) }
+        }
+
+        // …then make the one it asks for, updating kind in place when the
+        // link already exists (Mother → Stepmother, Wife → Ex-wife).
+        switch desired {
+        case .parent:
+            if let existing = subject.edgesAsParentArray.first(where: { $0.child === selfNode }) {
+                existing.kind = FamilyEdgeBuilder.parentageKind(l).rawValue
+            } else {
+                FamilyEdgeBuilder.addParentage(parent: subject, child: selfNode, kind: FamilyEdgeBuilder.parentageKind(l), context: context)
+            }
+        case .child:
+            if let existing = subject.edgesAsChildArray.first(where: { $0.parent === selfNode }) {
+                existing.kind = FamilyEdgeBuilder.parentageKind(l).rawValue
+            } else {
+                FamilyEdgeBuilder.addParentage(parent: selfNode, child: subject, kind: FamilyEdgeBuilder.parentageKind(l), context: context)
+            }
+        case .partner:
+            if let existing = subject.partnershipsAsAArray.first(where: { $0.b === selfNode })
+                ?? subject.partnershipsAsBArray.first(where: { $0.a === selfNode }) {
+                existing.kind = FamilyEdgeBuilder.partnershipKind(l).rawValue
+            } else {
+                FamilyEdgeBuilder.addPartnership(selfNode, subject, kind: FamilyEdgeBuilder.partnershipKind(l), context: context)
+            }
+        }
+    }
+}
+
 // MARK: - One-time migration of free-text family data into edges
 
 /// Converts the existing free-text family fields into `Parentage`/`Partnership`
@@ -95,17 +258,11 @@ enum FamilyGraphMigration {
         }
 
         func addParentage(parent: Person, child: Person, kind: ParentageKind) {
-            guard parent !== child,
-                  !parent.edgesAsParentArray.contains(where: { $0.child === child }) else { return }
-            context.insert(Parentage(parent: parent, child: child, kind: kind))
+            FamilyEdgeBuilder.addParentage(parent: parent, child: child, kind: kind, context: context)
         }
 
         func addPartnership(_ a: Person, _ b: Person, kind: PartnershipKind) {
-            guard a !== b else { return }
-            let linked = a.partnershipsAsAArray.contains { $0.b === b }
-                || a.partnershipsAsBArray.contains { $0.a === b }
-            guard !linked else { return }
-            context.insert(Partnership(a: a, b: b, kind: kind))
+            FamilyEdgeBuilder.addPartnership(a, b, kind: kind, context: context)
         }
 
         // 1) relationshipToUser → edges relative to the self node.
@@ -150,37 +307,12 @@ enum FamilyGraphMigration {
         }
     }
 
-    // A direct parent/child is a plain mother/father/child term — not a
-    // grandparent, aunt/uncle, niece/nephew, in-law, or godparent, all of
-    // which contain those words but sit off the direct line.
-    private static func isIndirect(_ l: String) -> Bool {
-        l.contains("grand") || l.contains("great") || l.contains("aunt")
-            || l.contains("uncle") || l.contains("niece") || l.contains("nephew")
-            || l.contains("in-law") || l.contains("god") || l.contains("cousin")
-    }
-    private static func isDirectParentTerm(_ l: String) -> Bool {
-        !isIndirect(l) && (l.contains("mother") || l.contains("father") || l.contains("parent"))
-    }
-    private static func isDirectChildTerm(_ l: String) -> Bool {
-        !isIndirect(l) && (l.contains("daughter") || l.contains("son") || l.contains("child"))
-    }
-    private static func isPartnerTerm(_ l: String) -> Bool {
-        l.contains("wife") || l.contains("husband") || l.contains("spouse")
-            || l.contains("partner") || l.contains("girlfriend") || l.contains("boyfriend")
-            || l.contains("fianc")
-    }
-    private static func parentageKind(_ l: String) -> ParentageKind {
-        if l.contains("step") { return .step }
-        if l.contains("adopt") { return .adopted }
-        if l.contains("foster") { return .foster }
-        return .bio
-    }
-    private static func partnershipKind(_ l: String) -> PartnershipKind {
-        if l.hasPrefix("ex-") || l.hasPrefix("ex ") || l.contains("former") { return .former }
-        if l.contains("fianc") { return .engaged }
-        if l.contains("wife") || l.contains("husband") || l.contains("spouse") { return .married }
-        return .partner
-    }
+    // Term helpers live in FamilyEdgeBuilder, shared with FamilyEdgeSync.
+    private static func isDirectParentTerm(_ l: String) -> Bool { FamilyEdgeBuilder.isDirectParentTerm(l) }
+    private static func isDirectChildTerm(_ l: String) -> Bool { FamilyEdgeBuilder.isDirectChildTerm(l) }
+    private static func isPartnerTerm(_ l: String) -> Bool { FamilyEdgeBuilder.isPartnerTerm(l) }
+    private static func parentageKind(_ l: String) -> ParentageKind { FamilyEdgeBuilder.parentageKind(l) }
+    private static func partnershipKind(_ l: String) -> PartnershipKind { FamilyEdgeBuilder.partnershipKind(l) }
 }
 
 // MARK: - Deep relationship description ("Your father's brother's daughter")
@@ -445,6 +577,14 @@ struct FamilyLinksEditor: View {
             }
             Spacer()
             kindMenu
+            // Click-reachable removal: swipe is the only other affordance,
+            // and a Mac mouse can't perform it.
+            Button(role: .destructive, action: onRemove) {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(Theme.terracotta)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Remove \(person.name) from these links")
         }
         .swipeActions {
             Button("Remove", role: .destructive, action: onRemove)

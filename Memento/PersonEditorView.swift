@@ -119,11 +119,11 @@ struct PersonEditorView: View {
 
     enum PickTarget: Identifiable {
         case partner
-        case member(Int)
+        case member(UUID)
         var id: String {
             switch self {
             case .partner: return "partner"
-            case .member(let index): return "member-\(index)"
+            case .member(let memberID): return "member-\(memberID.uuidString)"
             }
         }
     }
@@ -196,27 +196,28 @@ struct PersonEditorView: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel("Link an existing person as partner")
                     }
-                    ForEach(draftFamilyMembers.indices, id: \.self) { index in
+                    // Identified by the draft's stable id, like the other
+                    // draft lists — index-based identity shifts every later
+                    // row's bindings when one is removed mid-edit.
+                    ForEach($draftFamilyMembers) { $member in
                         HStack {
-                            TextField("Name", text: $draftFamilyMembers[index].name)
+                            TextField("Name", text: $member.name)
                             Button {
-                                pickerTarget = .member(index)
+                                pickerTarget = .member(member.id)
                             } label: {
                                 Image(systemName: "magnifyingglass")
                                     .foregroundStyle(Theme.aegean)
                             }
                             .buttonStyle(.borderless)
                             .accessibilityLabel("Link an existing person")
-                            Picker("", selection: $draftFamilyMembers[index].relation) {
+                            Picker("", selection: $member.relation) {
                                 ForEach(FamilyRelation.presets, id: \.self) { label in
                                     Text(label).tag(label)
                                 }
                             }
                             .labelsHidden()
                             rowDeleteButton(label: "Remove this family member") {
-                                if draftFamilyMembers.indices.contains(index) {
-                                    draftFamilyMembers.remove(at: index)
-                                }
+                                draftFamilyMembers.removeAll { $0.id == member.id }
                             }
                         }
                     }
@@ -364,8 +365,8 @@ struct PersonEditorView: View {
                     switch target {
                     case .partner:
                         partnerName = picked.name
-                    case .member(let index):
-                        if draftFamilyMembers.indices.contains(index) {
+                    case .member(let memberID):
+                        if let index = draftFamilyMembers.firstIndex(where: { $0.id == memberID }) {
                             draftFamilyMembers[index].name = picked.name
                         }
                     }
@@ -639,6 +640,10 @@ struct PersonEditorView: View {
         }
 
         applyReciprocalLinks(around: target)
+        // Mirror the edited relationship/partner/children/family fields into
+        // the Parentage/Partnership graph — the default pedigree tree draws
+        // only from edges, and the one-time migration won't run again.
+        FamilyEdgeSync.apply(around: target, context: context)
 
         try? context.save()
         NotificationManager.refreshFromContext(context)
