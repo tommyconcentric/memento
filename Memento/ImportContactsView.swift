@@ -700,6 +700,7 @@ struct ImportContactsView: View {
     private func importSelected() {
         // Imports join whichever workspace is currently open.
         let isBusiness = UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
+        var imported: [Person] = []
         for candidate in candidates where candidate.include {
             let person = Person(name: candidate.name.trimmed, group: selectedGroup)
             person.phoneNumber = candidate.phones.first ?? ""
@@ -723,6 +724,14 @@ struct ImportContactsView: View {
                     sortOrder += 1
                 }
             }
+            imported.append(person)
+        }
+        // Same pass every editor save runs: folds a namesake ghost onto the
+        // arriving profile so the pedigree doesn't chart the person twice —
+        // without this, a ghost "Sam" stays separate until Sam's profile
+        // happens to be re-saved by hand.
+        for person in imported {
+            FamilyEdgeSync.apply(around: person, context: context)
         }
         try? context.save()
         NotificationManager.refreshFromContext(context)
