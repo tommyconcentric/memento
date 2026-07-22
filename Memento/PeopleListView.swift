@@ -61,10 +61,6 @@ struct PeopleListView: View {
                 NavigationStack {
                     PersonDetailView(person: person)
                 }
-                // Cards inside the detail draw the person's own workspace
-                // surfaces, matching the background PersonDetailView
-                // already picks from `person.workspace`.
-                .environment(\.cardWorkspace, person.workspace)
             } else {
                 detailPlaceholder
             }

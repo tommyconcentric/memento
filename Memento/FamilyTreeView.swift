@@ -1164,11 +1164,18 @@ struct PersonFamilySection: View {
         // this name, guessing would lend the wrong person's photo,
         // deceased state and tap-through profile to the row, so an
         // ambiguous name renders unlinked instead.
-        let matches = people.filter {
+        // Real profiles are matched first, hidden graph nodes only as a
+        // fallback — an invisible ghost sharing a contact's name must not
+        // spoil the one-match rule for the real profile (the same split
+        // applyReciprocalLinks and import's duplicate check make).
+        let named = people.filter {
             $0.persistentModelID != person.persistentModelID &&
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
-        let match = matches.count == 1 ? matches.first : nil
+        let real = named.filter { !$0.isSelf && !$0.isGhost }
+        let match = real.count == 1
+            ? real.first
+            : (real.isEmpty && named.count == 1 ? named.first : nil)
         // Hidden graph nodes (the "You" self node, name-only ghosts) lend
         // their photo to the chart but never a navigation link — a tappable
         // self node would expose Delete Person, which cascades away every

@@ -195,8 +195,14 @@ struct PersonEditorView: View {
                         if birthday.hasPlaceholderYear && !editingYearlessBirthday {
                             yearlessBirthdayRow
                         } else {
+                            // The picker's expansion writes through to
+                            // editingYearlessBirthday, so collapsing the
+                            // calendar hands the header back to the
+                            // month/day row while the year is still the
+                            // placeholder — instead of latching open and
+                            // re-presenting the sentinel 1904.
                             AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness,
-                                          initiallyExpanded: editingYearlessBirthday)
+                                          expanded: $editingYearlessBirthday)
                         }
                     }
                 } header: {

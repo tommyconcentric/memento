@@ -301,6 +301,12 @@ struct NoteDetailSheet: View {
             .sheet(item: $viewerPhoto) { photo in
                 PhotoViewerSheet(photo: photo)
             }
+            // Same active dismissal the timeline's own sheets get: without
+            // it, a photo removed by sync mid-view strands a blank sheet
+            // whose Done button rendered away with the rest of the viewer.
+            .onChange(of: viewerPhoto?.isDeleted) { _, deleted in
+                if deleted == true { viewerPhoto = nil }
+            }
         }
     }
 }
