@@ -20,6 +20,16 @@ struct ImportContactsView: View {
     @State private var showingContactPicker = false
     @State private var showingFilePicker = false
     @State private var errorMessage: String?
+    @State private var isFetchingContacts = false
+
+    /// The system contact picker (CNContactPickerViewController) presents
+    /// nothing when the iOS app runs on a Mac ("Designed for iPad"), so the
+    /// Mac reads the Contacts database directly instead — which, unlike the
+    /// picker, requires the Contacts permission. The review list is the
+    /// picker there: everything is fetched, nothing imports unticked.
+    private var usesDirectContactsFetch: Bool {
+        ProcessInfo.processInfo.isiOSAppOnMac
+    }
 
     struct ImportCandidate: Identifiable {
         let id = UUID()
@@ -99,11 +109,18 @@ struct ImportContactsView: View {
             VStack(spacing: 14) {
                 optionCard(
                     icon: "person.crop.circle.badge.plus",
-                    title: "From iOS Contacts",
-                    subtitle: "Pick exactly who to import — names, photos, birthdays and every number, email and address come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
+                    title: isFetchingContacts ? "Loading Contacts…" : "From Contacts",
+                    subtitle: usesDirectContactsFetch
+                        ? "Reads the contacts on this Mac — names, photos, birthdays and every number, email and address come along. You'll tick exactly who to keep on the next screen."
+                        : "Pick exactly who to import — names, photos, birthdays and every number, email and address come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
                 ) {
-                    showingContactPicker = true
+                    if usesDirectContactsFetch {
+                        fetchAllContacts()
+                    } else {
+                        showingContactPicker = true
+                    }
                 }
+                .disabled(isFetchingContacts)
 
                 optionCard(
                     icon: "doc.badge.plus",
@@ -231,9 +248,54 @@ struct ImportContactsView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: - iOS Contacts
+    // MARK: - Contacts (direct fetch — Mac, where the picker can't present)
 
-    private func handlePicked(_ contacts: [CNContact]) {
+    /// Requests Contacts access and reads every contact into the review
+    /// list. Only used on the Mac: on iOS/iPadOS the system picker imports
+    /// without any Contacts permission, which is the more private path.
+    private func fetchAllContacts() {
+        guard !isFetchingContacts else { return }
+        isFetchingContacts = true
+        errorMessage = nil
+        Task { @MainActor in
+            defer { isFetchingContacts = false }
+            let store = CNContactStore()
+            let granted = (try? await store.requestAccess(for: .contacts)) ?? false
+            guard granted else {
+                errorMessage = "Turn on Contacts access for Memento in System Settings → Privacy & Security → Contacts, then try again."
+                return
+            }
+            // Enumerate off the main thread — a big Contacts database with
+            // photos takes long enough to hitch the sheet.
+            let contacts: [CNContact] = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let keys = [
+                        CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey,
+                        CNContactPhoneNumbersKey, CNContactEmailAddressesKey, CNContactPostalAddressesKey,
+                        CNContactBirthdayKey, CNContactImageDataKey, CNContactThumbnailImageDataKey
+                    ] as [CNKeyDescriptor]
+                    let request = CNContactFetchRequest(keysToFetch: keys)
+                    request.sortOrder = .userDefault
+                    var results: [CNContact] = []
+                    try? CNContactStore().enumerateContacts(with: request) { contact, _ in
+                        results.append(contact)
+                    }
+                    continuation.resume(returning: results)
+                }
+            }
+            guard !contacts.isEmpty else {
+                errorMessage = "No contacts were found on this Mac."
+                return
+            }
+            // Everything arrives (there was no picker step), so nothing is
+            // pre-ticked — the review list is where the choosing happens.
+            handlePicked(contacts, preselectNew: false)
+        }
+    }
+
+    // MARK: - Contacts (system picker — iPhone/iPad, no permission needed)
+
+    private func handlePicked(_ contacts: [CNContact], preselectNew: Bool = true) {
         var results: [ImportCandidate] = []
         for contact in contacts {
             var candidate = ImportCandidate(name: displayName(for: contact))
@@ -272,7 +334,7 @@ struct ImportContactsView: View {
             }
             results.append(candidate)
         }
-        setCandidates(results)
+        setCandidates(results, preselectNew: preselectNew)
     }
 
     private func displayName(for contact: CNContact) -> String {
@@ -444,13 +506,16 @@ struct ImportContactsView: View {
 
     // MARK: - Shared
 
-    private func setCandidates(_ results: [ImportCandidate]) {
+    /// `preselectNew: false` starts every candidate unticked — used when the
+    /// whole address book arrives at once (the Mac's direct fetch) rather
+    /// than a hand-picked selection.
+    private func setCandidates(_ results: [ImportCandidate], preselectNew: Bool = true) {
         let existingNames = Set(existingPeople.map { $0.name.lowercased() })
         var prepared = results
         for index in prepared.indices {
             let exists = existingNames.contains(prepared[index].name.trimmed.lowercased())
             prepared[index].alreadyExists = exists
-            if exists { prepared[index].include = false }
+            if exists || !preselectNew { prepared[index].include = false }
         }
         errorMessage = nil
         candidates = prepared.sorted { $0.name < $1.name }
