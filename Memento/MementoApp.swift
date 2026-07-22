@@ -104,9 +104,30 @@ struct RootView: View {
     // created by two devices seeding before sync can be folded together.
     @Query(filter: #Predicate<Person> { $0.isSelf }) private var selfNodes: [Person]
     @AppStorage("didSeedDefaultGroups") private var didSeedDefaultGroups = false
+    // A profile card arriving via AirDrop/"Open in Memento" (the app is
+    // registered as a plain-text viewer for exactly this).
+    @State private var incomingProfile: ParsedProfile?
+    @State private var showingUnrecognizedFile = false
 
     var body: some View {
         PeopleListView()
+            .onOpenURL { url in
+                if let profile = ProfileCard.load(from: url) {
+                    incomingProfile = profile
+                } else {
+                    // The user deliberately opened a file in Memento; a
+                    // silent no-op would read as the app being broken.
+                    showingUnrecognizedFile = true
+                }
+            }
+            .sheet(item: $incomingProfile) { profile in
+                ProfileImportSheet(profile: profile)
+            }
+            .alert("Not a Memento Profile", isPresented: $showingUnrecognizedFile) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Memento can open profile cards shared from another Memento — this text file isn't one.")
+            }
             .onAppear {
                 seedDefaultGroupsIfNeeded()
                 mergeDuplicateBuiltInGroups()
