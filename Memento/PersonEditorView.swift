@@ -220,6 +220,13 @@ struct PersonEditorView: View {
                             .buttonStyle(.borderless)
                             .accessibilityLabel("Link an existing person")
                             Picker("", selection: $member.relation) {
+                                // Reciprocal links can write labels outside
+                                // the presets ("Godchild", "Family") —
+                                // without a matching tag the picker renders
+                                // blank and silently mismatches.
+                                if !member.relation.isEmpty && !FamilyRelation.presets.contains(member.relation) {
+                                    Text(member.relation).tag(member.relation)
+                                }
                                 ForEach(FamilyRelation.presets, id: \.self) { label in
                                     Text(label).tag(label)
                                 }
@@ -290,6 +297,18 @@ struct PersonEditorView: View {
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
+                            // A starred row changing kind must displace any
+                            // star already held in the new kind — otherwise
+                            // two stars show, and the save's first-wins
+                            // dedupe keeps the older one over the star the
+                            // user set most recently.
+                            .onChange(of: draft.kind) { _, newKind in
+                                guard draft.starred else { return }
+                                for index in draftContacts.indices
+                                    where draftContacts[index].id != draft.id && draftContacts[index].kind == newKind {
+                                    draftContacts[index].starred = false
+                                }
+                            }
                             TextField(draft.kind.label, text: $draft.value, axis: draft.kind == .address ? .vertical : .horizontal)
                                 .keyboardType(keyboard(for: draft.kind))
                                 .textInputAutocapitalization(draft.kind == .email ? .never : .sentences)

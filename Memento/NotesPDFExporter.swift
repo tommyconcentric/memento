@@ -248,7 +248,15 @@ enum NotesPDFExporter {
         // MARK: Notes
 
         func drawNote(_ note: NoteEntry) {
-            ensure(90)   // keep the date line and a couple of text lines together
+            let photos = note.sortedPhotos.compactMap { photo in
+                photo.imageData.flatMap(UIImage.init(data:)).map { (downscaled($0), photo.caption) }
+            }
+            // Keep the date line together with what follows it: a couple of
+            // text lines normally, or the first photo row for a photos-only
+            // note — otherwise its date prints stranded at a page bottom
+            // with every polaroid on the next page.
+            let hasText = !note.title.isEmpty || !note.text.isEmpty
+            ensure(hasText ? 90 : (photos.isEmpty ? 40 : 250))
 
             var dateLine: String
             if style.business {
@@ -273,13 +281,25 @@ enum NotesPDFExporter {
                               spacingAfter: 8)
             }
 
-            let photos = note.sortedPhotos.compactMap { photo in
-                photo.imageData.flatMap(UIImage.init(data:)).map { ($0, photo.caption) }
-            }
             if !photos.isEmpty {
                 drawPhotoRows(photos)
             }
             y += 10
+        }
+
+        /// Photos embed at roughly 3× their ~156 pt cell, not at their full
+        /// stored resolution — a photo-heavy export was otherwise hundreds
+        /// of megabytes, too large to mail or AirDrop.
+        private func downscaled(_ image: UIImage, maxDimension: CGFloat = 480) -> UIImage {
+            let largest = max(image.size.width, image.size.height)
+            guard largest > maxDimension else { return image }
+            let scale = maxDimension / largest
+            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let format = UIGraphicsImageRendererFormat.default()
+            format.scale = 1
+            return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
         }
 
         /// Up to three photos per row. Report style: clean rounded
@@ -383,6 +403,10 @@ enum NotesPDFExporter {
         /// gold dots in the scrapbook.
         func drawDivider() {
             ensure(24)
+            // A page break separates better than any ornament — dots or a
+            // rule stranded at the very top of a fresh page just read as
+            // clutter above the next note.
+            guard y > margin else { return }
             if style.business {
                 y += 4
                 drawRule(weight: 0.5)

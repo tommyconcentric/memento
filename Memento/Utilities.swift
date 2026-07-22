@@ -23,8 +23,14 @@ extension Date {
     /// must hide it — the user never entered it.
     static let placeholderYear = 1904
 
+    /// Placeholder years are Gregorian by definition; going through
+    /// `Calendar.current` would mis-detect (and mis-construct) them on
+    /// devices using the Buddhist or Japanese calendar, where "year 1904"
+    /// is a different era entirely.
+    static let gregorian = Calendar(identifier: .gregorian)
+
     var hasPlaceholderYear: Bool {
-        Calendar.current.component(.year, from: self) == Self.placeholderYear
+        Self.gregorian.component(.year, from: self) == Self.placeholderYear
     }
 
     /// The next occurrence of this date's month/day, today included.

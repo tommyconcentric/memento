@@ -56,12 +56,26 @@ enum NotificationManager {
             var components = Calendar.current.dateComponents([.month, .day], from: event.date)
             let trigger: UNCalendarNotificationTrigger
             if components.month == 2, components.day == 29,
-               let next = Date.nextOccurrence(of: event.date) {
+               var next = Date.nextOccurrence(of: event.date) {
                 // A repeating trigger matches one fixed month/day forever:
                 // a literal Feb 29 would skip non-leap years, and a Feb 28
                 // remap would fire a day early in leap years. Aim a one-shot
                 // at the actual next occurrence (Feb 29 in leap years,
                 // Feb 28 otherwise) — the refresh on every save re-arms it.
+                if let nineAM = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: next),
+                   nineAM <= .now {
+                    // nextOccurrence returns *today* on the day itself; a
+                    // one-shot aimed at a 9 AM already past never fires, so
+                    // a refresh that afternoon would silently disarm next
+                    // year's reminder. Aim at the following year instead.
+                    let year = Calendar.current.component(.year, from: next) + 1
+                    var comps = DateComponents(year: year, month: 2, day: 29)
+                    if let feb1 = Calendar.current.date(from: DateComponents(year: year, month: 2, day: 1)),
+                       Calendar.current.range(of: .day, in: .month, for: feb1)?.count != 29 {
+                        comps.day = 28
+                    }
+                    next = Calendar.current.date(from: comps) ?? next
+                }
                 var oneShot = Calendar.current.dateComponents([.year, .month, .day], from: next)
                 oneShot.hour = 9
                 trigger = UNCalendarNotificationTrigger(dateMatching: oneShot, repeats: false)

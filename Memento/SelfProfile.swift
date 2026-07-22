@@ -76,6 +76,12 @@ enum ProfileCard {
     static func load(from url: URL) -> ParsedProfile? {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        // The app opens arbitrary plain text ("Open in Memento"); a real
+        // card is a few hundred bytes, so refuse to slurp a huge file into
+        // memory on the main thread just to discover it isn't one.
+        if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 64_000 {
+            return nil
+        }
         guard let data = try? Data(contentsOf: url) else { return nil }
         return parse(String(decoding: data, as: UTF8.self))
     }
@@ -114,11 +120,13 @@ enum ProfileCard {
             return full
         }
         // A year-less card line ("14 March") lands on the placeholder year,
-        // the same convention as contact import.
+        // the same convention as contact import — via the Gregorian
+        // calendar explicitly, where 1904 means 1904 (and is a leap year)
+        // regardless of the device's calendar setting.
         if let partial = birthdayFormatter("d MMMM").date(from: value) {
-            var comps = Calendar.current.dateComponents([.month, .day], from: partial)
+            var comps = Date.gregorian.dateComponents([.month, .day], from: partial)
             comps.year = Date.placeholderYear
-            return Calendar.current.date(from: comps)
+            return Date.gregorian.date(from: comps)
         }
         return nil
     }
