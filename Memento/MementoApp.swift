@@ -41,6 +41,19 @@ struct MementoApp: App {
     private static var lastActivationRefresh = Date.distantPast
     private static let activationRefreshInterval: TimeInterval = 15 * 60
 
+    /// A backup restore or migration carries the UserDefaults flags to the
+    /// new device but not the ThisDeviceOnly Keychain PIN — leaving Settings
+    /// claiming "Require a PIN" is ON while the app (correctly, see
+    /// `isLocked` above) never locks. Reset the flags to match reality so
+    /// Settings tells the truth and re-enabling routes through PIN setup;
+    /// biometrics can't stay on without a PIN behind it.
+    private func reconcileOrphanedLockFlag() {
+        if appLockEnabled && AppLock.storedPIN == nil {
+            appLockEnabled = false
+            UserDefaults.standard.set(false, forKey: AppLock.useBiometricsKey)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -52,6 +65,7 @@ struct MementoApp: App {
                 // presented above the root view, so an overlay would leave
                 // any open sheet visible and tappable while "locked".
                 .onAppear {
+                    reconcileOrphanedLockFlag()
                     if isLocked {
                         LockScreenPresenter.show { isLocked = false }
                     }
@@ -171,6 +185,42 @@ enum SelfNodeMaintenance {
             if keeper.foodPreferences.isEmpty { keeper.foodPreferences = extra.foodPreferences }
             if keeper.partnerName.isEmpty { keeper.partnerName = extra.partnerName }
             if keeper.childrenNames.isEmpty { keeper.childrenNames = extra.childrenNames }
+            if keeper.otherFamily.isEmpty { keeper.otherFamily = extra.otherFamily }
+            if keeper.howWeMet.isEmpty { keeper.howWeMet = extra.howWeMet }
+
+            // The duplicate's to-many rows (important dates, contact fields,
+            // family rows, notes, projects) cascade-delete with it — re-home
+            // them onto the keeper so nothing entered on the other device is
+            // lost. A row the keeper already holds an identical copy of
+            // (both devices entered the same thing) cascades away instead of
+            // duplicating.
+            for date in extra.importantDatesArray
+            where !keeper.importantDatesArray.contains(where: {
+                $0.label == date.label && $0.date == date.date
+            }) {
+                date.person = keeper
+            }
+            for member in extra.familyMembersArray
+            where !keeper.familyMembersArray.contains(where: {
+                $0.name == member.name && $0.relation == member.relation
+            }) {
+                member.person = keeper
+            }
+            for field in extra.contactFieldsArray
+            where !keeper.contactFieldsArray.contains(where: {
+                $0.kind == field.kind && $0.value == field.value
+            }) {
+                field.person = keeper
+            }
+            for note in extra.notesArray {
+                note.person = keeper
+            }
+            for project in extra.projectsArray
+            where !keeper.projectsArray.contains(where: {
+                $0.name == project.name && $0.isCompleted == project.isCompleted
+            }) {
+                project.person = keeper
+            }
 
             context.delete(extra)
         }

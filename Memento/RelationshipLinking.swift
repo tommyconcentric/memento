@@ -931,18 +931,55 @@ struct FamilyLinksEditor: View {
 
     /// A removed link clears the profile fields that fed it — otherwise
     /// FamilyEdgeSync would faithfully rebuild the edge from the stale
-    /// text on the very next editor save.
+    /// text on the very next editor save. Both sides need cleaning:
+    /// backfill and the editor's applyReciprocalLinks wrote the link onto
+    /// the counterpart too (reciprocal family row, partnerName), and
+    /// FamilyEdgeSync runs around whichever profile is saved next.
     private func clearBackfill(for other: Person?, role: Role) {
         guard let other else { return }
         if role == .partner,
            subject.partnerName.compare(other.name, options: .caseInsensitive) == .orderedSame {
             subject.partnerName = ""
         }
+        // The legacy free-text children list feeds FamilyEdgeSync alongside
+        // the family rows — a removed child left there resurrects on the
+        // subject's own next save.
+        if role == .child {
+            removeChildName(other.name, from: subject)
+        }
         for member in subject.familyMembersArray where
             member.name.compare(other.name, options: .caseInsensitive) == .orderedSame
             && matchesRole(member.relation, role: role) {
             context.delete(member)
         }
+
+        // The counterpart's fields describe the subject from their side —
+        // the subject's parent lists the subject as a child, and partners
+        // name each other.
+        if role == .partner,
+           other.partnerName.compare(subject.name, options: .caseInsensitive) == .orderedSame {
+            other.partnerName = ""
+        }
+        if role == .parent {
+            removeChildName(subject.name, from: other)
+        }
+        for member in other.familyMembersArray where
+            member.name.compare(subject.name, options: .caseInsensitive) == .orderedSame
+            && matchesRole(member.relation, role: inverse(of: role)) {
+            context.delete(member)
+        }
+
+        // Removing the hidden "You" node from this profile's links must
+        // also clear the profile's own "relationship to you" label —
+        // syncSelfEdge treats that label as authoritative and would
+        // rebuild the edge on the subject's very next editor save. The
+        // label describes the subject from the user's side, so it maps
+        // through the inverted role ("Mother" ↔ the self node being the
+        // subject's child).
+        if other.isSelf, matchesRole(subject.relationshipToUser, role: inverse(of: role)) {
+            subject.relationshipToUser = ""
+        }
+
         if subject.isSelf {
             let l = other.relationshipToUser.trimmed.lowercased()
             let mapsHere: Bool
@@ -953,6 +990,26 @@ struct FamilyLinksEditor: View {
             }
             if mapsHere { other.relationshipToUser = "" }
         }
+    }
+
+    /// How the removed link reads from the counterpart's side.
+    private func inverse(of role: Role) -> Role {
+        switch role {
+        case .parent: return .child
+        case .child: return .parent
+        case .partner: return .partner
+        }
+    }
+
+    /// Drops one name from a profile's free-text children list, keeping
+    /// the remaining names in the comma form `childNames(of:)` parses.
+    private func removeChildName(_ name: String, from person: Person) {
+        let current = childNames(of: person)
+        let remaining = current.filter {
+            $0.compare(name, options: .caseInsensitive) != .orderedSame
+        }
+        guard remaining.count != current.count else { return }
+        person.childrenNames = remaining.joined(separator: ", ")
     }
 
     private func matchesRole(_ relation: String, role: Role) -> Bool {
