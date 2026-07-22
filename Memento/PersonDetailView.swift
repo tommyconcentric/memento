@@ -64,6 +64,10 @@ struct PersonDetailView: View {
                     Button("Edit Person", systemImage: "pencil") {
                         showingEditor = true
                     }
+                    // Defense in depth: no surface should route the hidden
+                    // self node here, but if one ever leaks again, deleting
+                    // it would cascade away every family-tree edge.
+                    if !person.isSelf {
                     Button(
                         person.isDeceased ? "Unmark as Deceased" : "Mark as Deceased",
                         systemImage: "leaf"
@@ -72,6 +76,7 @@ struct PersonDetailView: View {
                         try? context.save()
                         NotificationManager.refreshFromContext(context)
                         CalendarSyncManager.refreshFromContext(context)
+                    }
                     }
                     // Business contacts export a crisp report; personal
                     // people a scrapbook — each workspace's voice, in print.
@@ -83,8 +88,10 @@ struct PersonDetailView: View {
                         showingPDFExporter = true
                     }
                     .disabled(person.notesArray.isEmpty)
-                    Button("Delete Person", systemImage: "trash", role: .destructive) {
-                        showingDeleteConfirm = true
+                    if !person.isSelf {
+                        Button("Delete Person", systemImage: "trash", role: .destructive) {
+                            showingDeleteConfirm = true
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")

@@ -60,7 +60,9 @@ enum CalendarSyncManager {
         guard UserDefaults.standard.bool(forKey: enabledKey) else { return }
 
         var events: [EventSnapshot] = []
-        for person in people where !person.isDeceased {
+        // Hidden graph nodes (self/ghost) are excluded, matching the in-app
+        // calendar.
+        for person in people where !person.isDeceased && !person.isSelf && !person.isGhost {
             if let birthday = person.birthday {
                 events.append(EventSnapshot(title: "🎂 \(person.name)'s Birthday", date: birthday))
             }
@@ -177,8 +179,15 @@ enum CalendarSyncManager {
             // (Feb 29 in leap years, Feb 28 otherwise), refreshed on every
             // sync like everything else.
             let thisYear = Calendar.current.component(.year, from: .now)
+            // Only emit occurrences inside removeAllEvents' one-year
+            // lookback: last year's date can fall before that window (Feb
+            // 28, 2025 against a July 2026 rebuild), where no rebuild could
+            // ever remove it — every sync would then stack one more
+            // duplicate onto the user's calendar, forever.
+            let windowStart = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
             for year in (thisYear - 1)...(thisYear + 4) {
-                guard let day = occurrence(month: 2, day: 29, inYear: year) else { continue }
+                guard let day = occurrence(month: 2, day: 29, inYear: year),
+                      day >= windowStart else { continue }
                 addSingleEvent(title: title, on: day, calendar: calendar)
             }
             return
