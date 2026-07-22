@@ -25,7 +25,6 @@ struct PeopleListView: View {
     @State private var showingSettings = false
     @State private var showingTree = false
     @State private var showingCalendar = false
-    @State private var showingAbout = false
     @State private var showingMyProfile = false
     @AppStorage("logoColorScheme") private var storedColorScheme = LogoColorScheme.default.rawValue
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
@@ -48,7 +47,7 @@ struct PeopleListView: View {
     /// "navigated away" and pending unpins can settle into their folders.
     private var isCoveredBySheet: Bool {
         showingAddPerson || showingFolders || showingSettings || showingTree
-            || showingCalendar || showingAbout || showingMyProfile
+            || showingCalendar || showingMyProfile
     }
 
     private func showsInPinnedSection(_ person: Person) -> Bool {
@@ -68,8 +67,15 @@ struct PeopleListView: View {
         }
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // Bound so our custom header's collapse button can hide the sidebar —
+    // the system's own toggle lived in the navigation bar we no longer
+    // show. Starts at .all: .automatic resolves to detail-only in iPad
+    // portrait, which would launch the app to an empty "Pick Someone".
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
             if let person = selectedPerson, !person.isDeleted {
@@ -94,9 +100,6 @@ struct PeopleListView: View {
         }
         .sheet(isPresented: $showingCalendar) {
             CalendarView()
-        }
-        .sheet(isPresented: $showingAbout) {
-            AboutView()
         }
         .sheet(isPresented: $showingMyProfile) {
             if let selfNode = selfNodes.canonicalSelfNode {
@@ -181,26 +184,13 @@ struct PeopleListView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(workspace.background)
-        .navigationTitle("Memento")
-        .searchable(text: $searchText, prompt: "Search by name, company, hobby")
+        // The sidebar's navigation bar is hidden entirely: its height caps
+        // any toolbar view (the Mac titlebar clipped a row-sized avatar),
+        // and its auto-generated "…" overflow is broken there anyway. The
+        // pinned bar below is the header now — full-size profile circle,
+        // wordmark, sidebar toggle and search, all on one designed surface.
+        .toolbar(.hidden, for: .navigationBar)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
-        .toolbar {
-            // Only the brand logo stays in the toolbar. A split-view sidebar
-            // can fit just a couple of toolbar icons before SwiftUI demotes
-            // the rest into its auto-generated "…" overflow menu — which on
-            // macOS ("Designed for iPad") flashes and shows nothing when
-            // tapped. A single item never overflows, so it stays a direct,
-            // working button; settings and folders move to the pinned bar
-            // alongside the other always-visible actions.
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    showingAbout = true
-                } label: {
-                    LogoMark(size: 27, colorScheme: logoColorScheme)
-                }
-                .accessibilityLabel("About Memento")
-            }
-        }
         .overlay {
             if workspacePeople.isEmpty {
                 ContentUnavailableView {
@@ -227,8 +217,34 @@ struct PeopleListView: View {
         // switch a single visible tap, on every device.
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 8) {
-                HStack(spacing: 10) {
+                // Header row: your circle at full row-avatar size in the
+                // top-left corner, the wordmark beside it, and (in regular
+                // width) a collapse button standing in for the system
+                // toggle the hidden navigation bar used to provide.
+                HStack(spacing: 12) {
                     myProfileButton
+                    Text("Memento")
+                        .font(.system(.title3, design: workspace.displayFontDesign, weight: .semibold))
+                    Spacer()
+                    if horizontalSizeClass == .regular {
+                        Button {
+                            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                        } label: {
+                            Image(systemName: "sidebar.leading")
+                                .font(.title3)
+                                .foregroundStyle(workspace.accent)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Hide sidebar")
+                    }
+                }
+                searchField
+                // The switcher owns this row (with the "+"): full width
+                // keeps "Personal"/"Business" from wrapping at any sidebar
+                // width.
+                HStack(spacing: 10) {
                     workspaceSwitcher
                     addPersonButton
                 }
@@ -245,10 +261,57 @@ struct PeopleListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
+            .padding(.top, 8)
             .padding(.bottom, 10)
             .background(workspace.background)
         }
+    }
+
+    /// Your own circle — the same 48pt as every row avatar, so it reads as
+    /// a peer of the other portraits. Opens My Profile (edit + share).
+    private var myProfileButton: some View {
+        Button {
+            showingMyProfile = true
+        } label: {
+            AvatarView(
+                data: selfNodes.canonicalSelfNode?.profilePhotoData,
+                name: myProfileDisplayName,
+                size: 48
+            )
+            .overlay(Circle().strokeBorder(workspace.accent.opacity(0.45), lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("My profile")
+    }
+
+    /// Replaces .searchable, which rendered inside the navigation bar this
+    /// sidebar no longer shows. Always visible, same card treatment as the
+    /// pinned tiles.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search by name, company, hobby", text: $searchText)
+                .textFieldStyle(.plain)
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(workspace.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        )
     }
 
     /// Tree and calendar live in the pinned bar alongside the switcher and
@@ -333,24 +396,6 @@ struct PeopleListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add person")
-    }
-
-    /// Your own circle beside the workspace switcher: initials (or photo
-    /// once set) opening My Profile — edit yourself like any other profile,
-    /// and share the profile card from there.
-    private var myProfileButton: some View {
-        Button {
-            showingMyProfile = true
-        } label: {
-            AvatarView(
-                data: selfNodes.canonicalSelfNode?.profilePhotoData,
-                name: myProfileDisplayName,
-                size: 42
-            )
-            .overlay(Circle().strokeBorder(workspace.accent.opacity(0.45), lineWidth: 1.5))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("My profile")
     }
 
     private var myProfileDisplayName: String {

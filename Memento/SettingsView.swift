@@ -126,7 +126,11 @@ struct SettingsView: View {
                 } header: {
                     Text("Help & Feedback")
                 } footer: {
-                    Text("Reviews help others find Memento; feedback reaches the developer.")
+                    // The About sheet is gone; this is the version's home now.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Reviews help others find Memento; feedback reaches the developer.")
+                        Text(aboutLine)
+                    }
                 }
 
                 Section {
@@ -299,6 +303,12 @@ struct SettingsView: View {
         if let url = components.url {
             openURL(url)
         }
+    }
+
+    private var aboutLine: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "Memento \(version) (\(build)) · SwiftUI + SwiftData · synced via your private iCloud"
     }
 
     private var lastSyncedText: String {
