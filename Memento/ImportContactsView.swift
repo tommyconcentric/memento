@@ -21,6 +21,26 @@ struct ImportContactsView: View {
     @State private var showingFilePicker = false
     @State private var errorMessage: String?
     @State private var isFetchingContacts = false
+    // Both import paths confirm first — a mis-tap on "Import All" could
+    // otherwise pour hundreds of contacts into the store with no way back
+    // but deleting them one by one.
+    @State private var pendingImport: PendingImport?
+
+    enum PendingImport: Identifiable {
+        case selection(count: Int)   // the toolbar's "Import N" — ticked rows only
+        case everyone(count: Int)    // "Import All" — every new row plus hand-ticked duplicates
+        var id: String {
+            switch self {
+            case .selection(let count): return "selection-\(count)"
+            case .everyone(let count): return "everyone-\(count)"
+            }
+        }
+        var count: Int {
+            switch self {
+            case .selection(let count), .everyone(let count): return count
+            }
+        }
+    }
 
     /// The system contact picker (CNContactPickerViewController) presents
     /// nothing when the iOS app runs on a Mac ("Designed for iPad"), so the
@@ -51,6 +71,12 @@ struct ImportContactsView: View {
 
     private var newCandidateCount: Int {
         candidates.filter { !$0.alreadyExists }.count
+    }
+
+    /// What "Import All" would actually bring in: every new candidate,
+    /// plus any duplicate the user ticked by hand.
+    private var bulkImportCount: Int {
+        candidates.filter { !$0.alreadyExists || $0.include }.count
     }
 
     // "All" means everyone not already in Memento — those default to
@@ -88,8 +114,10 @@ struct ImportContactsView: View {
                 }
                 if !candidates.isEmpty {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Import \(selectedCount)") { importSelected() }
-                            .disabled(selectedCount == 0)
+                        Button("Import \(selectedCount)") {
+                            pendingImport = .selection(count: selectedCount)
+                        }
+                        .disabled(selectedCount == 0)
                     }
                 }
             }
@@ -102,6 +130,23 @@ struct ImportContactsView: View {
                 allowedContentTypes: [.json, .commaSeparatedText, .plainText]
             ) { result in
                 handleFile(result)
+            }
+            .alert(
+                pendingImport.map { "Import \($0.count) \($0.count == 1 ? "Contact" : "Contacts")?" } ?? "",
+                isPresented: Binding(
+                    get: { pendingImport != nil },
+                    set: { if !$0 { pendingImport = nil } }
+                ),
+                presenting: pendingImport
+            ) { pending in
+                Button("Import") {
+                    if case .everyone = pending { setAllIncluded(true) }
+                    importSelected()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text(selectedGroup.map { "They'll be added to the “\($0.name)” folder." }
+                    ?? "They won't be filed in a folder — you can organize them later.")
             }
         }
     }
@@ -196,8 +241,7 @@ struct ImportContactsView: View {
             // comes along).
             Section {
                 Button {
-                    setAllIncluded(true)
-                    importSelected()
+                    pendingImport = .everyone(count: bulkImportCount)
                 } label: {
                     Label(
                         newCandidateCount == candidates.count
