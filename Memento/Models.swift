@@ -212,8 +212,17 @@ extension Person {
         additionalContacts(kind).first(where: \.isPreferred)
     }
 
+    /// Newest first. Backdated notes all land on midnight of their day, so
+    /// same-day ties are common — break them by `createdAt`, then by the
+    /// persistent ID, to keep timeline and PDF order stable across
+    /// launches, devices and CloudKit refetches (Swift's sort isn't stable
+    /// and the relationship's underlying order isn't guaranteed).
     var sortedNotes: [NoteEntry] {
-        notesArray.sorted { $0.eventDate > $1.eventDate }
+        notesArray.sorted {
+            if $0.eventDate != $1.eventDate { return $0.eventDate > $1.eventDate }
+            if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
+            return String(describing: $0.persistentModelID) < String(describing: $1.persistentModelID)
+        }
     }
 
     var hasAnyQuickInfo: Bool {
