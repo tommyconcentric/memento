@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct PersonDetailView: View {
     let person: Person
@@ -10,6 +11,8 @@ struct PersonDetailView: View {
     @State private var tab: DetailTab = .quickInfo
     @State private var showingEditor = false
     @State private var showingDeleteConfirm = false
+    @State private var pdfExport: PDFExportDocument?
+    @State private var showingPDFExporter = false
 
     enum DetailTab: String, CaseIterable {
         case quickInfo = "Quick Info"
@@ -70,6 +73,16 @@ struct PersonDetailView: View {
                         NotificationManager.refreshFromContext(context)
                         CalendarSyncManager.refreshFromContext(context)
                     }
+                    // Business contacts export a crisp report; personal
+                    // people a scrapbook — each workspace's voice, in print.
+                    Button(
+                        person.isBusiness ? "Export Notes Report (PDF)" : "Export Notes Scrapbook (PDF)",
+                        systemImage: "square.and.arrow.up"
+                    ) {
+                        pdfExport = PDFExportDocument(data: NotesPDFExporter.render(for: person))
+                        showingPDFExporter = true
+                    }
+                    .disabled(person.notesArray.isEmpty)
                     Button("Delete Person", systemImage: "trash", role: .destructive) {
                         showingDeleteConfirm = true
                     }
@@ -80,6 +93,14 @@ struct PersonDetailView: View {
         }
         .sheet(isPresented: $showingEditor) {
             PersonEditorView(person: person)
+        }
+        .fileExporter(
+            isPresented: $showingPDFExporter,
+            document: pdfExport,
+            contentType: .pdf,
+            defaultFilename: NotesPDFExporter.filename(for: person)
+        ) { _ in
+            pdfExport = nil
         }
         .confirmationDialog(
             "Delete \(person.name)?",
