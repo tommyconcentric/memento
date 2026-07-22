@@ -315,8 +315,8 @@ struct ProfileImportSheet: View {
                     VStack(alignment: .leading, spacing: 12) {
                         if let birthday = profile.birthday {
                             InfoRow(icon: "gift", label: "Birthday", value: birthday.hasPlaceholderYear
-                                ? birthday.formatted(.dateTime.month(.wide).day())
-                                : birthday.formatted(date: .long, time: .omitted))
+                                ? birthday.appFormattedMonthDay()
+                                : birthday.appFormatted(.long))
                         }
                         row("phone", "Phone", profile.phone)
                         row("envelope", "Email", profile.email)

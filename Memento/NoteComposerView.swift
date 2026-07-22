@@ -41,7 +41,7 @@ struct NoteComposerView: View {
         NavigationStack {
             Form {
                 Section("When & Where") {
-                    DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+                    AppDatePicker(title: "Date", date: $eventDate, business: person.isBusiness)
                     TextField("Location (e.g. Coffee at Marlowe's)", text: $location)
                 }
 

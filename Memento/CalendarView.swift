@@ -9,6 +9,7 @@ struct CalendarView: View {
     @Query(sort: [SortDescriptor(\Person.name, comparator: .localizedStandard)]) private var people: [Person]
 
     @State private var displayedMonth = Date.now
+    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
     @State private var selectedDay: Int?
 
     private var calendar: Calendar { .current }
@@ -236,7 +237,7 @@ struct CalendarView: View {
         var comps = calendar.dateComponents([.year, .month], from: displayedMonth)
         comps.day = day
         if let date = calendar.date(from: comps) {
-            return date.formatted(date: .complete, time: .omitted)
+            return date.appFormatted(.complete)
         }
         return "Day \(day)"
     }

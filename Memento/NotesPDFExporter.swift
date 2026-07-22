@@ -197,7 +197,7 @@ enum NotesPDFExporter {
             y += 8
             drawRule(weight: 0.5)
             y += 10
-            let meta = "\(noteCount) \(noteCount == 1 ? "note" : "notes"), newest first · Exported \(Date.now.formatted(date: .abbreviated, time: .omitted))"
+            let meta = "\(noteCount) \(noteCount == 1 ? "note" : "notes"), newest first · Exported \(Date.now.appFormatted())"
             drawParagraph(attributed(meta, font: style.font(8.5, .regular), color: style.subInk), spacingAfter: 22)
         }
 
@@ -260,12 +260,12 @@ enum NotesPDFExporter {
 
             var dateLine: String
             if style.business {
-                dateLine = note.eventDate.formatted(.dateTime.day().month(.abbreviated).year()).uppercased()
+                dateLine = note.eventDate.appFormatted().uppercased()
                 if !note.location.isEmpty { dateLine += "   ·   \(note.location.uppercased())" }
                 drawParagraph(attributed(dateLine, font: style.font(9, .semibold), color: style.accent, kern: 1),
                               spacingAfter: 5)
             } else {
-                dateLine = note.eventDate.formatted(.dateTime.day().month(.wide).year())
+                dateLine = note.eventDate.appFormatted(.long)
                 if !note.location.isEmpty { dateLine += " · \(note.location)" }
                 drawParagraph(attributed(dateLine, font: style.font(10.5, .regular, italic: true), color: style.warm),
                               spacingAfter: 5)
