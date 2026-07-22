@@ -170,7 +170,10 @@ struct CalendarView: View {
         // was never rendered (dropping the event from the calendar).
         let daysInDisplayedMonth = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 31
 
-        for person in people {
+        // Hidden graph nodes stay hidden: the self node would render "your
+        // own birthday" as a tappable person row whose detail view exposes
+        // Delete Person — which cascades away every family-tree edge.
+        for person in people where !person.isSelf && !person.isGhost {
             if let birthday = person.birthday {
                 let comps = calendar.dateComponents([.month, .day, .year], from: birthday)
                 if comps.month == month, let day = comps.day {

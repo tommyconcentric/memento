@@ -582,7 +582,10 @@ struct ImportContactsView: View {
     /// whole address book arrives at once (the Mac's direct fetch) rather
     /// than a hand-picked selection.
     private func setCandidates(_ results: [ImportCandidate], preselectNew: Bool = true) {
-        let existingNames = Set(existingPeople.map { $0.name.lowercased() })
+        // Only visible contacts count as duplicates — a hidden tree ghost
+        // sharing a contact's name would otherwise flag "Already in
+        // Memento" for someone the user has never seen in any list.
+        let existingNames = Set(existingPeople.filter { !$0.isSelf && !$0.isGhost }.map { $0.name.lowercased() })
         var prepared = results
         for index in prepared.indices {
             let exists = existingNames.contains(prepared[index].name.trimmed.lowercased())

@@ -269,6 +269,12 @@ struct SettingsView: View {
             try context.save()
             resetNote = nil
         } catch {
+            // Without the rollback, every queued deletion stays pending in
+            // the shared main context — the next successful save from
+            // anywhere would silently commit the full wipe (and sync it to
+            // every device) right after this message promised nothing was
+            // deleted.
+            context.rollback()
             resetNote = "Something went wrong and your data was not deleted. Please try again."
             return
         }

@@ -25,9 +25,17 @@ enum ProfileCard {
     static func text(for person: Person) -> String {
         var lines: [String] = [marker, ""]
         func add(_ key: String, _ value: String) {
-            let trimmed = value.trimmed
-            guard !trimmed.isEmpty else { return }
-            lines.append("\(key): \(trimmed)")
+            // The card is line-oriented; an interior newline (the address
+            // field is multi-line in the editor) would truncate the value
+            // on parse — or let a continuation line that happens to read
+            // "Company: …" masquerade as another key on the receiver.
+            let flattened = value
+                .replacingOccurrences(of: "\r\n", with: ", ")
+                .replacingOccurrences(of: "\n", with: ", ")
+                .replacingOccurrences(of: "\r", with: ", ")
+                .trimmed
+            guard !flattened.isEmpty else { return }
+            lines.append("\(key): \(flattened)")
         }
         add("Name", person.name)
         if let birthday = person.birthday {
@@ -324,6 +332,10 @@ struct ProfileImportSheet: View {
 
     private func add() {
         let person = Person(name: profile.name)
+        // Join whichever workspace is open, same as the contacts importer —
+        // a card accepted while in Business would otherwise land invisibly
+        // in Personal.
+        person.isBusiness = UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
         person.birthday = profile.birthday
         person.phoneNumber = profile.phone
         person.email = profile.email

@@ -144,9 +144,23 @@ enum FamilyEdgeSync {
 
         // 2) Partner / children / named family members — add-only, mirroring
         // migration step 2, so a routine editor save never tears down edges
-        // hand-built in the family links editor.
+        // hand-built in the family links editor. Names resolve through a
+        // registry that learns each ghost as it's created (ghosts first so
+        // real profiles win), like the migration's — resolving against the
+        // one-shot fetch alone would mint two ghost "Sam"s from a single
+        // save naming Sam in two fields.
+        var byName: [String: Person] = [:]
+        for p in people where !p.isSelf && p.isGhost { byName[p.name.trimmed.lowercased()] = p }
+        for p in people where !p.isSelf && !p.isGhost { byName[p.name.trimmed.lowercased()] = p }
         func node(for rawName: String) -> Person? {
-            resolveOrCreateGhost(named: rawName, in: context, among: people)
+            let name = rawName.trimmed
+            guard !name.isEmpty else { return nil }
+            if let existing = byName[name.lowercased()] { return existing }
+            let ghost = Person(name: name)
+            ghost.isGhost = true
+            context.insert(ghost)
+            byName[name.lowercased()] = ghost
+            return ghost
         }
         if let partner = node(for: subject.partnerName) {
             FamilyEdgeBuilder.addPartnership(subject, partner, kind: .partner, context: context)
@@ -175,6 +189,15 @@ enum FamilyEdgeSync {
 
     private enum DirectLink { case parent, child, partner }
 
+    /// Drops every direct self↔subject edge (both parentage directions and
+    /// any partnership).
+    private static func removeDirectSelfEdges(subject: Person, selfNode: Person, context: ModelContext) {
+        for edge in subject.edgesAsParentArray where edge.child === selfNode { context.delete(edge) }
+        for edge in subject.edgesAsChildArray where edge.parent === selfNode { context.delete(edge) }
+        for edge in subject.partnershipsAsAArray where edge.b === selfNode { context.delete(edge) }
+        for edge in subject.partnershipsAsBArray where edge.a === selfNode { context.delete(edge) }
+    }
+
     private static func syncSelfEdge(subject: Person, selfNode: Person, context: ModelContext) {
         let label = subject.relationshipToUser.trimmed
         // Only preset labels chart (custom "Other…" text never does), and
@@ -184,11 +207,20 @@ enum FamilyEdgeSync {
         // cleared: absence of a label is not evidence the link is wrong.
         guard FamilyRelation.isChartable(label) else { return }
         let l = label.lowercased()
-        let desired: DirectLink
+        let desired: DirectLink?
         if FamilyEdgeBuilder.isPartnerTerm(l) { desired = .partner }
         else if FamilyEdgeBuilder.isDirectParentTerm(l) { desired = .parent }
         else if FamilyEdgeBuilder.isDirectChildTerm(l) { desired = .child }
-        else { return }
+        else { desired = nil }
+        guard let desired else {
+            // Chartable but indirect (Aunt, Grandmother, Cousin…): no edge
+            // can be drawn, but the label still asserts this person is NOT
+            // a direct parent/child/partner — a mislabeled "Mother"
+            // corrected to "Aunt" must stop charting as one. (Only a
+            // cleared or custom label leaves hand-built edges alone.)
+            removeDirectSelfEdges(subject: subject, selfNode: selfNode, context: context)
+            return
+        }
 
         // Drop self↔subject edges the new label contradicts…
         if desired != .parent {

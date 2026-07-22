@@ -1001,6 +1001,10 @@ struct MyFamilyTreeView: View {
 
     private func apply(label: String, to person: Person) {
         person.relationshipToUser = label
+        // Keep the edge graph in step — without this, the drag would move
+        // them on the classic chart while the (default) pedigree kept
+        // drawing the old relationship indefinitely.
+        FamilyEdgeSync.apply(around: person, context: context)
         try? context.save()
         pendingMove = nil
     }
@@ -1046,11 +1050,16 @@ struct PersonFamilySection: View {
             $0.persistentModelID != person.persistentModelID &&
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
+        // Hidden graph nodes (the "You" self node, name-only ghosts) lend
+        // their photo to the chart but never a navigation link — a tappable
+        // self node would expose Delete Person, which cascades away every
+        // family-tree edge. Mirrors PedigreeTreeView.pedigreeNode.
+        let linkable = (match?.isSelf == true || match?.isGhost == true) ? nil : match
         return TreeNode(
             name: name,
             relation: relation,
             photoData: match?.profilePhotoData,
-            linkedPerson: match,
+            linkedPerson: linkable,
             isDeceased: match?.isDeceased ?? false,
             isFocus: false,
             generation: FamilyRelation.generation(of: relation)

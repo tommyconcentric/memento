@@ -31,7 +31,9 @@ enum NotificationManager {
         }
 
         var events: [PendingEvent] = []
-        for person in people where !person.isDeceased {
+        // Skip hidden graph nodes — the self node would otherwise notify
+        // "It's <your name>'s birthday — send them a message!" at yourself.
+        for person in people where !person.isDeceased && !person.isSelf && !person.isGhost {
             if let birthday = person.birthday, person.birthdayReminderEnabled {
                 events.append(PendingEvent(
                     title: "🎂 \(person.name)'s birthday",

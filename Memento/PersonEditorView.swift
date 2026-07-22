@@ -687,9 +687,15 @@ struct PersonEditorView: View {
             if let existing = other.familyMembersArray.first(where: {
                 $0.name.compare(target.name, options: .caseInsensitive) == .orderedSame
             }) {
-                // Keep the reciprocal relation in sync if it was already
-                // linked but the relation type changed since.
-                existing.relation = inverse
+                // Only rewrite the reciprocal when it genuinely contradicts
+                // the new relation (lands in a different generation). The
+                // computed inverse is generic ("Parent"); assigning it
+                // unconditionally on every save would coarsen a specific
+                // label the user set by hand on the other profile
+                // ("Stepmother") without ever touching it.
+                if FamilyRelation.generation(of: existing.relation) != FamilyRelation.generation(of: inverse) {
+                    existing.relation = inverse
+                }
             } else {
                 other.familyMembersArray.append(FamilyMember(name: target.name, relation: inverse))
             }
