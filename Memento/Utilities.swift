@@ -144,10 +144,14 @@ struct AvatarView: View {
     }
 
     /// Stable color derived from the name, so each person keeps their color.
+    /// The palette deliberately contains no blues or slate grays: selection
+    /// paints rows in aegean (personal) or graphite (business), and an
+    /// aegean initials circle on a selected row vanished into its own
+    /// background.
     private var fallbackColor: Color {
         let palette: [Color] = [
-            Theme.aegean, Theme.sky, Theme.bougainvillea,
-            Theme.olive, Theme.terracotta, Theme.gold
+            Theme.bougainvillea, Theme.olive, Theme.terracotta,
+            Theme.gold, Theme.bark
         ]
         let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return palette[sum % palette.count]
