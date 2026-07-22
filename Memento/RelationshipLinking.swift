@@ -965,7 +965,7 @@ struct FamilyLinksEditor: View {
         }
         for member in other.familyMembersArray where
             member.name.compare(subject.name, options: .caseInsensitive) == .orderedSame
-            && matchesRole(member.relation, role: inverse(of: role)) {
+            && matchesRoleAsWholeLabel(member.relation, role: inverse(of: role)) {
             context.delete(member)
         }
 
@@ -975,8 +975,11 @@ struct FamilyLinksEditor: View {
         // rebuild the edge on the subject's very next editor save. The
         // label describes the subject from the user's side, so it maps
         // through the inverted role ("Mother" ↔ the self node being the
-        // subject's child).
-        if other.isSelf, matchesRole(subject.relationshipToUser, role: inverse(of: role)) {
+        // subject's child). Only chartable presets ever feed syncSelfEdge,
+        // so a custom label ("Childhood neighbour") is never cleared.
+        if other.isSelf,
+           FamilyRelation.isChartable(subject.relationshipToUser),
+           matchesRole(subject.relationshipToUser, role: inverse(of: role)) {
             subject.relationshipToUser = ""
         }
 
@@ -1019,6 +1022,18 @@ struct FamilyLinksEditor: View {
         case .child: return FamilyEdgeBuilder.isDirectChildTerm(l)
         case .partner: return FamilyEdgeBuilder.isPartnerTerm(l)
         }
+    }
+
+    /// True when the relation reads as this role *on its own* — everything
+    /// backfill and applyReciprocalLinks write ("Partner", "Stepmother").
+    /// The keyword matchers alone would also hit hand-written compounds
+    /// ("Mum's partner", "Father's brother") that describe a different
+    /// link; deleting those from a profile the user never opened would
+    /// destroy their own words, so counterpart cleanup leaves them be.
+    private func matchesRoleAsWholeLabel(_ relation: String, role: Role) -> Bool {
+        guard matchesRole(relation, role: role) else { return false }
+        let l = relation.trimmed.lowercased()
+        return !l.contains("'s") && !l.contains("\u{2019}s") && !l.contains(" of ")
     }
 }
 
