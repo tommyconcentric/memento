@@ -230,6 +230,11 @@ enum SelfNodeMaintenance {
 
 /// Hosts the main list and seeds the four starter folders on first launch.
 struct RootView: View {
+    // Mirrors MementoApp's activation-refresh throttle (see the comment
+    // there) for the family-graph dedupe pass.
+    private static var lastGraphDedupe = Date.distantPast
+    private static let graphDedupeInterval: TimeInterval = 15 * 60
+
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Query private var groups: [PersonGroup]
@@ -280,7 +285,14 @@ struct RootView: View {
                 if newPhase == .active {
                     mergeDuplicateBuiltInGroups()
                     ensureSelfNode()
-                    FamilyGraphMaintenance.dedupe(context)
+                    // Throttled like the app-level refreshers: on the Mac
+                    // every window focus is an activation, and a full-graph
+                    // dedupe per focus would be constant churn (and could
+                    // race an open links editor's unsaved draft ghosts).
+                    if Date.now.timeIntervalSince(Self.lastGraphDedupe) > Self.graphDedupeInterval {
+                        Self.lastGraphDedupe = .now
+                        FamilyGraphMaintenance.dedupe(context)
+                    }
                 }
             }
     }
