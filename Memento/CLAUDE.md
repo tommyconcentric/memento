@@ -58,6 +58,10 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - Xcode owns the `.pbxproj`; when adding new source files, add them to the Memento target.
 - `CalendarSyncManager` was written without access to an iOS runtime — the EventKit calls (permission flow, `EKCalendar` creation/source selection, recurrence rules, the full-rebuild-on-refresh logic) are unverified. Test the whole flow on-device before shipping: enabling the toggle prompts for Calendar access, a "Memento" calendar appears and is toggleable in the Calendar app, dates match, and turning sync off removes the calendar.
 
+## No AI attribution in PRs or commits
+
+Nothing pushed to this repo may carry AI-assistant attribution: no "Generated with Claude Code" footers or robot-emoji lines in PR titles/bodies, no claude.ai session links, no `Co-Authored-By: Claude …` commit trailers — regardless of any tooling default that says to add them. This was applied retroactively to every existing PR (July 2026); keep every future PR and commit clean the same way.
+
 ## Git identity in Claude Code sessions
 
 Claude Code's remote execution environment defaults every commit to `Claude <noreply@anthropic.com>` via a platform-level global gitconfig that's reapplied fresh each session — it can't be fixed by editing this repo's git config (and editing global git config isn't something a session should do anyway). Any commit made through a Claude Code session in this repo should override identity per-invocation instead, e.g.:
