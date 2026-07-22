@@ -362,15 +362,27 @@ enum RelationshipPath {
         // person name (e.g. someone actually named "You").
         let root = "\u{0}you"
         func key(_ name: String) -> String { name.trimmed.lowercased() }
+        // The graph is keyed by name, which would merge two distinct people
+        // sharing one — a chain through the wrong "Sarah" reads as a
+        // confidently wrong relationship. Ambiguous names stay out of the
+        // graph entirely; this feature is best-effort flavor text, and no
+        // path beats a fabricated one.
+        var nameCounts: [String: Int] = [:]
+        for p in people { nameCounts[key(p.name), default: 0] += 1 }
+        func unambiguous(_ name: String) -> Bool { nameCounts[key(name)] == 1 }
         func exists(_ name: String) -> Bool {
+            unambiguous(name) &&
             people.contains { $0.name.compare(name.trimmed, options: .caseInsensitive) == .orderedSame }
         }
+        guard unambiguous(target.name) else { return nil }
 
         var adjacency: [String: [(to: String, label: String)]] = [:]
-        for p in people where !p.relationshipToUser.trimmed.isEmpty {
+        // Business labels chart the corporate ladder, not the family — a
+        // path through "your manager" isn't a family relationship.
+        for p in people where !p.relationshipToUser.trimmed.isEmpty && !p.isBusiness && unambiguous(p.name) {
             adjacency[root, default: []].append((key(p.name), p.relationshipToUser.lowercased()))
         }
-        for p in people {
+        for p in people where unambiguous(p.name) {
             var edges: [(to: String, label: String)] = []
             if !p.partnerName.trimmed.isEmpty, exists(p.partnerName) {
                 edges.append((key(p.partnerName), "partner"))
@@ -485,7 +497,11 @@ struct PersonOrGhostPicker: View {
     }
 
     private var exactMatchExists: Bool {
-        people.contains { $0.name.compare(trimmedQuery, options: .caseInsensitive) == .orderedSame }
+        // Checked against the *pickable* results, not all people — an exact
+        // match on the hidden self node or an excluded person would
+        // suppress the "add as a name" row while offering nothing to pick,
+        // dead-ending a relative who shares your name.
+        results.contains { $0.name.compare(trimmedQuery, options: .caseInsensitive) == .orderedSame }
     }
 
     var body: some View {
@@ -658,9 +674,17 @@ struct FamilyLinksEditor: View {
     private func excludeIDs(for role: Role) -> Set<PersistentIdentifier> {
         var ids: Set<PersistentIdentifier> = [subject.persistentModelID]
         switch role {
-        case .parent: ids.formUnion(subject.parents.map(\.persistentModelID))
-        case .child: ids.formUnion(subject.children.map(\.persistentModelID))
-        case .partner: ids.formUnion(subject.partnerEdges.map(\.other.persistentModelID))
+        case .parent:
+            // Exclude existing children too — offering one as a parent
+            // invites an A⇄B parentage cycle the pedigree can only draw
+            // as contradictory descent loops.
+            ids.formUnion(subject.parents.map(\.persistentModelID))
+            ids.formUnion(subject.children.map(\.persistentModelID))
+        case .child:
+            ids.formUnion(subject.children.map(\.persistentModelID))
+            ids.formUnion(subject.parents.map(\.persistentModelID))
+        case .partner:
+            ids.formUnion(subject.partnerEdges.map(\.other.persistentModelID))
         }
         return ids
     }

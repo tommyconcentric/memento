@@ -23,7 +23,7 @@ struct QuickInfoView: View {
                     projectsCard
                 }
 
-                if person.birthday != nil || !person.importantDatesArray.isEmpty {
+                if (person.birthday != nil || !person.importantDatesArray.isEmpty) && !person.isDeceased {
                     Text("Toggle a date to turn its reminder on or off — every date still shows on the Memento calendar either way.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -99,13 +99,19 @@ struct QuickInfoView: View {
             )
         }
         if let birthday = person.birthday {
-            dateRow(
-                icon: "gift", label: "Birthday", value: birthdayText(birthday),
-                isOn: Binding(
-                    get: { person.birthdayReminderEnabled },
-                    set: { person.birthdayReminderEnabled = $0; saveDateChange() }
+            // Reminders never fire for in-memoriam people, so a live-looking
+            // toggle would promise one that can't happen — plain text there.
+            if person.isDeceased {
+                InfoRow(icon: "gift", label: "Birthday", value: birthdayText(birthday))
+            } else {
+                dateRow(
+                    icon: "gift", label: "Birthday", value: birthdayText(birthday),
+                    isOn: Binding(
+                        get: { person.birthdayReminderEnabled },
+                        set: { person.birthdayReminderEnabled = $0; saveDateChange() }
+                    )
                 )
-            )
+            }
         }
         if !person.partnerName.isEmpty {
             InfoRow(icon: "heart", label: "Partner", value: person.partnerName)
@@ -139,13 +145,17 @@ struct QuickInfoView: View {
         contactRows(.email, primary: person.email)
         contactRows(.address, primary: person.address)
         ForEach(person.importantDatesArray.sorted { $0.date < $1.date }) { item in
-            dateRow(
-                icon: "calendar.badge.clock", label: item.label, value: dateText(item.date),
-                isOn: Binding(
-                    get: { item.remindersEnabled },
-                    set: { item.remindersEnabled = $0; saveDateChange() }
+            if person.isDeceased {
+                InfoRow(icon: "calendar.badge.clock", label: item.label, value: dateText(item.date))
+            } else {
+                dateRow(
+                    icon: "calendar.badge.clock", label: item.label, value: dateText(item.date),
+                    isOn: Binding(
+                        get: { item.remindersEnabled },
+                        set: { item.remindersEnabled = $0; saveDateChange() }
+                    )
                 )
-            )
+            }
         }
     }
 

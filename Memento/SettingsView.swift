@@ -178,7 +178,12 @@ struct SettingsView: View {
             .alert("Couldn't Save PIN", isPresented: $pinSaveFailed) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Your PIN wasn't saved. App Lock has been left off — please try again.")
+                // A failed change-PIN can leave the previous PIN in place
+                // (delete failed too) — "left off" would then be a lie
+                // about which key opens the app.
+                Text(AppLock.storedPIN == nil
+                    ? "Your PIN wasn't saved. App Lock has been left off — please try again."
+                    : "Your new PIN wasn't saved — your previous PIN is still in effect.")
             }
             .onChange(of: remindersEnabled) { _, isOn in
                 Task { @MainActor in

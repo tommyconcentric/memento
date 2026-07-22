@@ -394,7 +394,10 @@ struct ImportContactsView: View {
                 // displays hide it (see Date.placeholderYear). It's a leap
                 // year, so a Feb 29 birthday still constructs a valid date
                 // instead of silently failing.
-                candidate.birthday = Calendar.current.date(
+                // Built with the Gregorian calendar explicitly — CNContact
+                // components are Gregorian, and the placeholder year only
+                // means 1904 there.
+                candidate.birthday = Date.gregorian.date(
                     from: DateComponents(year: comps.year ?? Date.placeholderYear, month: month, day: day)
                 )
             }
@@ -552,6 +555,12 @@ struct ImportContactsView: View {
                     } else {
                         insideQuotes = false
                     }
+                } else if character == "\r" {
+                    // Normalize CRLF/CR inside a quoted field to "\n" so
+                    // stored values don't carry stray carriage returns.
+                    if !(i + 1 < characters.count && characters[i + 1] == "\n") {
+                        current.append("\n")
+                    }
                 } else {
                     current.append(character)
                 }
@@ -560,7 +569,10 @@ struct ImportContactsView: View {
             } else if character == "," {
                 endField()
             } else if character == "\r" {
-                // No-op; a following "\n" (if present) ends the row.
+                // Bare-CR files (classic exports) end rows on "\r"; in CRLF
+                // files the following "\n" then ends an empty row, which
+                // endRow() already skips.
+                endRow()
             } else if character == "\n" {
                 endRow()
             } else {

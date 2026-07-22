@@ -233,7 +233,14 @@ struct RootView: View {
     }
 
     private func seedDefaultGroupsIfNeeded() {
-        guard !didSeedDefaultGroups, groups.isEmpty else { return }
+        guard !didSeedDefaultGroups else { return }
+        guard groups.isEmpty else {
+            // Folders already exist (synced down from another device) —
+            // latch the flag so this device never "helpfully" re-seeds the
+            // built-ins after the user deliberately deletes every folder.
+            didSeedDefaultGroups = true
+            return
+        }
         let names = ["Close Friends", "Friends", "Work Colleagues", "Family"]
         for (index, name) in names.enumerated() {
             context.insert(PersonGroup(name: name, sortOrder: index, isBuiltIn: true))
