@@ -58,15 +58,23 @@ struct CalendarView: View {
                 shiftMonth(-1)
             } label: {
                 Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
             Spacer()
+            // Display text wears the brand serif, like person names and
+            // tab labels do.
             Text(displayedMonth.formatted(.dateTime.month(.wide).year()))
-                .font(.headline)
+                .font(.system(.title3, design: .serif).weight(.semibold))
             Spacer()
             Button {
                 shiftMonth(1)
             } label: {
                 Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
         }
         .padding(.horizontal, 4)
@@ -92,10 +100,10 @@ struct CalendarView: View {
         let symbols = calendar.veryShortWeekdaySymbols
         let start = calendar.firstWeekday - 1
         let ordered = Array(symbols[start...] + symbols[..<start])
-        return HStack {
+        return HStack(spacing: 8) {
             ForEach(Array(ordered.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
             }
@@ -113,12 +121,12 @@ struct CalendarView: View {
     }
 
     private func dayGrid(_ events: [Int: [DayEvent]]) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
             ForEach(Array(monthDays.enumerated()), id: \.offset) { _, day in
                 if let day {
                     dayCell(day, events[day] ?? [])
                 } else {
-                    Color.clear.frame(height: 54)
+                    Color.clear.frame(height: 66)
                 }
             }
         }
@@ -129,33 +137,33 @@ struct CalendarView: View {
         return Button {
             selectedDay = day
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 Text("\(day)")
-                    .font(.footnote.weight(isSelected ? .bold : .regular))
+                    .font(.callout.weight(isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? .white : .primary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 34, height: 34)
                     .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                HStack(spacing: -6) {
+                HStack(spacing: -7) {
                     ForEach(events.prefix(2)) { event in
                         AvatarView(
                             data: event.person.profilePhotoData,
                             name: event.person.name,
-                            size: 18,
+                            size: 20,
                             desaturated: event.person.isDeceased,
                             business: event.person.isBusiness
                         )
                     }
                 }
-                .frame(height: 18)
+                .frame(height: 20)
                 if events.count > 2 {
                     Text("+\(events.count - 2)")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
                 } else {
-                    Color.clear.frame(height: 10)
+                    Color.clear.frame(height: 11)
                 }
             }
-            .frame(height: 54)
+            .frame(height: 66)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
