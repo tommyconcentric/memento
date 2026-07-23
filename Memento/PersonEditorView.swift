@@ -724,6 +724,7 @@ struct PersonEditorView: View {
             let newPerson = Person(name: name.trimmed)
             context.insert(newPerson)
             target = newPerson
+            UsageAnalytics.recordContactsCreated(1)
         }
 
         target.name = name.trimmed

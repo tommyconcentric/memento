@@ -103,6 +103,13 @@ struct MementoApp: App {
                         NotificationManager.refreshFromContext(container.mainContext)
                         CalendarSyncManager.refreshFromContext(container.mainContext)
                     }
+                    // Anonymous session counting — its own 30-minute gap
+                    // logic keeps Mac focus churn from inflating anything.
+                    if newPhase == .active {
+                        UsageAnalytics.appBecameActive()
+                    } else {
+                        UsageAnalytics.appLeftForeground()
+                    }
                 }
         }
         .modelContainer(container)

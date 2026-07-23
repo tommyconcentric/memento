@@ -1,12 +1,16 @@
 # Memento Privacy Policy
 
-_Last updated: July 17, 2026_
+_Last updated: July 23, 2026_
 
 Memento is a personal-CRM app for remembering the people in your life. It is built so that **your data belongs to you and never reaches us**.
 
 ## What we collect
 
-Nothing. Memento has no accounts, no analytics, no advertising, no third-party SDKs, and no servers of our own. We cannot see, access, or recover anything you put in the app.
+**Nothing you create.** Memento has no accounts, no advertising, no third-party SDKs, and no servers of our own. We cannot see, access, or recover anything you put in the app — not a name, note, photo, date, or relationship.
+
+The only thing Memento reports is **anonymous usage statistics**: once a day it can send a random install identifier (a coin-flip ID created on first launch, tied to nothing about you), the number of times the app was opened that day, the number of contacts created that day, the app version, and the device type (iPhone/iPad/Mac). That's the entire list. These counters exist so the developer can answer "how many people use Memento?" — they can't identify you, and they are never used for tracking or advertising.
+
+You can turn this off any time in **Settings → Anonymous Usage Statistics**; switching it off also deletes the counts your device already sent. The counters are stored in the app's public CloudKit database (Apple infrastructure — no third parties).
 
 ## Where your data lives
 
@@ -29,7 +33,7 @@ Delete a person or note in the app and it's deleted from your devices and your p
 
 ## Children
 
-Memento is not directed at children and collects no data from anyone.
+Memento is not directed at children and collects no personal data from anyone; the anonymous usage counters above contain nothing that could identify any person.
 
 ## Changes
 
