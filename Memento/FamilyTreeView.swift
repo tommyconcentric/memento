@@ -564,12 +564,6 @@ struct PedigreeTreeView: View {
     }
 }
 
-private extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
-    }
-}
-
 // MARK: - Tree rendering
 
 /// Generation rows joined by a spine — designed to live inside a ScrollView.

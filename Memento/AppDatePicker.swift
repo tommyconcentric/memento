@@ -17,6 +17,9 @@ struct AppDatePicker: View {
     // editor's year-less birthday row needs to know when the calendar
     // closes so it can take the header's place back.
     private var externalExpanded: Binding<Bool>?
+    // The day grid's measured width, so its numbers and gutters size to the
+    // space they actually get (see MonthGridMetrics).
+    @State private var gridWidth: CGFloat = 0
 
     init(title: String, date: Binding<Date>, business: Bool = false,
          initiallyExpanded: Bool = false, expanded: Binding<Bool>? = nil) {
@@ -129,6 +132,10 @@ struct AppDatePicker: View {
         }
         .padding(12)
         .background(plateTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        // Grow with the form up to a tidy width, then centre — on a wide
+        // Mac editor the plate would otherwise splay the numbers apart.
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity)
     }
 
     private var yearOptions: [Int] {
@@ -170,7 +177,9 @@ struct AppDatePicker: View {
         let symbols = calendar.veryShortWeekdaySymbols
         let start = calendar.firstWeekday - 1
         let ordered = Array(symbols[start...] + symbols[..<start])
-        return HStack(spacing: 6) {
+        // Same gutter as the grid below so the initials sit over their days.
+        let spacing = MonthGridMetrics(availableWidth: gridWidth).spacing
+        return HStack(spacing: spacing) {
             ForEach(Array(ordered.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
                     .font(.caption.weight(.semibold))
@@ -183,7 +192,16 @@ struct AppDatePicker: View {
     private var dayGrid: some View {
         let today = calendar.dateComponents([.year, .month, .day], from: .now)
         let isThisMonth = today.year == year && today.month == month
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
+        let metrics = MonthGridMetrics(availableWidth: gridWidth)
+        // Half the cell width, clamped legible→large; the row runs a touch
+        // shorter than it is wide, and the chip corner scales with it.
+        let fontSize = metrics.fontSize(fraction: 0.5, in: 17...30)
+        let rowHeight = (metrics.cellWidth * 0.92).clamped(to: 36...56)
+        let corner = (metrics.cellWidth * 0.26).clamped(to: 9...16)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: metrics.spacing), count: 7),
+            spacing: metrics.spacing
+        ) {
             ForEach(Array(gridDays.enumerated()), id: \.offset) { _, gridDay in
                 if let gridDay {
                     let isSelected = gridDay == day
@@ -191,17 +209,17 @@ struct AppDatePicker: View {
                         set(day: gridDay)
                     } label: {
                         Text("\(gridDay)")
-                            .font(.callout.weight(isSelected ? .bold : .regular))
+                            .font(.system(size: fontSize, weight: isSelected ? .bold : .regular))
                             .foregroundStyle(isSelected ? .white : .primary)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 38)
+                            .frame(height: rowHeight)
                             .background(
                                 isSelected ? accent : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: corner, style: .continuous)
                             )
                             .overlay {
                                 if isThisMonth && gridDay == today.day && !isSelected {
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    RoundedRectangle(cornerRadius: corner, style: .continuous)
                                         .strokeBorder(accent.opacity(0.45), lineWidth: 1)
                                 }
                             }
@@ -209,10 +227,12 @@ struct AppDatePicker: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Color.clear.frame(height: 38)
+                    Color.clear.frame(height: rowHeight)
                 }
             }
         }
+        .measuringWidth()
+        .onPreferenceChange(WidthPreferenceKey.self) { gridWidth = $0 }
     }
 
     private var gridDays: [Int?] {
