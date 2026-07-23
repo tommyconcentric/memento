@@ -191,7 +191,6 @@ struct AppLockView: View {
     let onUnlock: () -> Void
 
     @AppStorage(AppLock.useBiometricsKey) private var useBiometrics = false
-    @Environment(\.scenePhase) private var scenePhase
     @State private var entered = ""
     @State private var shakeTick: CGFloat = 0
     @State private var biometricAttempted = false
@@ -245,28 +244,40 @@ struct AppLockView: View {
         // when the user actually comes back — so the advertised auto-unlock
         // effectively never happened on reopen. Attempt only while active,
         // and re-arm on every departure so each return gets one prompt.
+        //
+        // Those signals must come from UIApplication's lifecycle
+        // notifications, not \.scenePhase: this view lives in
+        // LockScreenPresenter's own UIWindow, outside the App's scene
+        // graph, and a UIHostingController there never receives scenePhase
+        // updates — the environment value stays frozen at its initial
+        // (background) reading, so a scenePhase-driven attempt never fires
+        // and its onChange never re-arms.
         .onAppear {
             autoAttemptBiometricsIfReady()
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                autoAttemptBiometricsIfReady()
-            } else if phase == .background {
-                // Re-arm only on a genuine departure. The Face ID/Touch ID
-                // system dialog itself dips this scene to .inactive and back
-                // to .active — re-arming on that dip meant every Cancel
-                // re-presented the prompt instantly, an endless loop standing
-                // between the user and the PIN pad. Real backgrounding always
-                // passes through .background, so each true return still gets
-                // its one auto-prompt (the button covers everything else).
-                biometricAttempted = false
-            }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.didBecomeActiveNotification)) { _ in
+            autoAttemptBiometricsIfReady()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // Re-arm only on a genuine departure. The Face ID/Touch ID
+            // system dialog itself dips the app to inactive and back to
+            // active — re-arming on that dip meant every Cancel
+            // re-presented the prompt instantly, an endless loop standing
+            // between the user and the PIN pad. Real backgrounding always
+            // reaches didEnterBackground, so each true return still gets
+            // its one auto-prompt (the button covers everything else).
+            biometricAttempted = false
         }
     }
 
     private func autoAttemptBiometricsIfReady() {
+        // On a cold locked launch onAppear can run before the app is
+        // active; the skipped attempt doesn't latch, and the
+        // didBecomeActive notification moments later retries it.
         guard autoAttemptsBiometrics, useBiometrics, !biometricAttempted,
-              scenePhase == .active else { return }
+              UIApplication.shared.applicationState == .active else { return }
         biometricAttempted = true
         attemptBiometricUnlock()
     }
