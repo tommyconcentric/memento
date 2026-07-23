@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import LocalAuthentication
+import Combine
 
 /// App-lock settings and state. The PIN is the source of truth — Face ID/Touch
 /// ID (when turned on) is a faster path to the same unlock, never a
@@ -9,6 +10,12 @@ enum AppLock {
     static let enabledKey = "appLockEnabled"
     static let useBiometricsKey = "appLockUseBiometrics"
     private static let pinKeychainKey = "MementoAppLockPIN"
+    // Brute-force throttle state. Persisted in UserDefaults so relaunching
+    // the app can't reset it — a 4-digit PIN is only 10,000 combinations,
+    // and without a cost per attempt the lock is trivially defeated by
+    // someone with the (unlocked) device in hand.
+    private static let failCountKey = "appLockFailCount"
+    private static let lockUntilKey = "appLockLockedUntil"
 
     static var storedPIN: String? {
         KeychainHelper.read(pinKeychainKey)
@@ -19,11 +26,63 @@ enum AppLock {
     @discardableResult
     static func savePIN(_ pin: String) -> Bool {
         KeychainHelper.save(pin, for: pinKeychainKey)
+        // A freshly set PIN starts with a clean throttle history.
+        clearThrottle()
         return storedPIN == pin
     }
 
     static func clearPIN() {
         KeychainHelper.delete(pinKeychainKey)
+        clearThrottle()
+    }
+
+    // MARK: Brute-force throttle
+
+    /// Seconds the user must wait before the next PIN attempt is accepted
+    /// (0 when not throttled).
+    static var lockoutSecondsRemaining: Int {
+        let until = UserDefaults.standard.double(forKey: lockUntilKey)
+        guard until > 0 else { return 0 }
+        return max(0, Int(until.rounded() - Date.now.timeIntervalSince1970))
+    }
+
+    /// Records a wrong PIN and, past a small grace count, imposes an
+    /// escalating cooldown before further attempts are accepted. The delay
+    /// grows the longer the guessing continues, so exhausting the keyspace
+    /// takes far longer than a human would, while a legitimate fumble (a
+    /// try or two) is never delayed.
+    static func registerFailedAttempt() {
+        let defaults = UserDefaults.standard
+        let count = defaults.integer(forKey: failCountKey) + 1
+        defaults.set(count, forKey: failCountKey)
+        let delay: TimeInterval
+        switch count {
+        case ..<5: delay = 0
+        case 5..<10: delay = 30
+        case 10..<15: delay = 5 * 60
+        default: delay = 60 * 60
+        }
+        if delay > 0 {
+            defaults.set(Date.now.timeIntervalSince1970 + delay, forKey: lockUntilKey)
+        }
+    }
+
+    static func registerSuccessfulAttempt() {
+        clearThrottle()
+    }
+
+    private static func clearThrottle() {
+        UserDefaults.standard.removeObject(forKey: failCountKey)
+        UserDefaults.standard.removeObject(forKey: lockUntilKey)
+    }
+
+    /// User-facing wait message for the current cooldown.
+    static func lockoutMessage(_ seconds: Int) -> String {
+        if seconds >= 60 {
+            let minutes = Int((Double(seconds) / 60).rounded(.up))
+            return "Too many attempts. Try again in \(minutes) minute\(minutes == 1 ? "" : "s")."
+        }
+        return "Too many attempts. Try again in \(seconds)s."
     }
 
     static var biometryType: LABiometryType {
@@ -195,6 +254,9 @@ struct AppLockView: View {
     @State private var shakeTick: CGFloat = 0
     @State private var biometricAttempted = false
     @State private var biometricNote: String?
+    // Ticks down a live "try again in …" message while the brute-force
+    // throttle is in effect (see AppLock.registerFailedAttempt).
+    @State private var lockoutRemaining = 0
 
     var body: some View {
         VStack(spacing: 32) {
@@ -217,6 +279,14 @@ struct AppLockView: View {
                     if !entered.isEmpty { entered.removeLast() }
                 }
             )
+
+            if lockoutRemaining > 0 {
+                Text(AppLock.lockoutMessage(lockoutRemaining))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.terracotta)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
 
             if useBiometrics && AppLock.biometryType != .none {
                 Button {
@@ -254,10 +324,20 @@ struct AppLockView: View {
         // and its onChange never re-arms.
         .onAppear {
             autoAttemptBiometricsIfReady()
+            lockoutRemaining = AppLock.lockoutSecondsRemaining
+        }
+        // Counts the cooldown down live and clears the message when it
+        // lapses; a no-op (stays 0) whenever the throttle isn't engaged.
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            let remaining = AppLock.lockoutSecondsRemaining
+            if remaining != lockoutRemaining {
+                withAnimation(.easeInOut(duration: 0.2)) { lockoutRemaining = remaining }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UIApplication.didBecomeActiveNotification)) { _ in
             autoAttemptBiometricsIfReady()
+            lockoutRemaining = AppLock.lockoutSecondsRemaining
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UIApplication.didEnterBackgroundNotification)) { _ in
@@ -283,11 +363,23 @@ struct AppLockView: View {
     }
 
     private func checkPIN() {
-        if entered == AppLock.storedPIN {
-            onUnlock()
-        } else {
+        // Refuse to even compare while a cooldown is active, so the throttle
+        // can't be spun through by hammering the pad.
+        guard AppLock.lockoutSecondsRemaining == 0 else {
             withAnimation(.default) { shakeTick += 1 }
             entered = ""
+            lockoutRemaining = AppLock.lockoutSecondsRemaining
+            return
+        }
+        if entered == AppLock.storedPIN {
+            AppLock.registerSuccessfulAttempt()
+            lockoutRemaining = 0
+            onUnlock()
+        } else {
+            AppLock.registerFailedAttempt()
+            withAnimation(.default) { shakeTick += 1 }
+            entered = ""
+            lockoutRemaining = AppLock.lockoutSecondsRemaining
         }
     }
 

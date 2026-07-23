@@ -445,11 +445,23 @@ struct ImportContactsView: View {
 
     // MARK: - Files (Facebook export / CSV)
 
+    /// A generous ceiling for a contacts export — thousands of contacts are
+    /// still only a few MB. Beyond this we refuse rather than slurp an
+    /// arbitrarily large "Open in Memento" file whole into memory on the
+    /// main thread (parseCSVRows then copies it into a `[Character]`), which
+    /// a malicious or mistaken file could turn into an out-of-memory crash.
+    private static let maxImportBytes = 10 * 1024 * 1024
+
     private func handleFile(_ result: Result<URL, Error>) {
         do {
             let url = try result.get()
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               size > Self.maxImportBytes {
+                errorMessage = "That file is too large to import (over 10 MB). Export just your contacts and try again."
+                return
+            }
             let data = try Data(contentsOf: url)
             if url.pathExtension.lowercased() == "json" {
                 parseFacebookJSON(data)
