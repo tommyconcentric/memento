@@ -53,39 +53,6 @@ struct PhotoCropperView: View {
                     .stroke(.white.opacity(0.9), lineWidth: 2)
                     .frame(width: side, height: side)
                     .allowsHitTesting(false)
-
-                VStack {
-                    HStack {
-                        Button("Cancel") { dismiss() }
-                        Spacer()
-                        Text("Drag to position \u{00B7} double-tap resets")
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.75))
-                        Spacer()
-                        Button("Choose") {
-                            crop(side: side, base: base)
-                            dismiss()
-                        }
-                        .fontWeight(.bold)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.top, 14)
-                    Spacer()
-                    // A click-reachable zoom control: pinch works on touch
-                    // screens and trackpads, but a mouse on the Mac has no
-                    // pinch input at all — without this slider, Mac users
-                    // could never zoom past the minimum fit.
-                    HStack(spacing: 12) {
-                        Image(systemName: "minus.magnifyingglass")
-                        Slider(value: zoomBinding(base: base, side: side), in: 1...5)
-                        Image(systemName: "plus.magnifyingglass")
-                    }
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 18)
-                    .frame(maxWidth: 420)
-                }
             }
             // The zoomed image's rigid frame would otherwise inflate the
             // ZStack past the screen (a ZStack reports the union of its
@@ -108,8 +75,56 @@ struct PhotoCropperView: View {
                     steadyOffset = .zero
                 }
             }
+            // The toolbar overlays the clipped, screen-sized container
+            // rather than joining the ZStack: as a stack child it was
+            // proposed the union bounds (dominated by the zoomed image), so
+            // its expanding bars stretched to the union's edges and the
+            // clip cut them off-screen — with a wide landscape photo,
+            // Cancel/Choose sat past the screen edge even at zoom 1, and at
+            // high zoom the whole toolbar (slider included) vanished. The
+            // overlay is proposed the visible bounds, so the controls stay
+            // reachable at any zoom; its empty regions don't hit-test, so
+            // drag, pinch and double-tap still reach the image beneath.
+            .overlay {
+                toolbar(base: base, side: side)
+            }
         }
         .background(Color.black)
+    }
+
+    /// Cancel/Choose, the hint, and the click-reachable zoom slider (pinch
+    /// works on touch screens and trackpads, but a mouse on the Mac has no
+    /// pinch input at all — without the slider, Mac users could never zoom
+    /// past the minimum fit).
+    private func toolbar(base: CGSize, side: CGFloat) -> some View {
+        VStack {
+            HStack {
+                Button("Cancel") { dismiss() }
+                Spacer()
+                Text("Drag to position \u{00B7} double-tap resets")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.75))
+                Spacer()
+                Button("Choose") {
+                    crop(side: side, base: base)
+                    dismiss()
+                }
+                .fontWeight(.bold)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            Spacer()
+            HStack(spacing: 12) {
+                Image(systemName: "minus.magnifyingglass")
+                Slider(value: zoomBinding(base: base, side: side), in: 1...5)
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 18)
+            .frame(maxWidth: 420)
+        }
     }
 
     // MARK: - Geometry
