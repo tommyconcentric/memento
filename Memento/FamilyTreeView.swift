@@ -966,11 +966,16 @@ struct MyFamilyTreeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // Build the pedigree once per render (and not at all in Business
+        // mode, where the ladder is shown instead) — it was computed twice,
+        // here and again in the toolbar's `.disabled`, each a full graph
+        // BFS + layout pass.
+        let layout = isLadder ? nil : pedigreeLayout
+        return NavigationStack {
             Group {
                 if isLadder {
                     ladderBody
-                } else if let layout = pedigreeLayout, layout.nodes.count > 1 {
+                } else if let layout, layout.nodes.count > 1 {
                     PedigreeTreeView(layout: layout, accent: workspace.accent)
                 } else {
                     newTreeEmptyState
@@ -995,7 +1000,7 @@ struct MyFamilyTreeView: View {
                         Image(systemName: "square.and.arrow.up")
                     }
                     .accessibilityLabel(isLadder ? "Share ladder as picture" : "Share tree as picture")
-                    .disabled(isLadder ? labeled.isEmpty : (pedigreeLayout?.nodes.count ?? 0) <= 1)
+                    .disabled(isLadder ? labeled.isEmpty : (layout?.nodes.count ?? 0) <= 1)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

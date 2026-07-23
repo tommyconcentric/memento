@@ -107,10 +107,25 @@ struct PeopleListView: View {
     // MARK: - Sidebar (people list)
 
     private var sidebar: some View {
-        List(selection: $selectedPerson) {
+        // Bucket the filtered people in a single pass, rather than
+        // re-filtering the whole list once for Pinned, again for every
+        // folder, and once more for Ungrouped — that was O(folders ×
+        // people) of filtering on every sidebar render. `filteredPeople`
+        // is name-sorted, and appending preserves that order per bucket.
+        let visible = filteredPeople
+        let pinned = visible.filter(\.isPinned)
+        var membersByGroup: [PersistentIdentifier: [Person]] = [:]
+        var ungrouped: [Person] = []
+        for person in visible where !person.isPinned {
+            if let groupID = person.group?.persistentModelID {
+                membersByGroup[groupID, default: []].append(person)
+            } else {
+                ungrouped.append(person)
+            }
+        }
+        return List(selection: $selectedPerson) {
             // Pinned people ride at the very top, across every folder, until
             // unpinned — handy for someone you're about to see.
-            let pinned = filteredPeople.filter { $0.isPinned }
             if !pinned.isEmpty {
                 Section {
                     ForEach(pinned) { person in
@@ -122,9 +137,7 @@ struct PeopleListView: View {
             }
 
             ForEach(groups) { group in
-                let members = filteredPeople.filter {
-                    !$0.isPinned && $0.group?.persistentModelID == group.persistentModelID
-                }
+                let members = membersByGroup[group.persistentModelID] ?? []
                 if !members.isEmpty {
                     Section {
                         ForEach(members) { person in
@@ -136,7 +149,6 @@ struct PeopleListView: View {
                 }
             }
 
-            let ungrouped = filteredPeople.filter { !$0.isPinned && $0.group == nil }
             if !ungrouped.isEmpty {
                 Section("Ungrouped") {
                     ForEach(ungrouped) { person in
