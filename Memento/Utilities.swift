@@ -304,6 +304,21 @@ struct AvatarView: View {
         .clipShape(Circle())
     }
 
+    // Hoisted out of `fallbackColor` so an initials avatar doesn't rebuild
+    // these arrays on every render — they're rendered in every list row,
+    // calendar cell and tree node.
+    private static let businessPalette: [Color] = [
+        Color(red: 0.18, green: 0.47, blue: 0.44),   // boardroom teal
+        Color(red: 0.55, green: 0.27, blue: 0.30),   // oxblood
+        Color(red: 0.58, green: 0.45, blue: 0.20),   // bronze
+        Color(red: 0.44, green: 0.34, blue: 0.52),   // plum
+        Color(red: 0.38, green: 0.44, blue: 0.31)    // moss
+    ]
+    private static let personalPalette: [Color] = [
+        Theme.bougainvillea, Theme.olive, Theme.terracotta,
+        Theme.gold, Theme.bark
+    ]
+
     /// Stable color derived from the name, so each person keeps their color.
     /// Personal circles use the warm holiday tones; business circles a set
     /// of muted boardroom tones. Neither palette contains blues or slate
@@ -311,18 +326,7 @@ struct AvatarView: View {
     /// (business), and an initials circle in a near-hue vanished into the
     /// selected row's own background.
     private var fallbackColor: Color {
-        let palette: [Color] = business
-            ? [
-                Color(red: 0.18, green: 0.47, blue: 0.44),   // boardroom teal
-                Color(red: 0.55, green: 0.27, blue: 0.30),   // oxblood
-                Color(red: 0.58, green: 0.45, blue: 0.20),   // bronze
-                Color(red: 0.44, green: 0.34, blue: 0.52),   // plum
-                Color(red: 0.38, green: 0.44, blue: 0.31)    // moss
-            ]
-            : [
-                Theme.bougainvillea, Theme.olive, Theme.terracotta,
-                Theme.gold, Theme.bark
-            ]
+        let palette = business ? Self.businessPalette : Self.personalPalette
         let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return palette[sum % palette.count]
     }
