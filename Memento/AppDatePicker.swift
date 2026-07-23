@@ -98,7 +98,7 @@ struct AppDatePicker: View {
     // MARK: - Calendar
 
     private var calendarBody: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack(spacing: 6) {
                 stepper(icon: "chevron.left") { shift(.month, by: -1) }
                 Menu {
@@ -127,7 +127,7 @@ struct AppDatePicker: View {
             weekdayHeader
             dayGrid
         }
-        .padding(10)
+        .padding(12)
         .background(plateTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
@@ -170,10 +170,10 @@ struct AppDatePicker: View {
         let symbols = calendar.veryShortWeekdaySymbols
         let start = calendar.firstWeekday - 1
         let ordered = Array(symbols[start...] + symbols[..<start])
-        return HStack {
+        return HStack(spacing: 6) {
             ForEach(Array(ordered.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
             }
@@ -183,7 +183,7 @@ struct AppDatePicker: View {
     private var dayGrid: some View {
         let today = calendar.dateComponents([.year, .month, .day], from: .now)
         let isThisMonth = today.year == year && today.month == month
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
             ForEach(Array(gridDays.enumerated()), id: \.offset) { _, gridDay in
                 if let gridDay {
                     let isSelected = gridDay == day
@@ -191,17 +191,17 @@ struct AppDatePicker: View {
                         set(day: gridDay)
                     } label: {
                         Text("\(gridDay)")
-                            .font(.footnote.weight(isSelected ? .bold : .regular))
+                            .font(.callout.weight(isSelected ? .bold : .regular))
                             .foregroundStyle(isSelected ? .white : .primary)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 32)
+                            .frame(height: 38)
                             .background(
                                 isSelected ? accent : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                             )
                             .overlay {
                                 if isThisMonth && gridDay == today.day && !isSelected {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
                                         .strokeBorder(accent.opacity(0.45), lineWidth: 1)
                                 }
                             }
@@ -209,7 +209,7 @@ struct AppDatePicker: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Color.clear.frame(height: 32)
+                    Color.clear.frame(height: 38)
                 }
             }
         }
