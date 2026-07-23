@@ -1,6 +1,68 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Numeric helpers
+
+extension Comparable {
+    /// Keep a value inside an inclusive range.
+    func clamped(to limits: ClosedRange<Self>) -> Self {
+        min(max(self, limits.lowerBound), limits.upperBound)
+    }
+}
+
+// MARK: - Month-grid geometry
+
+/// Reports the measured width of a view up the hierarchy, so a month grid
+/// can size itself to whatever space it actually gets.
+struct WidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+extension View {
+    /// Publishes this view's width via `WidthPreferenceKey`; pair with
+    /// `.onPreferenceChange(WidthPreferenceKey.self)`. Reads outside the
+    /// layout pass, so it updates cleanly on device rotation and Mac
+    /// window resizing without "modifying state during update" warnings.
+    func measuringWidth() -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: WidthPreferenceKey.self, value: proxy.size.width)
+            }
+        )
+    }
+}
+
+/// Shared geometry for the seven-column month grids — the editor's inline
+/// date picker (`AppDatePicker`) and the Important Dates calendar
+/// (`CalendarView`). Deriving cell size and gutter from the *actual*
+/// available width, rather than fixed points, keeps the day numbers a
+/// legible size and the columns tight at every width: a narrow iPhone
+/// sheet, an iPad form, or a Mac window mid-resize.
+struct MonthGridMetrics {
+    let cellWidth: CGFloat
+    let spacing: CGFloat
+
+    private static let columns: CGFloat = 7
+
+    init(availableWidth: CGFloat) {
+        // A typical iPhone plate width stands in until the first real
+        // measurement lands, so the grid never paints at zero size.
+        let width = availableWidth > 0 ? availableWidth : 320
+        spacing = (width * 0.016).clamped(to: 3...8)
+        cellWidth = (width - spacing * (Self.columns - 1)) / Self.columns
+    }
+
+    /// A point size that fills `fraction` of the cell, clamped to `range`
+    /// so numbers stay readable on a narrow sheet and don't balloon on a
+    /// wide window.
+    func fontSize(fraction: CGFloat, in range: ClosedRange<CGFloat>) -> CGFloat {
+        (cellWidth * fraction).clamped(to: range)
+    }
+}
+
 // MARK: - String helpers
 
 extension String {

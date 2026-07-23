@@ -11,6 +11,10 @@ struct CalendarView: View {
     @State private var displayedMonth = Date.now
     @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
     @State private var selectedDay: Int?
+    // The grid's measured width, so day numbers and gutters size to the
+    // sheet width on iPhone/iPad and to a resized Mac window (see
+    // MonthGridMetrics).
+    @State private var gridWidth: CGFloat = 0
 
     private var calendar: Calendar { .current }
 
@@ -37,6 +41,11 @@ struct CalendarView: View {
                     selectedDaySection(events)
                 }
                 .padding()
+                // Grow with the sheet/window up to a tidy width, then centre
+                // — a calendar stretched across a wide Mac window would just
+                // scatter the numbers into huge gaps.
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
             }
             .background(Theme.background)
             .navigationTitle("Important Dates")
@@ -100,7 +109,9 @@ struct CalendarView: View {
         let symbols = calendar.veryShortWeekdaySymbols
         let start = calendar.firstWeekday - 1
         let ordered = Array(symbols[start...] + symbols[..<start])
-        return HStack(spacing: 8) {
+        // Same gutter as the grid below so the initials sit over their days.
+        let spacing = MonthGridMetrics(availableWidth: gridWidth).spacing
+        return HStack(spacing: spacing) {
             ForEach(Array(ordered.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol)
                     .font(.caption.weight(.semibold))
@@ -120,50 +131,78 @@ struct CalendarView: View {
         return Array(repeating: nil, count: leadingBlanks) + dayRange.map { Optional($0) }
     }
 
-    private func dayGrid(_ events: [Int: [DayEvent]]) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
-            ForEach(Array(monthDays.enumerated()), id: \.offset) { _, day in
-                if let day {
-                    dayCell(day, events[day] ?? [])
-                } else {
-                    Color.clear.frame(height: 66)
-                }
-            }
+    /// The day cell's adaptive sizes, all derived from the measured grid
+    /// width so the numbers grow with the sheet/window instead of floating
+    /// small in wide columns.
+    private struct CellMetrics {
+        let chip: CGFloat        // the day-number square
+        let fontSize: CGFloat    // the day number
+        let avatar: CGFloat      // each event portrait
+        let overflowFont: CGFloat
+        let cellHeight: CGFloat
+        let corner: CGFloat
+
+        init(_ metrics: MonthGridMetrics) {
+            chip = (metrics.cellWidth * 0.78).clamped(to: 32...48)
+            fontSize = metrics.fontSize(fraction: 0.42, in: 16...24)
+            avatar = (metrics.cellWidth * 0.46).clamped(to: 18...28)
+            overflowFont = (chip * 0.28).clamped(to: 9...13)
+            cellHeight = chip + avatar + 14
+            corner = (chip * 0.28).clamped(to: 8...13)
         }
     }
 
-    private func dayCell(_ day: Int, _ events: [DayEvent]) -> some View {
+    private func dayGrid(_ events: [Int: [DayEvent]]) -> some View {
+        let metrics = MonthGridMetrics(availableWidth: gridWidth)
+        let cell = CellMetrics(metrics)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: metrics.spacing), count: 7),
+            spacing: metrics.spacing + 6
+        ) {
+            ForEach(Array(monthDays.enumerated()), id: \.offset) { _, day in
+                if let day {
+                    dayCell(day, events[day] ?? [], cell: cell)
+                } else {
+                    Color.clear.frame(height: cell.cellHeight)
+                }
+            }
+        }
+        .measuringWidth()
+        .onPreferenceChange(WidthPreferenceKey.self) { gridWidth = $0 }
+    }
+
+    private func dayCell(_ day: Int, _ events: [DayEvent], cell: CellMetrics) -> some View {
         let isSelected = selectedDay == day
         return Button {
             selectedDay = day
         } label: {
             VStack(spacing: 4) {
                 Text("\(day)")
-                    .font(.callout.weight(isSelected ? .bold : .medium))
+                    .font(.system(size: cell.fontSize, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? .white : .primary)
-                    .frame(width: 34, height: 34)
-                    .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                HStack(spacing: -7) {
+                    .frame(width: cell.chip, height: cell.chip)
+                    .background(isSelected ? AnyShapeStyle(Theme.aegean) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: cell.corner, style: .continuous))
+                HStack(spacing: -cell.avatar * 0.35) {
                     ForEach(events.prefix(2)) { event in
                         AvatarView(
                             data: event.person.profilePhotoData,
                             name: event.person.name,
-                            size: 20,
+                            size: cell.avatar,
                             desaturated: event.person.isDeceased,
                             business: event.person.isBusiness
                         )
                     }
                 }
-                .frame(height: 20)
+                .frame(height: cell.avatar)
                 if events.count > 2 {
                     Text("+\(events.count - 2)")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: cell.overflowFont, weight: .semibold))
                         .foregroundStyle(.secondary)
                 } else {
-                    Color.clear.frame(height: 11)
+                    Color.clear.frame(height: cell.overflowFont + 2)
                 }
             }
-            .frame(height: 66)
+            .frame(height: cell.cellHeight)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
