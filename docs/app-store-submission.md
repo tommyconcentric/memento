@@ -50,11 +50,15 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 
 ## Privacy nutrition label answers (App Store Connect → App Privacy)
 
-- **Do you or your third-party partners collect data from this app?** → **No, we do not collect data from this app.**
-  (Everything stays on device / in the user's private CloudKit database, which the developer cannot access — that qualifies as "not collected" under Apple's definitions. No analytics, no third-party SDKs.)
+- **Do you or your third-party partners collect data from this app?** → **Yes.**
+- **Product Interaction** (under Usage Data) → collected, **used for Analytics**, **not linked to the user's identity**, **not used for tracking**.
+  (This is the anonymous usage counters — random install id, daily app-open and contacts-created counts — sent to the app's public CloudKit database; see `UsageAnalytics.swift` and the disclosure in `PRIVACY.md`. Users can opt out in Settings.)
+- Every other category → **not collected.** Everything the user creates stays on device / in their private CloudKit database, which the developer cannot access. No third-party SDKs.
 - Tracking: **No.**
 
-The bundled `PrivacyInfo.xcprivacy` matches these answers (no tracking, no collected data, UserDefaults declared with reason CA92.1). **If any analytics or third-party SDK is ever added, both the manifest and the nutrition label must be redone.**
+The bundled `PrivacyInfo.xcprivacy` matches these answers (no tracking; Product Interaction collected, not linked, analytics purpose; UserDefaults declared with reason CA92.1). **If collection ever changes again, the manifest, `PRIVACY.md` and this label must all be redone together.**
+
+Also before release: in the CloudKit Console, deploy the public-database `UsagePing` schema (with queryable indexes on `pingDate` and `installID`) from Development to Production — debug builds create it just-in-time in Development only, and TestFlight/App Store builds ping Production.
 
 ---
 

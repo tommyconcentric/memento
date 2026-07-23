@@ -2,17 +2,37 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Memento collects nothing and tracks nothing: all data lives on
-	     device and in the user's own private iCloud database, which the
-	     developer cannot access. The only network traffic is CloudKit sync.
-	     Keep this manifest in step with that stance — adding any analytics,
-	     third-party SDK, or server call means revisiting every key here. -->
+	<!-- Everything the user creates lives on device and in their own
+	     private iCloud database, which the developer cannot access; no
+	     third-party SDKs, no tracking. The one thing collected is the
+	     anonymous usage counters below (UsageAnalytics.swift): a random
+	     install id with daily session and contacts-created counts, sent to
+	     the app's public CloudKit database, on by default with an opt-out
+	     in Settings. Keep this manifest, PRIVACY.md and the App Store
+	     privacy label in step — they must always tell the same story. -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<dict>
+			<!-- Product Interaction: app opens (sessions) and
+			     contacts-created counts, keyed by a random install id.
+			     Not linked to identity, not used for tracking; purpose is
+			     first-party analytics only. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>

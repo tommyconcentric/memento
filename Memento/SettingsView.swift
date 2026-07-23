@@ -38,6 +38,22 @@ struct SettingsView: View {
 
     @State private var showingImport = false
     @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
+    @AppStorage(UsageAnalytics.optOutKey) private var usageOptOut = false
+    @State private var showingUsageDashboard = false
+
+    /// The toggle reads naturally ("share on/off") while storage stays an
+    /// opt-out flag; switching off also triggers the remote cleanup.
+    private var shareUsageBinding: Binding<Bool> {
+        Binding(
+            get: { !usageOptOut },
+            set: { share in
+                usageOptOut = !share
+                if !share {
+                    UsageAnalytics.handleOptOut()
+                }
+            }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -126,6 +142,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Share anonymous usage statistics", isOn: shareUsageBinding)
+                } header: {
+                    Text("Anonymous Usage Statistics")
+                } footer: {
+                    Text("Sends a daily count of app opens and contacts created under a random identifier — never your name, notes, photos, dates or anything you've written. Turning this off also deletes the counts this device already sent.")
+                }
+
+                Section {
                     Button {
                         rateMemento()
                     } label: {
@@ -143,6 +167,12 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Reviews help others find Memento; feedback reaches the developer.")
                         Text(aboutLine)
+                            // The developer's hidden usage dashboard —
+                            // seven taps, same spirit as build-number
+                            // easter eggs. Harmless if found: it shows only
+                            // the anonymous aggregate counts described in
+                            // the toggle's footer above.
+                            .onTapGesture(count: 7) { showingUsageDashboard = true }
                     }
                 }
 
@@ -164,6 +194,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingImport) {
                 ImportContactsView()
+            }
+            .sheet(isPresented: $showingUsageDashboard) {
+                UsageDashboardView()
             }
             .sheet(isPresented: $showingPINSetup) {
                 PINSetupView(
