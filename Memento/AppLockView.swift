@@ -257,6 +257,10 @@ struct AppLockView: View {
     // Ticks down a live "try again in …" message while the brute-force
     // throttle is in effect (see AppLock.registerFailedAttempt).
     @State private var lockoutRemaining = 0
+    // "Forgot PIN?" recovery: device-passcode / biometric auth, then a
+    // fresh PIN — no app can ask for an Apple ID password.
+    @State private var showingPINReset = false
+    @State private var resetNote: String?
 
     var body: some View {
         VStack(spacing: 32) {
@@ -303,11 +307,40 @@ struct AppLockView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+
+            Button("Forgot PIN?") {
+                attemptPINReset()
+            }
+            .font(.footnote)
+            .foregroundStyle(Theme.aegean)
+            .padding(.top, useBiometrics && AppLock.biometryType != .none ? 0 : 8)
+            if let resetNote {
+                Text(resetNote)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.terracotta)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
             Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
+        // Setting a new PIN after passing device-owner auth. The lock window
+        // hosts this sheet above everything, and the new PIN unlocks the app.
+        .sheet(isPresented: $showingPINReset) {
+            PINSetupView(
+                onComplete: { newPIN in
+                    showingPINReset = false
+                    if AppLock.savePIN(newPIN) {
+                        onUnlock()
+                    } else {
+                        resetNote = "Couldn't save the new PIN — please try again."
+                    }
+                },
+                onCancel: { showingPINReset = false }
+            )
+        }
         // The lock window is created at the moment of *locking* — usually
         // while the app is leaving the foreground. An onAppear-only prompt
         // would fire (and be consumed) right then, latch, and never re-run
@@ -403,6 +436,31 @@ struct AppLockView: View {
         ) { success, _ in
             guard success else { return }
             Task { @MainActor in onUnlock() }
+        }
+    }
+
+    /// "Forgot PIN?" recovery. Unlike the biometric fast-path, this is
+    /// deliberately `.deviceOwnerAuthentication` — biometrics *with the
+    /// device-passcode fallback* — so it works when Memento's own Face ID is
+    /// off, unenrolled, or biometry-locked. It never asks for an Apple ID
+    /// password (no API allows that, and Apple treats it as phishing); the
+    /// person who can unlock the device sets a fresh PIN. If the device has
+    /// no passcode at all, there's nothing to authenticate against, so point
+    /// at the reinstall path (the data is safe in iCloud regardless).
+    private func attemptPINReset() {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            resetNote = "Set a device passcode in Settings to reset your PIN here — or reinstall Memento, and iCloud restores your data."
+            return
+        }
+        resetNote = nil
+        context.evaluatePolicy(
+            .deviceOwnerAuthentication,
+            localizedReason: "Reset your Memento PIN"
+        ) { success, _ in
+            guard success else { return }
+            Task { @MainActor in showingPINReset = true }
         }
     }
 

@@ -138,7 +138,7 @@ struct SettingsView: View {
                 } header: {
                     Text("App Lock")
                 } footer: {
-                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Reinstall — iCloud restores your data.")
+                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Tap “Forgot PIN?” on the lock screen to reset it with your device passcode\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "").")
                 }
 
                 Section {
