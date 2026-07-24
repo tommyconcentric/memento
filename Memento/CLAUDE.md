@@ -27,6 +27,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - `KeychainHelper.swift` — generic Keychain read/save/delete, currently only used for the app-lock PIN.
 - `UsageAnalytics.swift` — anonymous usage counters (random install id + daily sessions/contacts-created), batched into one `UsagePing` record per install per day in the CloudKit **public** database; on by default, Settings opt-out (which also best-effort deletes prior pings). Deliberately not SwiftData — never entangle analytics with the user's private sync.
 - `UsageDashboardView.swift` — the developer's hidden dashboard (7 taps on the Settings version line): Swift Charts of daily actives/sessions/contacts aggregated from `UsagePing`. Downloads aren't measurable in-app; App Store Connect has them.
+- `DataArchive.swift` / `DataCSV.swift` — export/import (Settings → Backup & Transfer). The `.memento` JSON archive is the complete backup (both workspaces, notes, dates, photos as base64, family edges, folders, self node); the CSV is a re-importable subset (people + notes + dates + extra contacts, no photos or tree). **Format compatibility is a hard contract: only ever add optional fields to the archive structs — never remove, rename or repurpose one — so any version reads any version's file.** Full spec + rules in `docs/data-format.md`.
 - `Scripts/generate_icons.swift` — regenerates the alternate app icon PNGs; run standalone with `swift Scripts/generate_icons.swift`, not part of the app target.
 
 ## Conventions (follow these when editing)
