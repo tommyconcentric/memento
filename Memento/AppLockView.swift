@@ -257,6 +257,7 @@ struct AppLockView: View {
     // Ticks down a live "try again in …" message while the brute-force
     // throttle is in effect (see AppLock.registerFailedAttempt).
     @State private var lockoutRemaining = 0
+    @State private var showingForgotPIN = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -303,11 +304,27 @@ struct AppLockView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+
+            Button("Forgot PIN?") {
+                showingForgotPIN = true
+            }
+            .font(.footnote)
+            .foregroundStyle(Theme.aegean)
+            .padding(.top, useBiometrics && AppLock.biometryType != .none ? 0 : 8)
             Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
+        // The PIN is device-only (ThisDeviceOnly Keychain) with no way to
+        // read or reset it from outside the lock, by design — so the only
+        // recovery is to clear it by reinstalling. The data itself is safe
+        // in the user's iCloud and restores automatically.
+        .alert("Forgot Your PIN?", isPresented: $showingForgotPIN) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your people and notes are safely stored in your iCloud. To reset a forgotten PIN, delete Memento and download it again — your data restores automatically, and only the PIN is cleared.")
+        }
         // The lock window is created at the moment of *locking* — usually
         // while the app is leaving the foreground. An onAppear-only prompt
         // would fire (and be consumed) right then, latch, and never re-run
