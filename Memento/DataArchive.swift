@@ -28,9 +28,13 @@ import SwiftData
 ///    one, never change a field's meaning or type. A retired feature's field
 ///    stays in the struct (kept, ignored) so old files still parse.
 /// 2. Bump `formatVersion` only for a genuinely breaking change, and add a
-///    migration path keyed on it — never as routine version bumping.
-/// 3. Dates are ISO-8601 and photos are base64 so the file is inspectable and
-///    stays valid across time zones and platforms.
+///    migration path keyed on it — never as routine version bumping. The
+///    importer refuses a file whose `formatVersion` is above its own rather
+///    than import it wrong.
+/// 3. Dates are ISO-8601 **without fractional seconds** (both coders use the
+///    strict `.iso8601` strategy, which rejects them) and photos are base64,
+///    so the file is inspectable and stays valid across time zones and
+///    platforms.
 ///
 /// (One honest boundary: an app only preserves fields it understands, so
 /// round-tripping a *newer* file *through* an older app drops the newer
@@ -39,7 +43,7 @@ struct MementoArchive: Codable {
     /// Marker so a stray JSON file can be told apart from a real archive.
     var format: String? = archiveMarker
     /// Breaking-change gate; additive changes do not bump this.
-    var formatVersion: Int? = 1
+    var formatVersion: Int? = currentFormatVersion
     var exportedAt: Date? = .now
     var appVersion: String?
 
@@ -49,6 +53,7 @@ struct MementoArchive: Codable {
     var partnerships: [ArchivePartnership]? = []
 
     static let archiveMarker = "memento-archive"
+    static let currentFormatVersion = 1
 }
 
 struct ArchiveGroup: Codable {
@@ -157,16 +162,23 @@ struct ImportSummary {
     var notesAdded = 0
     var photosAdded = 0
     var datesAdded = 0
+    var contactsAdded = 0
     var groupsAdded = 0
 
     var headline: String {
         var parts: [String] = []
-        parts.append("\(peopleAdded) \(peopleAdded == 1 ? "person" : "people") added")
+        if peopleAdded > 0 { parts.append(counted(peopleAdded, "person", "people") + " added") }
         if peopleMerged > 0 { parts.append("\(peopleMerged) already present") }
-        if notesAdded > 0 { parts.append("\(notesAdded) notes") }
-        if photosAdded > 0 { parts.append("\(photosAdded) photos") }
-        if datesAdded > 0 { parts.append("\(datesAdded) dates") }
+        if notesAdded > 0 { parts.append(counted(notesAdded, "note", "notes")) }
+        if photosAdded > 0 { parts.append(counted(photosAdded, "photo", "photos")) }
+        if datesAdded > 0 { parts.append(counted(datesAdded, "date", "dates")) }
+        if contactsAdded > 0 { parts.append(counted(contactsAdded, "contact detail", "contact details")) }
+        guard !parts.isEmpty else { return "Nothing new to add — everything in that file is already here" }
         return parts.joined(separator: " · ")
+    }
+
+    private func counted(_ n: Int, _ singular: String, _ plural: String) -> String {
+        "\(n) \(n == 1 ? singular : plural)"
     }
 }
 
@@ -327,6 +339,8 @@ enum DataArchiveImport {
     /// Additive by design: people are matched to existing ones by name +
     /// workspace (so re-importing the same backup doesn't duplicate them),
     /// and only genuinely new people bring in their notes, photos and dates.
+    /// Each existing person can be claimed by only one archive person per
+    /// run, so two distinct same-named people in a backup restore as two.
     @discardableResult
     static func importArchive(_ data: Data, into context: ModelContext) throws -> ImportSummary {
         // A file that isn't our JSON shape (e.g. a CSV, or any other text)
@@ -334,6 +348,12 @@ enum DataArchiveImport {
         guard let archive = try? decoder.decode(MementoArchive.self, from: data),
               archive.format == MementoArchive.archiveMarker else {
             throw DataArchiveError.notAnArchive
+        }
+        // The one job `formatVersion` has: refuse a file from a future
+        // format that deliberately broke compatibility, instead of
+        // importing it wrong.
+        guard (archive.formatVersion ?? 1) <= MementoArchive.currentFormatVersion else {
+            throw DataArchiveError.unreadable
         }
 
         var summary = ImportSummary()
@@ -356,6 +376,11 @@ enum DataArchiveImport {
 
         var personByArchiveID: [UUID: Person] = [:]
         var existingPeople = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+        // People already claimed by an archive person this run. A backup can
+        // legitimately hold two distinct people with the same name, and each
+        // must land on its own person: once a name-match is claimed, the
+        // next same-named archive person creates a new one instead.
+        var claimed = Set<ObjectIdentifier>()
 
         for ap in archive.people ?? [] {
             let name = (ap.name ?? "").trimmed
@@ -364,7 +389,9 @@ enum DataArchiveImport {
             if ap.isSelf == true {
                 // Fold the archived self into the device's own hidden node,
                 // filling only blanks so a restore never clobbers current
-                // "You" data; bring self notes/dates in only if it has none.
+                // "You" data; each collection (notes, dates, family rows,
+                // contacts, projects) comes in only where this node has none
+                // of its own — addChildren skips any that aren't empty.
                 let selfNode = existingPeople.canonicalSelfNode ?? {
                     let node = Person(name: name.isEmpty ? "You" : name)
                     node.isSelf = true
@@ -373,12 +400,15 @@ enum DataArchiveImport {
                     return node
                 }()
                 apply(ap, to: selfNode, group: groupByArchiveID[ap.groupID ?? UUID()], fillEmptyOnly: true)
-                if selfNode.notesArray.isEmpty, selfNode.importantDatesArray.isEmpty {
-                    addChildren(of: ap, to: selfNode, context: context, summary: &summary)
-                }
+                addChildren(of: ap, to: selfNode, context: context, summary: &summary)
                 personByArchiveID[ap.id] = selfNode
                 continue
             }
+
+            // A blank name can only come from a hand-edited file; skip the
+            // row rather than minting nameless people that would all merge
+            // into each other.
+            guard !name.isEmpty else { continue }
 
             if ap.isGhost == true {
                 let ghost = existingPeople.first {
@@ -395,12 +425,16 @@ enum DataArchiveImport {
             }
 
             // A normal contact: reuse a same-name, same-workspace person if
-            // one already exists (so repeated imports are idempotent), else
-            // create it and bring in everything hanging off it.
+            // one exists and hasn't been claimed by another archive person
+            // yet (so repeated imports are idempotent *and* duplicate names
+            // stay distinct), else create it and bring in everything
+            // hanging off it.
             if let match = existingPeople.first(where: {
                 !$0.isSelf && !$0.isGhost && $0.isBusiness == isBusiness
+                    && !claimed.contains(ObjectIdentifier($0))
                     && $0.name.trimmed.caseInsensitiveCompare(name) == .orderedSame
             }) {
+                claimed.insert(ObjectIdentifier(match))
                 personByArchiveID[ap.id] = match
                 summary.peopleMerged += 1
                 continue
@@ -411,6 +445,7 @@ enum DataArchiveImport {
             apply(ap, to: person, group: groupByArchiveID[ap.groupID ?? UUID()], fillEmptyOnly: false)
             addChildren(of: ap, to: person, context: context, summary: &summary)
             existingPeople.append(person)
+            claimed.insert(ObjectIdentifier(person))
             personByArchiveID[ap.id] = person
             summary.peopleAdded += 1
         }
@@ -433,7 +468,14 @@ enum DataArchiveImport {
                                        kind: PartnershipKind(rawValue: edge.kind ?? "") ?? .partner))
         }
 
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            // Roll the half-applied import back rather than reporting
+            // success on data that never persisted.
+            context.rollback()
+            throw error
+        }
         FamilyGraphMaintenance.dedupe(context)
         try? context.save()
         NotificationManager.refreshFromContext(context)
@@ -450,12 +492,16 @@ enum DataArchiveImport {
             person[keyPath: keyPath] = value
         }
         if !fillEmptyOnly || person.name.trimmed.isEmpty { person.name = (ap.name ?? person.name) }
-        person.isBusiness = ap.isBusiness ?? person.isBusiness
-        person.isPinned = ap.isPinned ?? person.isPinned
-        person.isDeceased = ap.isDeceased ?? person.isDeceased
-        person.birthdayReminderEnabled = ap.birthdayReminderEnabled ?? true
-        if let created = ap.createdAt, !fillEmptyOnly { person.createdAt = created }
-        if let group { person.group = group }
+        if !fillEmptyOnly {
+            person.isBusiness = ap.isBusiness ?? person.isBusiness
+            person.isPinned = ap.isPinned ?? person.isPinned
+            person.isDeceased = ap.isDeceased ?? person.isDeceased
+            // nil here means "was true at export" — the exporter omits the
+            // default; the self node keeps its own setting regardless.
+            person.birthdayReminderEnabled = ap.birthdayReminderEnabled ?? true
+            if let created = ap.createdAt { person.createdAt = created }
+        }
+        if let group, !fillEmptyOnly || person.group == nil { person.group = group }
         if person.birthday == nil || !fillEmptyOnly { person.birthday = ap.birthday ?? person.birthday }
         if let photo = ap.profilePhoto, person.profilePhotoData == nil || !fillEmptyOnly {
             person.profilePhotoData = photo
@@ -476,57 +522,73 @@ enum DataArchiveImport {
     }
 
     /// Creates the notes, dates, family members, contacts and projects that
-    /// belong to a freshly imported person.
+    /// belong to an imported person. Each collection fills only when the
+    /// target has none of its own — for a freshly created person that's all
+    /// of them, and for the self node it means a restore adds to "You"
+    /// without ever replacing rows that already exist.
     private static func addChildren(of ap: ArchivePerson, to person: Person,
                                     context: ModelContext, summary: inout ImportSummary) {
-        var notes: [NoteEntry] = []
-        for an in ap.notes ?? [] {
-            let note = NoteEntry(text: an.text ?? "", eventDate: an.eventDate ?? .now, location: an.location ?? "")
-            note.title = an.title ?? ""
-            note.createdAt = an.createdAt ?? an.eventDate ?? .now
-            context.insert(note)
-            note.person = person
-            var photos: [EventPhoto] = []
-            for aphoto in an.photos ?? [] {
-                let photo = EventPhoto(imageData: aphoto.imageData, caption: aphoto.caption ?? "",
-                                       sortOrder: aphoto.sortOrder ?? 0)
-                context.insert(photo)
-                photos.append(photo)
-                summary.photosAdded += 1
+        if person.notesArray.isEmpty {
+            var notes: [NoteEntry] = []
+            for an in ap.notes ?? [] {
+                let note = NoteEntry(text: an.text ?? "", eventDate: an.eventDate ?? .now, location: an.location ?? "")
+                note.title = an.title ?? ""
+                note.createdAt = an.createdAt ?? an.eventDate ?? .now
+                context.insert(note)
+                note.person = person
+                var photos: [EventPhoto] = []
+                for aphoto in an.photos ?? [] {
+                    let photo = EventPhoto(imageData: aphoto.imageData, caption: aphoto.caption ?? "",
+                                           sortOrder: aphoto.sortOrder ?? 0)
+                    context.insert(photo)
+                    photos.append(photo)
+                    summary.photosAdded += 1
+                }
+                note.photosArray = photos
+                notes.append(note)
+                summary.notesAdded += 1
             }
-            note.photosArray = photos
-            notes.append(note)
-            summary.notesAdded += 1
+            person.notesArray = notes
         }
-        person.notesArray = notes
 
-        var dates: [ImportantDate] = []
-        for ad in ap.importantDates ?? [] {
-            let date = ImportantDate(label: ad.label ?? "", date: ad.date ?? .now)
-            date.remindersEnabled = ad.remindersEnabled ?? true
-            context.insert(date)
-            dates.append(date)
-            summary.datesAdded += 1
+        if person.importantDatesArray.isEmpty {
+            var dates: [ImportantDate] = []
+            for ad in ap.importantDates ?? [] {
+                let date = ImportantDate(label: ad.label ?? "", date: ad.date ?? .now)
+                date.remindersEnabled = ad.remindersEnabled ?? true
+                context.insert(date)
+                dates.append(date)
+                summary.datesAdded += 1
+            }
+            person.importantDatesArray = dates
         }
-        person.importantDatesArray = dates
 
-        person.familyMembersArray = (ap.familyMembers ?? []).map {
-            let member = FamilyMember(name: $0.name ?? "", relation: $0.relation ?? "")
-            context.insert(member)
-            return member
+        if person.familyMembersArray.isEmpty {
+            person.familyMembersArray = (ap.familyMembers ?? []).map {
+                let member = FamilyMember(name: $0.name ?? "", relation: $0.relation ?? "")
+                context.insert(member)
+                return member
+            }
         }
-        person.contactFieldsArray = (ap.contactFields ?? []).map {
-            let field = ContactField(kind: ContactField.Kind(rawValue: $0.kind ?? "") ?? .phone,
-                                     value: $0.value ?? "", sortOrder: $0.sortOrder ?? 0)
-            field.isPreferred = $0.isPreferred ?? false
-            context.insert(field)
-            return field
+        if person.contactFieldsArray.isEmpty {
+            var fields: [ContactField] = []
+            for af in ap.contactFields ?? [] {
+                let field = ContactField(kind: ContactField.Kind(rawValue: af.kind ?? "") ?? .phone,
+                                         value: af.value ?? "", sortOrder: af.sortOrder ?? 0)
+                field.isPreferred = af.isPreferred ?? false
+                context.insert(field)
+                fields.append(field)
+                summary.contactsAdded += 1
+            }
+            person.contactFieldsArray = fields
         }
-        person.projectsArray = (ap.projects ?? []).map {
-            let project = Project(name: $0.name ?? "", isCompleted: $0.isCompleted ?? false,
-                                  sortOrder: $0.sortOrder ?? 0)
-            context.insert(project)
-            return project
+        if person.projectsArray.isEmpty {
+            person.projectsArray = (ap.projects ?? []).map {
+                let project = Project(name: $0.name ?? "", isCompleted: $0.isCompleted ?? false,
+                                      sortOrder: $0.sortOrder ?? 0)
+                context.insert(project)
+                return project
+            }
         }
     }
 }

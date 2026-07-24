@@ -439,19 +439,25 @@ struct SettingsView: View {
             }
             let data = try Data(contentsOf: url)
             // Sniff by content, not extension: try a full backup first (it's
-            // marked with `format`), then read it as a Memento CSV.
-            if let summary = try? DataArchiveImport.importArchive(data, into: context) {
+            // marked with `format`), then read it as a Memento CSV. Only
+            // "wrong format" falls through to the next attempt — a real
+            // failure (a backup from a newer breaking format, or the save
+            // failing) surfaces through the outer catch instead.
+            do {
+                let summary = try DataArchiveImport.importArchive(data, into: context)
                 showResult("Backup Imported", summary.headline + ".")
                 return
-            }
-            if let text = String(data: data, encoding: .utf8),
-               let summary = try? MementoCSV.importCSV(text, into: context) {
-                showResult("Data Imported", summary.headline + ".")
-                return
+            } catch DataArchiveError.notAnArchive {}
+            if let text = String(data: data, encoding: .utf8) {
+                do {
+                    let summary = try MementoCSV.importCSV(text, into: context)
+                    showResult("Data Imported", summary.headline + ".")
+                    return
+                } catch DataArchiveError.notAnArchive, DataArchiveError.unreadable {}
             }
             showResult("Couldn't Import", "That file isn't a Memento backup or a Memento CSV export.")
         } catch {
-            showResult("Import Failed", "Couldn't read that file: \(error.localizedDescription)")
+            showResult("Import Failed", error.localizedDescription)
         }
     }
 

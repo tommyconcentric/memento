@@ -125,7 +125,15 @@ enum MementoCSV {
         var summary = ImportSummary()
         var groups = (try? context.fetch(FetchDescriptor<PersonGroup>())) ?? []
         var existingPeople = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+        // Only people created by *this* import go in the ID map, so
+        // Note/Date/Contact rows belonging to someone already here are
+        // skipped — re-importing the same CSV never duplicates their rows
+        // (the same rule the JSON archive applies to merged people).
         var personByCSVID: [String: Person] = [:]
+        // And, as in the archive import, each existing person can be
+        // claimed once per run, so two same-named Person rows in one file
+        // stay two people.
+        var claimed = Set<ObjectIdentifier>()
 
         func folder(named name: String) -> PersonGroup? {
             let trimmed = name.trimmed
@@ -150,9 +158,10 @@ enum MementoCSV {
 
             if let match = existingPeople.first(where: {
                 !$0.isSelf && !$0.isGhost && $0.isBusiness == isBusiness
+                    && !claimed.contains(ObjectIdentifier($0))
                     && $0.name.trimmed.caseInsensitiveCompare(name) == .orderedSame
             }) {
-                if !csvID.isEmpty { personByCSVID[csvID] = match }
+                claimed.insert(ObjectIdentifier(match))
                 summary.peopleMerged += 1
                 continue
             }
@@ -175,6 +184,7 @@ enum MementoCSV {
             person.address = value(fields, "Address")
             context.insert(person)
             existingPeople.append(person)
+            claimed.insert(ObjectIdentifier(person))
             if !csvID.isEmpty { personByCSVID[csvID] = person }
             summary.peopleAdded += 1
         }
@@ -206,10 +216,18 @@ enum MementoCSV {
                 let field = ContactField(kind: kind, value: fieldValue, sortOrder: owner.contactFieldsArray.count)
                 context.insert(field)
                 field.person = owner
+                summary.contactsAdded += 1
             }
         }
 
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            // Roll the half-applied import back rather than reporting
+            // success on data that never persisted.
+            context.rollback()
+            throw error
+        }
         NotificationManager.refreshFromContext(context)
         CalendarSyncManager.refreshFromContext(context)
         return summary

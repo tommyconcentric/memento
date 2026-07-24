@@ -30,9 +30,14 @@ Rules, forever (enforced by convention, like the privacy manifest):
    or meaning of a field. A retired feature's field stays in the struct — kept
    and ignored — so old files still parse.
 2. Bump `formatVersion` only for a genuinely breaking change, with a migration
-   path keyed on it. Additive changes never bump it.
-3. Dates are ISO-8601; photos are base64 — the file is inspectable and stable
-   across time zones and platforms.
+   path keyed on it. Additive changes never bump it. The importer refuses any
+   file whose `formatVersion` is above its own (surfaced to the user as "may
+   be from a much newer version of Memento") rather than import it wrong.
+3. Dates are ISO-8601 **without fractional seconds** (both coders use the
+   strict `.iso8601` strategy, which rejects them — never switch the encoder
+   to emit fractional seconds, or old apps will reject whole files); photos
+   are base64 — the file is inspectable and stable across time zones and
+   platforms.
 
 Honest boundary: an app only preserves fields it understands, so round-tripping
 a *newer* file *through* an older app drops the newer fields. Importing directly
@@ -41,11 +46,15 @@ between versions never loses data the two versions share.
 ### Import behaviour
 
 Additive and idempotent: people are matched to existing ones by **name +
-workspace**, so re-importing the same backup doesn't duplicate anyone. Only
-genuinely new people bring in their notes, photos and dates. Folders are matched
-by name (built-ins reused). The archived "You" node is folded into the device's
-own self node, filling blanks without clobbering existing data. Family-tree
-edges reconnect via archive-local ids, skipping any that already exist.
+workspace**, so re-importing the same backup doesn't duplicate anyone. Each
+existing person can be claimed by only one archive person per import, so two
+distinct same-named people in a backup restore as two people rather than
+collapsing into one. Only genuinely new people bring in their notes, photos and
+dates. Folders are matched by name (built-ins reused). The archived "You" node
+is folded into the device's own self node, filling blank fields only; its
+notes, dates, family rows, contacts and projects come in per-collection, each
+only where the device's own node has none. Family-tree edges reconnect via
+archive-local ids, skipping any that already exist.
 
 ## 2. Spreadsheet — `.csv`
 
@@ -64,6 +73,17 @@ whole file re-imports as connected data. Unknown `Type` values and unknown
 columns are ignored — same forward/backward tolerance as the JSON archive.
 Birthdays use `yyyy-MM-dd`, or `--MM-dd` for a year-less birthday (matching the
 contact-import convention).
+
+Import follows the same rules as the archive: people match by name + workspace
+(claimed once per run, so duplicate names stay distinct), and the child rows of
+a person who already exists are skipped — re-importing the same CSV never
+duplicates notes, dates or contacts.
+
+One spreadsheet caveat: Excel rewrites date-looking cells into its locale
+format (e.g. `5/3/24`) on save, which the importer does not accept — those
+ambiguous forms can silently swap day and month, so only `yyyy-MM-dd` and
+`--MM-dd` are parsed and anything else is dropped. Numbers (formatted as text
+or plain) and every other column survive Excel fine.
 
 The CSV import and the "Import from Contacts" screen are separate: this one
 reads Memento's own typed-row export; that one reads a plain address-book CSV.
