@@ -1,6 +1,19 @@
 # App Store submission pack
 
-Everything needed to publish Memento to the App Store (iPhone + iPad) and make it available on the Mac App Store as an *iPhone & iPad App on Apple Silicon*. The repo side is done (privacy manifest, compliance keys, category, background mode); this file holds the listing copy to paste into App Store Connect and the checklist of steps only a human with the developer account can do.
+Everything needed to publish Memento to the App Store (iPhone + iPad) and make it available on the Mac App Store as an *iPhone & iPad App on Apple Silicon*. This file holds the listing copy to paste into App Store Connect and the checklist of steps only a human with the developer account can do.
+
+## Repo pre-flight (verified 2026-07-24)
+
+- **Release build:** compiles clean in the Release configuration; no errors, no unused-code warnings.
+- **No dev tooling in the shipping binary:** `StressSeeder` and the `--ui-probe` verification hooks are `#if DEBUG` only — confirmed absent from the Release build's strings.
+- **Version:** `MARKETING_VERSION 1.0`, `CURRENT_PROJECT_VERSION 2` (bump the build number for every upload).
+- **Deployment target:** iOS 17.0 (a stray project-level 26.5 default is overridden by the target; effective value is 17.0).
+- **Export compliance:** `ITSAppUsesNonExemptEncryption = NO` set — no per-upload encryption prompt.
+- **Category:** Productivity. **Bundle id:** `brickcedar.Memento`. **Team:** `7V79F7AY68`.
+- **Icon:** single 1024×1024 App Store icon present. **Entitlements:** iCloud + CloudKit (container `iCloud.brickcedar.Memento`).
+- **Privacy:** `PrivacyInfo.xcprivacy` declares Product Interaction (anonymous usage counts, not linked, no tracking); `PRIVACY.md` and the App Store description below now match that (the description no longer claims "no analytics").
+
+Still requires a human with the developer account: distribution certificate, CloudKit production schema deploy, App Store Connect record + metadata, screenshots, archive & upload, TestFlight, and submit — all below.
 
 ---
 
@@ -31,7 +44,7 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 > Import from your contacts — names, photos, birthdays, and every number, email and address come along. Dictate notes hands-free with on-device transcription.
 >
 > PRIVATE BY DESIGN
-> No accounts, no analytics, no servers. Everything lives on your device and in your own private iCloud, synced across your iPhone, iPad and Mac. Lock the app with a PIN and Face ID.
+> No accounts, no ads, no tracking. Everything you write lives on your device and in your own private iCloud — never on our servers — synced across your iPhone, iPad and Mac. The only thing Memento reports is an anonymous, opt-out count of app opens and contacts added, so we know how many people use it. Lock the app with a PIN and Face ID.
 
 **Keywords** (100 chars max):
 `personal crm,contacts,relationships,birthday,reminder,family tree,notes,networking,friends,people`
