@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import LocalAuthentication
 import StoreKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -40,6 +41,17 @@ struct SettingsView: View {
     @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
     @AppStorage(UsageAnalytics.optOutKey) private var usageOptOut = false
     @State private var showingUsageDashboard = false
+
+    // Backup & transfer
+    @State private var exportShareItem: TreeImageExport.Item?
+    @State private var showingDataImport = false
+    @State private var dataResultTitle = ""
+    @State private var dataResultMessage = ""
+    @State private var showingDataResult = false
+    @State private var isExporting = false
+    /// A generous ceiling so a photo-heavy backup still imports, without
+    /// slurping a pathologically large file whole into memory.
+    private static let maxImportBytes = 200 * 1024 * 1024
 
     /// The toggle reads naturally ("share on/off") while storage stays an
     /// opt-out flag; switching off also triggers the remote cleanup.
@@ -113,6 +125,30 @@ struct SettingsView: View {
                     Text("Contacts")
                 } footer: {
                     Text("Import contacts with their names, photos, birthdays and details.")
+                }
+
+                Section {
+                    Button {
+                        exportBackup()
+                    } label: {
+                        Label("Export All Data (Backup)…", systemImage: "arrow.up.doc")
+                    }
+                    .disabled(isExporting)
+                    Button {
+                        exportCSV()
+                    } label: {
+                        Label("Export as Spreadsheet (CSV)…", systemImage: "tablecells")
+                    }
+                    .disabled(isExporting)
+                    Button {
+                        showingDataImport = true
+                    } label: {
+                        Label("Import Backup or CSV…", systemImage: "arrow.down.doc")
+                    }
+                } header: {
+                    Text("Backup & Transfer")
+                } footer: {
+                    Text("Export a complete backup — everyone in both workspaces, notes, dates, photos and family links — as a single file you can save or move to another device, and import it back on any version of Memento. The CSV holds people, notes and dates in a spreadsheet (no photos or family tree) and imports back too.")
                 }
 
                 Section {
@@ -194,6 +230,20 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingImport) {
                 ImportContactsView()
+            }
+            .sheet(item: $exportShareItem) { item in
+                ActivityShareSheet(url: item.url)
+            }
+            .fileImporter(
+                isPresented: $showingDataImport,
+                allowedContentTypes: [.json, .commaSeparatedText, .plainText, .item]
+            ) { result in
+                handleDataImport(result)
+            }
+            .alert(dataResultTitle, isPresented: $showingDataResult) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(dataResultMessage)
             }
             .sheet(isPresented: $showingUsageDashboard) {
                 UsageDashboardView()
@@ -345,6 +395,76 @@ struct SettingsView: View {
         }
         NotificationManager.refreshFromContext(context)
         CalendarSyncManager.refreshFromContext(context)
+    }
+
+    // MARK: - Backup & transfer
+
+    private func exportBackup() {
+        isExporting = true
+        // Encoding walks every note and base64s every photo; keep it off the
+        // main thread so a large store doesn't freeze Settings. The build
+        // reads SwiftData on the main context, so snapshot there, encode on
+        // a background task, then present on the main actor.
+        let archive = DataArchiveExport.makeArchive(context)
+        Task.detached {
+            let url = DataArchiveExport.writeArchive(archive)
+            await MainActor.run {
+                isExporting = false
+                if let url {
+                    exportShareItem = TreeImageExport.Item(url: url)
+                } else {
+                    showResult("Export Failed", "Memento couldn't create the backup file. Please try again.")
+                }
+            }
+        }
+    }
+
+    private func exportCSV() {
+        if let url = MementoCSV.writeCSVFile(context) {
+            exportShareItem = TreeImageExport.Item(url: url)
+        } else {
+            showResult("Export Failed", "Memento couldn't create the CSV file. Please try again.")
+        }
+    }
+
+    private func handleDataImport(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               size > Self.maxImportBytes {
+                showResult("File Too Large", "That file is over 200 MB and can't be imported.")
+                return
+            }
+            let data = try Data(contentsOf: url)
+            // Sniff by content, not extension: try a full backup first (it's
+            // marked with `format`), then read it as a Memento CSV. Only
+            // "wrong format" falls through to the next attempt — a real
+            // failure (a backup from a newer breaking format, or the save
+            // failing) surfaces through the outer catch instead.
+            do {
+                let summary = try DataArchiveImport.importArchive(data, into: context)
+                showResult("Backup Imported", summary.headline + ".")
+                return
+            } catch DataArchiveError.notAnArchive {}
+            if let text = String(data: data, encoding: .utf8) {
+                do {
+                    let summary = try MementoCSV.importCSV(text, into: context)
+                    showResult("Data Imported", summary.headline + ".")
+                    return
+                } catch DataArchiveError.notAnArchive, DataArchiveError.unreadable {}
+            }
+            showResult("Couldn't Import", "That file isn't a Memento backup or a Memento CSV export.")
+        } catch {
+            showResult("Import Failed", error.localizedDescription)
+        }
+    }
+
+    private func showResult(_ title: String, _ message: String) {
+        dataResultTitle = title
+        dataResultMessage = message
+        showingDataResult = true
     }
 
     private func sendFeedback() {
