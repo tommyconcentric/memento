@@ -10,6 +10,7 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 - **Deployment target:** iOS 17.0 (a stray project-level 26.5 default is overridden by the target; effective value is 17.0).
 - **Export compliance:** `ITSAppUsesNonExemptEncryption = NO` set — no per-upload encryption prompt.
 - **Category:** Productivity. **Bundle id:** `brickcedar.Memento`. **Team:** `7V79F7AY68`.
+- **App Store Connect Apple ID:** `6791973402` (store name "Memento Vivere"). Direct links: version page `https://appstoreconnect.apple.com/apps/6791973402/distribution`, TestFlight `.../6791973402/testflight`. This is the number that belongs in `SettingsView.appStoreID` — see the last section.
 - **Icon:** single 1024×1024 App Store icon present. **Entitlements:** iCloud + CloudKit (container `iCloud.brickcedar.Memento`).
 - **Privacy:** `PrivacyInfo.xcprivacy` declares Product Interaction (anonymous usage counts, not linked, no tracking); `PRIVACY.md` and the App Store description below now match that (the description no longer claims "no analytics").
 
@@ -101,7 +102,7 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 
 **Accounts & certificates**
 - [ ] Apple Developer Program membership active (paid) for team `7V79F7AY68`.
-- [ ] In Xcode: Settings → Accounts → Manage Certificates → create an **Apple Distribution** certificate (only Apple Development exists on this machine today).
+- [x] **Apple Distribution certificate exists** on this machine (`Apple Distribution: Ha Bao Trung Le (7V79F7AY68)`, verified 2026-07-25) — archiving and App Store export both work without further certificate setup.
 
 **One-time Xcode capability check**
 - [ ] Signing & Capabilities → confirm iCloud (CloudKit, container `iCloud.brickcedar.Memento`) shows no errors, and add **Background Modes → Remote notifications** if the checkbox isn't already reflected (the Info.plist key is now set; the capability UI should agree). Optionally add the Push Notifications capability — recommended for CloudKit change pushes.
