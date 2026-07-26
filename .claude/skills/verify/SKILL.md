@@ -15,13 +15,25 @@ variant string breaks shell parsing — use `id=`):
   `DerivedData/Memento-*/Build/Products/Debug-iphoneos/Memento.app`
 - iPad/iPhone Simulator: `-destination 'id=<sim-udid>'` → `Debug-iphonesimulator/`
 
-## Observe on the iOS Simulator (preferred — no TCC needed)
+**The repo lives in a OneDrive-synced folder, and the file provider
+re-stamps build products with `com.apple.fileprovider.fpfs#P` — codesign
+then fails with "resource fork, Finder information, or similar detritus
+not allowed".** Simulator builds don't sign so they escape; any *signed*
+build (Mac destination, device) must use `-derivedDataPath` outside the
+synced tree, e.g. `/tmp/memento-dd`. (`xattr -cr` doesn't stick — the
+provider re-tags.)
 
-`screencapture` and AppleScript/System Events are TCC-blocked for shell
-sessions on this Mac (they hang or fail), so drive verification on the
-Simulator instead; `simctl io booted screenshot` needs no permissions.
-Use an iPad simulator — the Mac build is the unmodified iPad app, so the
+## Observe on the iOS Simulator
+
+`simctl io booted screenshot` needs no permissions. Use an iPad
+simulator — the Mac build is the unmodified iPad app, so the
 split-view/selection idiom matches.
+
+`screencapture` and AppleScript/System Events also work from shell
+sessions now (TCC granted 2026-07-26; an older note here claimed they
+hang — stale). Safari has "Allow JavaScript from Apple Events" enabled,
+so `osascript … do JavaScript` can drive and read web pages; screenshot
+the screen with `screencapture -x /tmp/x.png` and Read the file.
 
 ```bash
 xcrun simctl boot <udid> && xcrun simctl bootstatus <udid>
@@ -49,16 +61,24 @@ bundle the old registration goes stale ("Launchd job spawn failed") —
 recreate and re-register:
 
 ```bash
-rm -rf /Applications/Memento.app
-mkdir -p /Applications/Memento.app/Wrapper
-cp -R <path>/Debug-iphoneos/Memento.app /Applications/Memento.app/Wrapper/
-ln -s Wrapper/Memento.app /Applications/Memento.app/WrappedBundle
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Memento.app
-open /Applications/Memento.app --args --stress-seed 60
+mkdir -p ~/Applications/Memento.app/Wrapper
+cp -R <path>/Debug-iphoneos/Memento.app ~/Applications/Memento.app/Wrapper/
+ln -sf Wrapper/Memento.app ~/Applications/Memento.app/WrappedBundle
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/Memento.app
+open ~/Applications/Memento.app --args --stress-seed 60
 ```
 
-The Mac app's screen can't be captured from here (TCC); confirm behavior
-via `/usr/bin/log show --predicate 'subsystem == "brickcedar.Memento"'`
+Use `~/Applications` — auto-mode permission rules block writes to
+`/Applications` (the user's own install lives there; leave it alone).
+
+**`open --args` only reaches a freshly spawned process.** If any Memento
+instance is already running, `open` foregrounds it and the args go
+nowhere — `tell application "Memento" to quit`, wait, then `open`.
+Confirm with `ps -o lstart=,command= -p <pid> -ww` that the start time is
+now and the args are on the command line.
+
+Confirm behavior via
+`/usr/bin/log show --predicate 'subsystem == "brickcedar.Memento"'`
 (full path — the user's zsh profile defines a `log` function that shadows
 the system tool and fails with "too many arguments").
 
@@ -72,3 +92,9 @@ directly; go through the app.
   validation only happens when the ModelContainer is constructed (see CLAUDE.md).
 - `--stress-seed N` / StressSeeder is DEBUG-only and idempotent (marker
   person "Stress 001 Aegean Papadopoulos").
+- A CloudKit record type only exists once a record of that model has
+  actually been *saved* by a debug build — `CD_Project` was missing from
+  the Development schema until 2026-07-26 because nothing (not even the
+  stress seeder) had ever saved a `Project`. After adding a `@Model`,
+  save one record of it before any "Deploy Schema Changes to Production"
+  (see `docs/app-store-submission.md`).
