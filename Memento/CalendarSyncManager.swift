@@ -9,26 +9,26 @@ import SwiftUI
 /// of NotificationManager's per-date reminder toggle — every date syncs
 /// here regardless, matching the in-app Calendar tab.
 enum CalendarSyncManager {
-    static let enabledKey = "appleCalendarSyncEnabled"
-    static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
-    static let lastSyncKey = "appleCalendarLastSync"
-    private static let calendarIdentifierKey = "appleCalendarIdentifier"
+    nonisolated static let enabledKey = "appleCalendarSyncEnabled"
+    nonisolated static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
+    nonisolated static let lastSyncKey = "appleCalendarLastSync"
+    nonisolated private static let calendarIdentifierKey = "appleCalendarIdentifier"
     // True when the stored identifier points at a calendar this app
     // *adopted* rather than created (see `findOrCreateCalendar`). An
     // adopted calendar may hold the user's own events, so rebuilds touch
     // only app-generated events in it and toggle-off never deletes it.
-    private static let calendarAdoptedKey = "appleCalendarAdopted"
-    private static let calendarTitle = "Memento"
+    nonisolated private static let calendarAdoptedKey = "appleCalendarAdopted"
+    nonisolated private static let calendarTitle = "Memento"
     // EKEventStore is documented thread-safe; the rebuild runs on syncQueue
     // so a 250-contact full rebuild (measured at multiple seconds) doesn't
     // freeze the UI on every save.
     nonisolated(unsafe) private static let store = EKEventStore()
-    nonisolated(unsafe) private static let syncQueue =
+    nonisolated private static let syncQueue =
         DispatchQueue(label: "brickcedar.Memento.calendar-sync", qos: .utility)
     // Coalescing: a burst of saves bumps the generation; queued rebuilds
     // whose generation is stale skip, so only the newest snapshot lands.
     nonisolated(unsafe) private static var latestGeneration = 0
-    nonisolated(unsafe) private static let generationLock = NSLock()
+    nonisolated private static let generationLock = NSLock()
 
     /// One event to mirror — a plain value, because SwiftData models must
     /// not cross to the sync queue.

@@ -2,20 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Merged into the generated Info.plist (GENERATE_INFOPLIST_FILE stays
-	     YES). Only keys with no INFOPLIST_KEY_ build-setting equivalent
-	     belong here. remote-notification lets CloudKit push changes to the
-	     app in the background, so cross-device sync doesn't wait for the
-	     next launch. -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<!-- Registers Memento as an (alternate-rank) opener of plain text, so an
-	     AirDropped profile card — a structured .txt so Notes and anyone
-	     without Memento can still read it — offers "Open in Memento" on the
-	     receiving device. RootView's onOpenURL parses the card and offers to
-	     add the person; non-profile text files are declined with an alert. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -30,6 +16,12 @@
 				<string>public.plain-text</string>
 			</array>
 		</dict>
+	</array>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

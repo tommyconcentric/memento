@@ -4,7 +4,7 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 
 ## Repo pre-flight (verified 2026-07-24)
 
-- **Release build:** compiles clean in the Release configuration; no errors, no unused-code warnings.
+- **Release build:** compiles clean in the Release configuration — zero warnings, zero errors on a full *clean* build (re-verified 2026-07-26; incremental builds hide compiler diagnostics, so always judge from a clean build).
 - **No dev tooling in the shipping binary:** `StressSeeder` and the `--ui-probe` verification hooks are `#if DEBUG` only — confirmed absent from the Release build's strings.
 - **Version:** `MARKETING_VERSION 1.0`, `CURRENT_PROJECT_VERSION 2` (bump the build number for every upload).
 - **Deployment target:** iOS 17.0 (a stray project-level 26.5 default is overridden by the target; effective value is 17.0).
@@ -123,7 +123,7 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [ ] Submit for review.
 
 **After the listing exists**
-- [ ] Put the numeric Apple ID of the app into `SettingsView.appStoreID` so "Rate Memento" deep-links to the review page, and ship it in the next build.
+- [x] Put the numeric Apple ID of the app into `SettingsView.appStoreID` so "Rate Memento" deep-links to the review page (set to `6791973402`, 2026-07-26 — ships with the first build).
 - [ ] If the app name on the store ends up different, update the About screen copy if desired.
 
 **Housekeeping per release**

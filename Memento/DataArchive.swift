@@ -39,7 +39,7 @@ import SwiftData
 /// (One honest boundary: an app only preserves fields it understands, so
 /// round-tripping a *newer* file *through* an older app drops the newer
 /// fields. Importing directly between versions never loses shared data.)
-struct MementoArchive: Codable {
+nonisolated struct MementoArchive: Codable {
     /// Marker so a stray JSON file can be told apart from a real archive.
     var format: String? = archiveMarker
     /// Breaking-change gate; additive changes do not bump this.
@@ -56,14 +56,14 @@ struct MementoArchive: Codable {
     static let currentFormatVersion = 1
 }
 
-struct ArchiveGroup: Codable {
+nonisolated struct ArchiveGroup: Codable {
     var id: UUID
     var name: String?
     var sortOrder: Int?
     var isBuiltIn: Bool?
 }
 
-struct ArchivePerson: Codable {
+nonisolated struct ArchivePerson: Codable {
     /// Archive-local identity, used only to wire up folders, notes and
     /// family edges within this one file (SwiftData's own ids aren't
     /// portable). Never stored back onto the model.
@@ -103,7 +103,7 @@ struct ArchivePerson: Codable {
     var projects: [ArchiveProject]?
 }
 
-struct ArchiveNote: Codable {
+nonisolated struct ArchiveNote: Codable {
     var title: String?
     var text: String?
     var eventDate: Date?
@@ -112,43 +112,43 @@ struct ArchiveNote: Codable {
     var photos: [ArchivePhoto]?
 }
 
-struct ArchivePhoto: Codable {
+nonisolated struct ArchivePhoto: Codable {
     var imageData: Data?
     var caption: String?
     var sortOrder: Int?
 }
 
-struct ArchiveImportantDate: Codable {
+nonisolated struct ArchiveImportantDate: Codable {
     var label: String?
     var date: Date?
     var remindersEnabled: Bool?
 }
 
-struct ArchiveFamilyMember: Codable {
+nonisolated struct ArchiveFamilyMember: Codable {
     var name: String?
     var relation: String?
 }
 
-struct ArchiveContactField: Codable {
+nonisolated struct ArchiveContactField: Codable {
     var kind: String?
     var value: String?
     var isPreferred: Bool?
     var sortOrder: Int?
 }
 
-struct ArchiveProject: Codable {
+nonisolated struct ArchiveProject: Codable {
     var name: String?
     var isCompleted: Bool?
     var sortOrder: Int?
 }
 
-struct ArchiveParentage: Codable {
+nonisolated struct ArchiveParentage: Codable {
     var parentID: UUID?
     var childID: UUID?
     var kind: String?
 }
 
-struct ArchivePartnership: Codable {
+nonisolated struct ArchivePartnership: Codable {
     var aID: UUID?
     var bID: UUID?
     var kind: String?
@@ -199,7 +199,7 @@ enum DataArchiveError: LocalizedError {
 // MARK: - Export
 
 enum DataArchiveExport {
-    private static var encoder: JSONEncoder {
+    nonisolated private static var encoder: JSONEncoder {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -318,7 +318,7 @@ enum DataArchiveExport {
         }
     }
 
-    static func filenameStamp() -> String {
+    nonisolated static func filenameStamp() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
