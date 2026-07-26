@@ -14,7 +14,7 @@ struct SettingsView: View {
     /// write-review deep link (works for both the iOS and Mac App Store).
     /// While empty, the Rate button falls back to the system's in-app
     /// review prompt instead.
-    private static let appStoreID = ""
+    private static let appStoreID = "6791973402"
     private static let feedbackAddress = "tommy@concentric.health"
     /// Where permission recovery actually lives: there is no "iOS Settings
     /// app" when the app runs on a Mac — pointing users there is misleading

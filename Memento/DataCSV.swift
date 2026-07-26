@@ -53,7 +53,7 @@ enum MementoCSV {
                 "Workspace": person.isBusiness ? "Business" : "Personal",
                 "Folder": person.group?.name ?? "",
                 "Name": person.name,
-                "Birthday": person.birthday.map(birthdayString) ?? "",
+                "Birthday": person.birthday.map { birthdayString($0) } ?? "",
                 "Deceased": person.isDeceased ? "Yes" : "",
                 "Pinned": person.isPinned ? "Yes" : "",
                 "Relationship": person.relationshipToUser,
@@ -95,7 +95,7 @@ enum MementoCSV {
             }
         }
 
-        var lines = [columns.map(escape).joined(separator: ",")]
+        var lines = [columns.map { escape($0) }.joined(separator: ",")]
         for row in rows {
             lines.append(columns.map { escape(row[$0] ?? "") }.joined(separator: ","))
         }
