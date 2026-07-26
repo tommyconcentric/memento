@@ -105,10 +105,10 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [x] **Apple Distribution certificate exists** on this machine (`Apple Distribution: Ha Bao Trung Le (7V79F7AY68)`, verified 2026-07-25) — archiving and App Store export both work without further certificate setup.
 
 **One-time Xcode capability check**
-- [ ] Signing & Capabilities → confirm iCloud (CloudKit, container `iCloud.brickcedar.Memento`) shows no errors, and add **Background Modes → Remote notifications** if the checkbox isn't already reflected (the Info.plist key is now set; the capability UI should agree). Optionally add the Push Notifications capability — recommended for CloudKit change pushes.
+- [x] Signing & Capabilities → confirm iCloud (CloudKit, container `iCloud.brickcedar.Memento`) shows no errors, and add **Background Modes → Remote notifications** if the checkbox isn't already reflected. Verified 2026-07-26 from the exported App Store `.ipa` itself: iCloud/CloudKit entitlements and the `remote-notification` background mode are all present in the shipping package. (The optional Push Notifications capability remains unadded — fine for CloudKit pushes.)
 
 **CloudKit — critical, easy to forget**
-- [ ] CloudKit Console (icloud.developer.apple.com) → container `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production**. A TestFlight/App Store build talks to the *production* CloudKit environment; without this, sync silently fails for release users. Redo this any time the SwiftData schema changes.
+- [x] CloudKit Console (icloud.developer.apple.com) → container `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production**. Deployed and verified in Production 2026-07-26: all ten `CD_*` record types plus `UsagePing` with its queryable `pingDate`/`installID` indexes. (`CD_Project` had never materialized in Development — no debug build had ever saved a `Project`, the stress seeder included — and had to be created first by saving a real record; a schema type only exists once a record of it has been saved.) **Redo this any time the SwiftData schema changes** — and if a new `@Model` is added, save at least one record of it in a debug build first, or the type won't be in the schema to deploy.
 
 **App Store Connect**
 - [x] Create the app: bundle ID `brickcedar.Memento`, store name "Memento Vivere" (plain "Memento" was taken). iOS platform only — Mac availability comes from the "Make this app available on Mac" checkbox, not the macOS platform.
