@@ -146,6 +146,9 @@ struct QuickInfoView: View {
         if !person.hometown.isEmpty {
             InfoRow(icon: "house", label: "Hometown", value: person.hometown)
         }
+        if !person.currentCity.isEmpty {
+            InfoRow(icon: "location", label: "Currently Based", value: person.currentCity)
+        }
         if !person.howWeMet.isEmpty {
             InfoRow(icon: "sparkles", label: "How We Met", value: person.howWeMet)
         }

@@ -1,6 +1,6 @@
 # Memento Privacy Policy
 
-_Last updated: July 23, 2026_
+_Last updated: August 14, 2026_
 
 Memento is a personal-CRM app for remembering the people in your life. It is built so that **your data belongs to you and never reaches us**.
 
@@ -17,6 +17,10 @@ You can turn this off any time in **Settings → Anonymous Usage Statistics**; s
 Everything you enter — people, notes, photos, dates, family relationships — is stored on your device and, if you're signed into iCloud, synced through **your own private iCloud database (CloudKit)**. That sync is between your devices and Apple; the developer has no access to it. Apple's handling of iCloud data is covered by [Apple's Privacy Policy](https://www.apple.com/legal/privacy/).
 
 The optional app lock PIN is stored only in your device's Keychain and never leaves the device.
+
+## City search (Apple Maps)
+
+When you type in the **Hometown** or **Currently based in** fields, Memento asks Apple Maps for matching city names so you can pick one. Only what you type in those two fields is sent, it goes to **Apple's Maps servers** (never to us or any third party), and nothing about it is stored outside your own data. Apple's handling of Maps queries is covered by [Apple's Privacy Policy](https://www.apple.com/legal/privacy/). If you're offline, the fields simply work as plain text. This and your own iCloud sync are the only network traffic in the app.
 
 ## Device permissions Memento may ask for
 

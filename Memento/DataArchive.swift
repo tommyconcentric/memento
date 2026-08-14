@@ -88,6 +88,7 @@ nonisolated struct ArchivePerson: Codable {
     var company: String?
     var hobbies: String?
     var hometown: String?
+    var currentCity: String?     // added later; optional so any version reads any file
     var howWeMet: String?
     var foodPreferences: String?
     var phoneNumber: String?
@@ -246,6 +247,7 @@ enum DataArchiveExport {
                 company: person.company.nilIfEmpty,
                 hobbies: person.hobbies.nilIfEmpty,
                 hometown: person.hometown.nilIfEmpty,
+                currentCity: person.currentCity.nilIfEmpty,
                 howWeMet: person.howWeMet.nilIfEmpty,
                 foodPreferences: person.foodPreferences.nilIfEmpty,
                 phoneNumber: person.phoneNumber.nilIfEmpty,
@@ -514,6 +516,7 @@ enum DataArchiveImport {
         setString(\.company, ap.company)
         setString(\.hobbies, ap.hobbies)
         setString(\.hometown, ap.hometown)
+        setString(\.currentCity, ap.currentCity)
         setString(\.howWeMet, ap.howWeMet)
         setString(\.foodPreferences, ap.foodPreferences)
         setString(\.phoneNumber, ap.phoneNumber)

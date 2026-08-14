@@ -86,6 +86,7 @@ final class Person {
     var company: String = ""
     var hobbies: String = ""
     var hometown: String = ""
+    var currentCity: String = ""          // where they're based now, e.g. "Lisbon, Portugal"
     var howWeMet: String = ""
     var foodPreferences: String = ""
     var phoneNumber: String = ""
@@ -273,7 +274,7 @@ extension Person {
     var hasAnyQuickInfo: Bool {
         if birthday != nil || !importantDatesArray.isEmpty || !contactFieldsArray.isEmpty { return true }
         let fields = [partnerName, childrenNames, otherFamily, jobTitle, company,
-                      hobbies, hometown, howWeMet, foodPreferences, phoneNumber, email,
+                      hobbies, hometown, currentCity, howWeMet, foodPreferences, phoneNumber, email,
                       address, relationshipToUser]
         return !fields.allSatisfy { $0.isEmpty }
     }

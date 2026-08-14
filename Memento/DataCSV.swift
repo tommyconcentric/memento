@@ -19,7 +19,7 @@ enum MementoCSV {
     static let columns = [
         "Type", "ID", "PersonID", "Workspace", "Folder", "Name",
         "Birthday", "Deceased", "Pinned", "Relationship",
-        "Job Title", "Company", "Hobbies", "Hometown", "How We Met",
+        "Job Title", "Company", "Hobbies", "Hometown", "Currently Based", "How We Met",
         "Food & Drink", "Phone", "Email", "Address",
         "Date", "Label", "Title", "Text", "Location"
     ]
@@ -61,6 +61,7 @@ enum MementoCSV {
                 "Company": person.company,
                 "Hobbies": person.hobbies,
                 "Hometown": person.hometown,
+                "Currently Based": person.currentCity,
                 "How We Met": person.howWeMet,
                 "Food & Drink": person.foodPreferences,
                 "Phone": person.phoneNumber,
@@ -177,6 +178,7 @@ enum MementoCSV {
             person.company = value(fields, "Company")
             person.hobbies = value(fields, "Hobbies")
             person.hometown = value(fields, "Hometown")
+            person.currentCity = value(fields, "Currently Based")
             person.howWeMet = value(fields, "How We Met")
             person.foodPreferences = value(fields, "Food & Drink")
             person.phoneNumber = value(fields, "Phone")
