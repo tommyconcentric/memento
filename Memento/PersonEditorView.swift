@@ -41,6 +41,7 @@ struct PersonEditorView: View {
     @State private var company = ""
     @State private var hobbies = ""
     @State private var hometown = ""
+    @State private var currentCity = ""
     @State private var howWeMet = ""
     @State private var foodPreferences = ""
     @State private var phoneNumber = ""
@@ -295,11 +296,17 @@ struct PersonEditorView: View {
                     TextField("Running, jazz, board games…", text: $hobbies, axis: .vertical)
                 }
 
-                Section("Background") {
-                    TextField("Hometown", text: $hometown)
+                Section {
+                    CityField(title: "Hometown", text: $hometown)
+                    CityField(title: "Currently based in", text: $currentCity)
                     if !isSelfProfile {
                         TextField("How we met", text: $howWeMet, axis: .vertical)
                     }
+                } header: {
+                    TipHeader(
+                        title: "Background",
+                        tip: "Start typing and pick a city — it's saved as city and country (with the state for the US and Canada). Anything else you type is kept as written."
+                    )
                 }
 
                 Section("Food & Drink") {
@@ -706,6 +713,7 @@ struct PersonEditorView: View {
         company = person.company
         hobbies = person.hobbies
         hometown = person.hometown
+        currentCity = person.currentCity
         howWeMet = person.howWeMet
         foodPreferences = person.foodPreferences
         phoneNumber = PhoneNumberFormatter.display(person.phoneNumber)
@@ -770,6 +778,7 @@ struct PersonEditorView: View {
         target.company = company.trimmed
         target.hobbies = hobbies.trimmed
         target.hometown = hometown.trimmed
+        target.currentCity = currentCity.trimmed
         target.howWeMet = howWeMet.trimmed
         target.foodPreferences = foodPreferences.trimmed
         target.phoneNumber = phoneNumber.trimmed
