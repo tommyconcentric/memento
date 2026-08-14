@@ -753,6 +753,12 @@ struct PersonEditorView: View {
         target.email = email.trimmed
         target.address = address.trimmed
         target.relationshipToUser = isOtherRelationship ? customRelationship.trimmed : relationshipToUser
+        // Your partner rides at the top of the list — but only the first time
+        // they become your partner. Unpinning them afterwards sticks.
+        if target.isYourPartner, !target.didAutoPinAsPartner {
+            target.didAutoPinAsPartner = true
+            target.isPinned = true
+        }
 
         // Replace important dates with the edited set.
         let oldDates = target.importantDatesArray

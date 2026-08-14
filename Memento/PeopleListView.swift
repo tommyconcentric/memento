@@ -505,6 +505,12 @@ struct PersonRow: View {
                             .font(.caption2)
                             .foregroundStyle(detailColor)
                     }
+                    if person.isYourPartner {
+                        Image(systemName: "heart.fill")
+                            .font(.caption2)
+                            .foregroundStyle(isSelected ? .white : Theme.terracotta)
+                            .accessibilityLabel("Your partner")
+                    }
                 }
                 if !person.subtitle.isEmpty {
                     Text(person.subtitle)

@@ -250,6 +250,7 @@ struct RootView: View {
     // created by two devices seeding before sync can be folded together.
     @Query(filter: #Predicate<Person> { $0.isSelf }) private var selfNodes: [Person]
     @AppStorage("didSeedDefaultGroups") private var didSeedDefaultGroups = false
+    @AppStorage("didAdoptStarterFolderOrder") private var didAdoptStarterFolderOrder = false
     // A profile card arriving via AirDrop/"Open in Memento" (the app is
     // registered as a plain-text viewer for exactly this).
     @State private var incomingProfile: ParsedProfile?
@@ -277,6 +278,7 @@ struct RootView: View {
             .onAppear {
                 retireLogoColorScheme()
                 seedDefaultGroupsIfNeeded()
+                adoptStarterFolderOrderIfUntouched()
                 mergeDuplicateBuiltInGroups()
                 ensureSelfNode()
                 #if DEBUG
@@ -321,6 +323,26 @@ struct RootView: View {
         }
     }
 
+    /// Existing installs were seeded with Family last. Move it to the top —
+    /// but only for someone who never touched the order, which means the
+    /// folders must still be exactly the four originals, still in exactly the
+    /// order they were seeded in. Any rename, addition, deletion or drag and
+    /// this leaves well alone: their arrangement is theirs.
+    private func adoptStarterFolderOrderIfUntouched() {
+        guard !didAdoptStarterFolderOrder else { return }
+        didAdoptStarterFolderOrder = true
+
+        let legacyOrder = ["Close Friends", "Friends", "Work Colleagues", "Family"]
+        let current = groups.sorted { $0.sortOrder < $1.sortOrder }
+        guard current.map(\.name) == legacyOrder, current.allSatisfy(\.isBuiltIn) else { return }
+
+        for group in current {
+            guard let index = PersonGroup.starterFolderNames.firstIndex(of: group.name) else { return }
+            group.sortOrder = index
+        }
+        try? context.save()
+    }
+
     private func seedDefaultGroupsIfNeeded() {
         guard !didSeedDefaultGroups else { return }
         guard groups.isEmpty else {
@@ -330,8 +352,7 @@ struct RootView: View {
             didSeedDefaultGroups = true
             return
         }
-        let names = ["Close Friends", "Friends", "Work Colleagues", "Family"]
-        for (index, name) in names.enumerated() {
+        for (index, name) in PersonGroup.starterFolderNames.enumerated() {
             context.insert(PersonGroup(name: name, sortOrder: index, isBuiltIn: true))
         }
         // Only latch the flag once the insert is durably saved, so a failed

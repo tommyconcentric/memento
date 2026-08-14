@@ -69,20 +69,9 @@ struct PersonDetailView: View {
                     Button("Edit Person", systemImage: "pencil") {
                         showingEditor = true
                     }
-                    // Defense in depth: no surface should route the hidden
-                    // self node here, but if one ever leaks again, deleting
-                    // it would cascade away every family-tree edge.
-                    if !person.isSelf {
-                    Button(
-                        person.isDeceased ? "Unmark as Deceased" : "Mark as Deceased",
-                        systemImage: "leaf"
-                    ) {
-                        person.isDeceased.toggle()
-                        try? context.save()
-                        NotificationManager.refreshFromContext(context)
-                        CalendarSyncManager.refreshFromContext(context)
-                    }
-                    }
+                    // Marking someone deceased lives at the foot of the editor,
+                    // not here: it's a considered edit, not a quick action, and
+                    // a menu tap away from "Edit Person" made it easy to hit.
                     // Business contacts export a crisp report; personal
                     // people a scrapbook — each workspace's voice, in print.
                     Button(
@@ -142,6 +131,18 @@ struct PersonDetailView: View {
             )
             .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 3))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+            .overlay(alignment: .topTrailing) {
+                if person.isYourPartner {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Theme.terracotta)
+                        .padding(5)
+                        .background(.white, in: Circle())
+                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                        .offset(x: 2, y: -2)
+                        .accessibilityLabel("Your partner")
+                }
+            }
 
             Text(person.name)
                 .font(.system(.title2, design: person.workspace.displayFontDesign, weight: .semibold))
