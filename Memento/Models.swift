@@ -22,6 +22,31 @@ final class PersonGroup {
 }
 
 extension PersonGroup {
+    /// The starter set, in the order a new user meets them.
+    static let starterFolderNames = ["Family", "Close Friends", "Work Colleagues", "Friends"]
+
+    /// Where a folder sits before anyone drags it: the closest relationships
+    /// first, everything else alphabetically after. `sortOrder` stays the
+    /// source of truth for display — this only decides what that order starts
+    /// out as, so reordering by hand always wins.
+    private static let rankedFolderNames = ["Family", "Close Friends", "Friends"]
+
+    static func defaultRank(of name: String) -> Int {
+        let match = rankedFolderNames.firstIndex {
+            $0.compare(name.trimmed, options: .caseInsensitive) == .orderedSame
+        }
+        return match ?? rankedFolderNames.count
+    }
+
+    /// Orders folders the way a user who has never reordered them expects.
+    static func inDefaultOrder(_ groups: [PersonGroup]) -> [PersonGroup] {
+        groups.sorted {
+            let (left, right) = (defaultRank(of: $0.name), defaultRank(of: $1.name))
+            if left != right { return left < right }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
     var peopleArray: [Person] {
         get { people ?? [] }
         set { people = newValue }
@@ -52,6 +77,9 @@ final class Person {
     var birthday: Date?
     var birthdayReminderEnabled: Bool = true
     var partnerName: String = ""
+    // Set once, when someone first becomes your partner, so they ride at the
+    // top of the list without ever re-pinning someone you deliberately unpinned.
+    var didAutoPinAsPartner: Bool = false
     var childrenNames: String = ""
     var otherFamily: String = ""
     var jobTitle: String = ""
@@ -128,6 +156,23 @@ extension Array where Element == Person {
 }
 
 extension Person {
+    /// Labels that mean "this is my partner". `relationshipToUser` is written
+    /// by the self-node linking (which normalises girlfriend/boyfriend to
+    /// "Partner"), but the user can also type their own, so equivalents count.
+    private static let partnerLabels: Set<String> = [
+        "partner", "spouse", "husband", "wife", "girlfriend", "boyfriend",
+        "fiancé", "fiancée", "fiance", "fiancee"
+    ]
+
+    /// True when this person is *your* partner. Ex-partners deliberately
+    /// don't count — "Ex-partner" is exactly what the linking writes when a
+    /// partnership is marked former.
+    var isYourPartner: Bool {
+        let label = relationshipToUser.trimmed.lowercased()
+        guard !label.hasPrefix("ex"), !label.hasPrefix("former") else { return false }
+        return Self.partnerLabels.contains(label)
+    }
+
     /// A one-line summary shown under the name in the people list.
     var subtitle: String {
         let work = [jobTitle, company].filter { !$0.isEmpty }.joined(separator: " · ")

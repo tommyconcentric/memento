@@ -35,13 +35,22 @@ struct GroupsManagerView: View {
                                 Spacer()
                                 Text("\(group.peopleArray.count)")
                                     .foregroundStyle(.secondary)
+                                // The drag affordance sits in the row itself,
+                                // not only behind Edit: a list that reorders is
+                                // invisible until you already know it does.
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.footnote)
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
                     .onDelete(perform: delete)
                     .onMove(perform: move)
+                } header: {
+                    Text("Drag ≡ to reorder")
                 } footer: {
-                    Text("Tap a folder to rename it. Deleting a folder keeps its people — they move to Ungrouped.")
+                    Text("Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people — they move to Ungrouped.")
                 }
             }
             .navigationTitle("Folders")
@@ -84,8 +93,24 @@ struct GroupsManagerView: View {
     private func addGroup() {
         let trimmed = newName.trimmed
         guard !trimmed.isEmpty else { return }
-        let nextOrder = (groups.map(\.sortOrder).max() ?? -1) + 1
-        context.insert(PersonGroup(name: trimmed, sortOrder: nextOrder))
+        // Slot it in alphabetically among its peers rather than dumping it at
+        // the bottom. Only an insert — every existing folder keeps its
+        // relative position, so a hand-dragged order survives.
+        let newRank = PersonGroup.defaultRank(of: trimmed)
+        let ordered = groups.sorted { $0.sortOrder < $1.sortOrder }
+        let insertion = ordered.firstIndex {
+            let rank = PersonGroup.defaultRank(of: $0.name)
+            if rank != newRank { return rank > newRank }
+            return $0.name.localizedStandardCompare(trimmed) == .orderedDescending
+        } ?? ordered.count
+
+        let group = PersonGroup(name: trimmed, sortOrder: insertion)
+        context.insert(group)
+        var reordered = ordered
+        reordered.insert(group, at: insertion)
+        for (index, folder) in reordered.enumerated() {
+            folder.sortOrder = index
+        }
         try? context.save()
         newName = ""
     }
