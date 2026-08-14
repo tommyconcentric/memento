@@ -10,7 +10,6 @@ struct PersonDetailView: View {
 
     @State private var tab: DetailTab = .quickInfo
     @State private var showingEditor = false
-    @State private var showingDeleteConfirm = false
     @State private var pdfExport: PDFExportDocument?
     @State private var showingPDFExporter = false
 
@@ -54,6 +53,23 @@ struct PersonDetailView: View {
                     PersonFamilySection(person: person) { showingEditor = true }
                 case .notes:
                     NotesTimelineView(person: person)
+                    // The export earns its place only once there's something
+                    // to print; business contacts get a crisp report,
+                    // personal people a scrapbook.
+                    if !person.notesArray.isEmpty {
+                        Button {
+                            pdfExport = PDFExportDocument(data: NotesPDFExporter.render(for: person))
+                            showingPDFExporter = true
+                        } label: {
+                            Label(
+                                person.isBusiness ? "Export Notes Report (PDF)" : "Export Notes Scrapbook (PDF)",
+                                systemImage: "square.and.arrow.up"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(person.workspace.accent)
+                    }
                 }
             }
             .padding()
@@ -63,32 +79,13 @@ struct PersonDetailView: View {
         .background(person.workspace.background)
         .navigationTitle(person.name)
         .navigationBarTitleDisplayMode(.inline)
+        // A pencil straight to the editor — the old ⋯ menu's other actions
+        // moved to where they're used: PDF export to the foot of the Notes
+        // tab, deletion (and deceased) to the foot of the editor.
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Edit Person", systemImage: "pencil") {
-                        showingEditor = true
-                    }
-                    // Marking someone deceased lives at the foot of the editor,
-                    // not here: it's a considered edit, not a quick action, and
-                    // a menu tap away from "Edit Person" made it easy to hit.
-                    // Business contacts export a crisp report; personal
-                    // people a scrapbook — each workspace's voice, in print.
-                    Button(
-                        person.isBusiness ? "Export Notes Report (PDF)" : "Export Notes Scrapbook (PDF)",
-                        systemImage: "square.and.arrow.up"
-                    ) {
-                        pdfExport = PDFExportDocument(data: NotesPDFExporter.render(for: person))
-                        showingPDFExporter = true
-                    }
-                    .disabled(person.notesArray.isEmpty)
-                    if !person.isSelf {
-                        Button("Delete Person", systemImage: "trash", role: .destructive) {
-                            showingDeleteConfirm = true
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                Button("Edit Person", systemImage: "pencil") {
+                    showingEditor = true
                 }
             }
         }
@@ -102,21 +99,6 @@ struct PersonDetailView: View {
             defaultFilename: NotesPDFExporter.filename(for: person)
         ) { _ in
             pdfExport = nil
-        }
-        .confirmationDialog(
-            "Delete \(person.name)?",
-            isPresented: $showingDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                context.delete(person)
-                try? context.save()
-                NotificationManager.refreshFromContext(context)
-                CalendarSyncManager.refreshFromContext(context)
-                dismiss()
-            }
-        } message: {
-            Text("All notes and photos for this person will be deleted too.")
         }
     }
 

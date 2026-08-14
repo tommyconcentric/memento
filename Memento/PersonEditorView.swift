@@ -54,6 +54,7 @@ struct PersonEditorView: View {
     @State private var draftProjects: [DraftProject] = []
 
     @State private var loadedInitial = false
+    @State private var showingDeleteConfirm = false
 
     // "Other…" reveals a free-text box; the typed label is stored in the
     // same relationshipToUser field but never charts (see isChartable).
@@ -424,6 +425,17 @@ struct PersonEditorView: View {
                             tip: "Grays their profile and hides birthday countdowns."
                         )
                     }
+
+                    // Deletion lives at the very foot of the editor, under
+                    // Remembrance — the profile's other end-of-the-road —
+                    // and only for someone who already exists.
+                    if person != nil {
+                        Section {
+                            Button("Delete Person", systemImage: "trash", role: .destructive) {
+                                showingDeleteConfirm = true
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle(person == nil ? "New Person" : (isSelfProfile ? "My Profile" : "Edit Person"))
@@ -476,7 +488,28 @@ struct PersonEditorView: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "Delete \(person?.name ?? "")?",
+                isPresented: $showingDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive, action: deletePerson)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("All notes and photos for this person will be deleted too.")
+            }
         }
+    }
+
+    /// Deletes the person being edited and closes the editor; the detail
+    /// view underneath blanks itself via `person.isDeleted`.
+    private func deletePerson() {
+        guard let person else { return }
+        context.delete(person)
+        try? context.save()
+        NotificationManager.refreshFromContext(context)
+        CalendarSyncManager.refreshFromContext(context)
+        dismiss()
     }
 
     // MARK: - Sections
