@@ -28,6 +28,7 @@ When you type in the **Hometown** or **Currently based in** fields, Memento asks
 - **Calendars** — only if you turn on Apple Calendar sync, so Memento can maintain its "Memento" calendar of birthdays and important dates on your device.
 - **Contacts** — Memento uses the system contact picker, which shares only the specific contacts you select. It never reads your address book.
 - **Photos** — Memento uses the system photo picker, which shares only the photos you choose.
+- **Camera** — only if you choose "Take Photo" for a profile picture. The photo goes straight into Memento on your device (and your own iCloud sync); we never see it.
 - **Face ID / Touch ID** — only if you enable it for the optional app lock; biometric data never leaves the device and is handled entirely by the system.
 - **Notifications** — only if you enable birthday and date reminders; these are local notifications scheduled on your device.
 

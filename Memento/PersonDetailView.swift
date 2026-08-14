@@ -125,6 +125,12 @@ struct PersonDetailView: View {
                         .accessibilityLabel("Your partner")
                 }
             }
+            // Change the photo right here — no detour through Edit Person.
+            // Bottom corner (iOS's photo-edit spot); the heart owns the top.
+            .overlay(alignment: .bottomTrailing) {
+                ProfilePhotoEditButton(person: person)
+                    .offset(x: 2, y: 2)
+            }
 
             Text(person.name)
                 .font(.system(.title2, design: person.workspace.displayFontDesign, weight: .semibold))
