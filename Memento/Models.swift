@@ -279,6 +279,20 @@ extension Person {
         return !fields.allSatisfy { $0.isEmpty }
     }
 
+    /// Where they live for grouping and filtering: the city they're based in
+    /// now, falling back to their hometown.
+    var cityLabel: String {
+        let based = currentCity.trimmed
+        return based.isEmpty ? hometown.trimmed : based
+    }
+
+    /// Age usable for ordering — nil when there's no birthday or only a
+    /// year-less one (the placeholder year would fake a 120-year-old).
+    var sortableAge: Int? {
+        guard let birthday, !birthday.hasPlaceholderYear else { return nil }
+        return age
+    }
+
     /// Completed years since the stored birthday.
     var age: Int? {
         guard let birthday else { return nil }

@@ -23,6 +23,52 @@ struct PeopleListView: View {
     @State private var showingMyProfile = false
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
 
+    // MARK: Sort & filter
+
+    enum PeopleSort: String, CaseIterable, Identifiable {
+        case alphabetical, age, city
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .alphabetical: return "Alphabetical"
+            case .age: return "By Age"
+            case .city: return "By City"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .alphabetical: return "textformat"
+            case .age: return "birthday.cake"
+            case .city: return "building.2"
+            }
+        }
+    }
+
+    @AppStorage("peopleSortOrder") private var sortRaw = PeopleSort.alphabetical.rawValue
+    // Newline-joined names — folder and city names can contain commas.
+    // Name-keyed so the filter survives relaunch and sync; a renamed folder
+    // simply un-hides, which errs on showing people rather than losing them.
+    @AppStorage("hiddenFolderNames") private var hiddenFoldersRaw = ""
+    @AppStorage("hiddenCityNames") private var hiddenCitiesRaw = ""
+    /// Stands in for "no folder" in the hidden set — a real folder could be
+    /// named "Ungrouped".
+    private static let ungroupedFilterKey = "\u{1}ungrouped"
+
+    private var sort: PeopleSort { PeopleSort(rawValue: sortRaw) ?? .alphabetical }
+    private var hiddenFolders: Set<String> { Self.parseHidden(hiddenFoldersRaw) }
+    private var hiddenCities: Set<String> { Self.parseHidden(hiddenCitiesRaw) }
+    private var isFiltering: Bool { !hiddenFolders.isEmpty || !hiddenCities.isEmpty }
+
+    private static func parseHidden(_ raw: String) -> Set<String> {
+        Set(raw.components(separatedBy: "\n").filter { !$0.isEmpty })
+    }
+
+    private func toggleHidden(_ key: String, in raw: inout String) {
+        var set = Self.parseHidden(raw)
+        if set.contains(key) { set.remove(key) } else { set.insert(key) }
+        raw = set.sorted().joined(separator: "\n")
+    }
+
     private var workspace: Workspace {
         Workspace(rawValue: storedWorkspace) ?? .personal
     }
@@ -34,11 +80,24 @@ struct PeopleListView: View {
     }
 
     private var filteredPeople: [Person] {
+        // Hidden folders and cities come out first — hiding a group hides
+        // its people everywhere, pinned included.
+        let folders = hiddenFolders
+        let cities = hiddenCities
+        var result = workspacePeople
+        if !folders.isEmpty || !cities.isEmpty {
+            result = result.filter { person in
+                if folders.contains(person.group?.name ?? Self.ungroupedFilterKey) { return false }
+                let city = person.cityLabel
+                if !city.isEmpty, cities.contains(city) { return false }
+                return true
+            }
+        }
         // Match on the trimmed query too — a trailing space (easy via
         // dictation or QuickType) would otherwise hide exact-name matches.
         let query = searchText.trimmed
-        guard !query.isEmpty else { return workspacePeople }
-        return workspacePeople.filter {
+        guard !query.isEmpty else { return result }
+        return result.filter {
             $0.name.localizedCaseInsensitiveContains(query)
             || $0.company.localizedCaseInsensitiveContains(query)
             || $0.jobTitle.localizedCaseInsensitiveContains(query)
@@ -93,10 +152,11 @@ struct PeopleListView: View {
         }
     }
 
-    private func row(for person: Person, isLast: Bool) -> some View {
+    private func row(for person: Person, isLast: Bool, showsAge: Bool = false) -> some View {
         PersonRow(
             person: person,
             isSelected: selectedPerson?.persistentModelID == person.persistentModelID,
+            showsAge: showsAge,
             showsDivider: !isLast,
             onDelete: { personPendingDelete = person },
             onTogglePin: { togglePin(person) }
@@ -104,27 +164,100 @@ struct PeopleListView: View {
         .tag(person)
     }
 
+    // MARK: - Sidebar sections (one per sort order)
+
+    /// The default view: folder sections in the folders' own order.
+    /// Bucketed in a single pass — `filteredPeople` is name-sorted, and
+    /// appending preserves that order per bucket.
+    @ViewBuilder
+    private func folderSections(_ people: [Person]) -> some View {
+        let buckets: ([PersistentIdentifier: [Person]], [Person]) = {
+            var byGroup: [PersistentIdentifier: [Person]] = [:]
+            var ungrouped: [Person] = []
+            for person in people {
+                if let groupID = person.group?.persistentModelID {
+                    byGroup[groupID, default: []].append(person)
+                } else {
+                    ungrouped.append(person)
+                }
+            }
+            return (byGroup, ungrouped)
+        }()
+
+        ForEach(groups) { group in
+            let members = buckets.0[group.persistentModelID] ?? []
+            if !members.isEmpty {
+                peopleSection(members, header: "\(group.name) · \(members.count)")
+            }
+        }
+        if !buckets.1.isEmpty {
+            peopleSection(buckets.1, header: "Ungrouped")
+        }
+    }
+
+    /// Oldest first; anyone without a full birthday (none recorded, or no
+    /// year) sits at the bottom, alphabetical among themselves.
+    @ViewBuilder
+    private func ageSection(_ people: [Person]) -> some View {
+        let sorted = people.sorted { left, right in
+            switch (left.sortableAge, right.sortableAge) {
+            case let (l?, r?) where l != r: return l > r
+            case (.some, .none): return true
+            case (.none, .some): return false
+            default: return left.name.localizedStandardCompare(right.name) == .orderedAscending
+            }
+        }
+        if !sorted.isEmpty {
+            peopleSection(sorted, header: "Oldest First · \(sorted.count)", showsAges: true)
+        }
+    }
+
+    /// City sections stand in for the folders: "City, Country · count",
+    /// biggest city first. People with no city land in "No City" at the end.
+    @ViewBuilder
+    private func citySections(_ people: [Person]) -> some View {
+        let buckets: ([(city: String, members: [Person])], [Person]) = {
+            var byCity: [String: [Person]] = [:]
+            var placeless: [Person] = []
+            for person in people {
+                let city = person.cityLabel
+                if city.isEmpty { placeless.append(person) } else { byCity[city, default: []].append(person) }
+            }
+            let ordered = byCity
+                .map { (city: $0.key, members: $0.value) }
+                .sorted {
+                    if $0.members.count != $1.members.count { return $0.members.count > $1.members.count }
+                    return $0.city.localizedStandardCompare($1.city) == .orderedAscending
+                }
+            return (ordered, placeless)
+        }()
+
+        ForEach(buckets.0, id: \.city) { bucket in
+            peopleSection(bucket.members, header: "\(bucket.city) · \(bucket.members.count)")
+        }
+        if !buckets.1.isEmpty {
+            peopleSection(buckets.1, header: "No City · \(buckets.1.count)")
+        }
+    }
+
+    private func peopleSection(_ members: [Person], header: String, showsAges: Bool = false) -> some View {
+        Section(header) {
+            ForEach(members) { person in
+                row(for: person,
+                    isLast: person.persistentModelID == members.last?.persistentModelID,
+                    showsAge: showsAges)
+            }
+        }
+    }
+
     // MARK: - Sidebar (people list)
 
     private var sidebar: some View {
-        // Bucket the filtered people in a single pass, rather than
-        // re-filtering the whole list once for Pinned, again for every
-        // folder, and once more for Ungrouped — that was O(folders ×
-        // people) of filtering on every sidebar render. `filteredPeople`
-        // is name-sorted, and appending preserves that order per bucket.
         let visible = filteredPeople
         let pinned = visible.filter(\.isPinned)
-        var membersByGroup: [PersistentIdentifier: [Person]] = [:]
-        var ungrouped: [Person] = []
-        for person in visible where !person.isPinned {
-            if let groupID = person.group?.persistentModelID {
-                membersByGroup[groupID, default: []].append(person)
-            } else {
-                ungrouped.append(person)
-            }
-        }
+        let unpinned = visible.filter { !$0.isPinned }
         return List(selection: $selectedPerson) {
-            // Pinned people ride at the very top, across every folder, until
+            // Pinned people ride at the very top, whatever the sort, until
             // unpinned — handy for someone you're about to see.
             if !pinned.isEmpty {
                 Section {
@@ -136,25 +269,10 @@ struct PeopleListView: View {
                 }
             }
 
-            ForEach(groups) { group in
-                let members = membersByGroup[group.persistentModelID] ?? []
-                if !members.isEmpty {
-                    Section {
-                        ForEach(members) { person in
-                            row(for: person, isLast: person.persistentModelID == members.last?.persistentModelID)
-                        }
-                    } header: {
-                        Text("\(group.name) · \(members.count)")
-                    }
-                }
-            }
-
-            if !ungrouped.isEmpty {
-                Section("Ungrouped") {
-                    ForEach(ungrouped) { person in
-                        row(for: person, isLast: person.persistentModelID == ungrouped.last?.persistentModelID)
-                    }
-                }
+            switch sort {
+            case .alphabetical: folderSections(unpinned)
+            case .age: ageSection(unpinned)
+            case .city: citySections(unpinned)
             }
         }
         .confirmationDialog(
@@ -198,6 +316,18 @@ struct PeopleListView: View {
                 }
             } else if !searchText.trimmed.isEmpty && filteredPeople.isEmpty {
                 ContentUnavailableView.search(text: searchText)
+            } else if filteredPeople.isEmpty && isFiltering {
+                ContentUnavailableView {
+                    Label("Everyone's Hidden", systemImage: "line.3.horizontal.decrease.circle")
+                } description: {
+                    Text("Your filters hide every person in this workspace.")
+                } actions: {
+                    Button("Show Everyone") {
+                        hiddenFoldersRaw = ""
+                        hiddenCitiesRaw = ""
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
         }
         // Pinned above the list rather than a toolbar item: the toolbar
@@ -216,6 +346,7 @@ struct PeopleListView: View {
                     Text("Memento")
                         .font(.system(.title3, design: workspace.displayFontDesign, weight: .semibold))
                     Spacer()
+                    filterSortMenu
                     if horizontalSizeClass == .regular {
                         Button {
                             columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
@@ -254,6 +385,75 @@ struct PeopleListView: View {
             .padding(.bottom, 10)
             .background(workspace.background)
         }
+    }
+
+    // MARK: - Filter & sort menu
+
+    /// Every distinct city across the workspace — from the *unfiltered*
+    /// list, so a hidden city stays in the menu to be un-hidden. Biggest
+    /// first, matching the city sections.
+    private var allCities: [String] {
+        var counts: [String: Int] = [:]
+        for person in workspacePeople {
+            let city = person.cityLabel
+            if !city.isEmpty { counts[city, default: 0] += 1 }
+        }
+        return counts.keys.sorted {
+            if counts[$0] != counts[$1] { return (counts[$0] ?? 0) > (counts[$1] ?? 0) }
+            return $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
+
+    private func folderShownBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !hiddenFolders.contains(key) },
+            set: { _ in toggleHidden(key, in: &hiddenFoldersRaw) }
+        )
+    }
+
+    private func cityShownBinding(_ city: String) -> Binding<Bool> {
+        Binding(
+            get: { !hiddenCities.contains(city) },
+            set: { _ in toggleHidden(city, in: &hiddenCitiesRaw) }
+        )
+    }
+
+    private var filterSortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sortRaw) {
+                ForEach(PeopleSort.allCases) { option in
+                    Label(option.label, systemImage: option.icon).tag(option.rawValue)
+                }
+            }
+            Section("Show Folders") {
+                ForEach(groups) { group in
+                    Toggle(group.name, isOn: folderShownBinding(group.name))
+                }
+                Toggle("Ungrouped", isOn: folderShownBinding(Self.ungroupedFilterKey))
+            }
+            if !allCities.isEmpty {
+                Section("Show Cities") {
+                    ForEach(allCities, id: \.self) { city in
+                        Toggle(city, isOn: cityShownBinding(city))
+                    }
+                }
+            }
+            if isFiltering {
+                Button("Show Everyone", systemImage: "eye") {
+                    hiddenFoldersRaw = ""
+                    hiddenCitiesRaw = ""
+                }
+            }
+        } label: {
+            Image(systemName: isFiltering
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease.circle")
+                .font(.title3)
+                .foregroundStyle(workspace.accent)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(isFiltering ? "Filter and sort — filters active" : "Filter and sort")
     }
 
     /// Your own circle — the same 48pt as every row avatar, so it reads as
@@ -453,6 +653,9 @@ struct PeopleListView: View {
 struct PersonRow: View {
     let person: Person
     var isSelected = false
+    /// Age sort shows each person's age on the row — the order would look
+    /// arbitrary without it.
+    var showsAge = false
     /// The last row of a section skips its divider, like a system list.
     var showsDivider = true
     var onDelete: () -> Void
@@ -510,6 +713,12 @@ struct PersonRow: View {
                             .font(.caption2)
                             .foregroundStyle(isSelected ? .white : Theme.terracotta)
                             .accessibilityLabel("Your partner")
+                    }
+                    if showsAge, let age = person.sortableAge {
+                        Text("\(age)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(detailColor)
+                            .accessibilityLabel("Age \(age)")
                     }
                 }
                 if !person.subtitle.isEmpty {

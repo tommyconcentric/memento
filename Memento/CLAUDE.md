@@ -21,7 +21,7 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 - `PhoneNumberField.swift` — `PhoneNumberField` (formats as you type) and `CountryFlagView`.
 - `TypedDateEntry.swift` — `TypedDateParser` (typed dates in the app format's component order; year-less input maps to the placeholder year) and `DateEntryText` (the editable date readout in `AppDatePicker`'s header).
 - `CityAutocomplete.swift` — MapKit city completions (`CityAutocomplete`) and the `CityField` picker used for Hometown / Currently based in; stores plain "City, Country" ("City, ST, Country" for US/CA) strings.
-- `PeopleListView.swift` — split view, sidebar list with selection, toolbar (settings/folders/tree/calendar/add-import menu).
+- `PeopleListView.swift` — split view, sidebar list with selection, toolbar (settings/folders/tree/calendar/add-import menu), and the filter/sort menu (hide folders/cities; alphabetical, oldest-first age with unknowns last, or city sections via `Person.cityLabel`). Sort and hidden-name sets persist in AppStorage, name-keyed.
 - `PersonDetailView.swift` — gradient header, `PillPicker` tabs: Quick Info / Family / Notes.
 - `QuickInfoView.swift`, `FamilyTreeView.swift`, `CalendarView.swift`, `NotesTimelineView.swift`, `NoteComposerView.swift`, `ImportContactsView.swift`, `PersonEditorView.swift`, `GroupsManagerView.swift`, `SettingsView.swift`.
 - `SpeechTranscriber.swift` — segmented `SFSpeechRecognizer` engine (auto-restarts for long recordings; on-device when supported).
