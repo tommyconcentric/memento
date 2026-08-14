@@ -150,6 +150,19 @@ struct PeopleListView: View {
             guard let person = selectedPerson, person.workspace != workspace else { return }
             selectedPerson = nil
         }
+        // A deleted person must clear the selection, or the split view keeps
+        // showing their stale profile: `isDeleted` is only true while the
+        // deletion is pending, so the detail's own guard can't catch a
+        // deletion that has already saved. The row-swipe path clears the
+        // selection by hand; this catches every other route — the editor's
+        // Delete Person, Settings' reset, a deletion synced from another
+        // device.
+        .onChange(of: people.count) {
+            guard let selected = selectedPerson,
+                  !people.contains(where: { $0.persistentModelID == selected.persistentModelID })
+            else { return }
+            selectedPerson = nil
+        }
     }
 
     private func row(for person: Person, isLast: Bool, showsAge: Bool = false) -> some View {
