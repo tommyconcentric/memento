@@ -317,7 +317,7 @@ struct ImportContactsView: View {
 
     private func candidateDetails(_ candidate: ImportCandidate) -> String {
         var parts: [String] = []
-        if let phone = candidate.phones.first {
+        if let phone = candidate.phones.first.map({ PhoneNumberFormatter.display($0) }) {
             parts.append(candidate.phones.count > 1 ? "\(phone) +\(candidate.phones.count - 1)" : phone)
         }
         if let birthday = candidate.birthday {
