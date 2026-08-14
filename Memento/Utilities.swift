@@ -334,10 +334,12 @@ struct AvatarView: View {
 
 // MARK: - Quick-info row
 
-struct InfoRow: View {
+struct InfoRow<Accessory: View>: View {
     let icon: String
     let label: String
     let value: String
+    /// Sits flush right, level with the value — the country flag on phone numbers.
+    @ViewBuilder var accessory: Accessory
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -348,11 +350,20 @@ struct InfoRow: View {
                 Text(label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.body)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(value)
+                        .font(.body)
+                    Spacer(minLength: 0)
+                    accessory
+                }
             }
-            Spacer(minLength: 0)
         }
+    }
+}
+
+extension InfoRow where Accessory == EmptyView {
+    init(icon: String, label: String, value: String) {
+        self.init(icon: icon, label: label, value: value) { EmptyView() }
     }
 }
 

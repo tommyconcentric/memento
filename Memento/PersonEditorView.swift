@@ -306,8 +306,7 @@ struct PersonEditorView: View {
                     // extra of the same kind holds the preference — tapping
                     // it reclaims the lead.
                     primaryContactRow(kind: .phone, value: phoneNumber) {
-                        TextField("Phone", text: $phoneNumber)
-                            .keyboardType(.phonePad)
+                        PhoneNumberField(text: $phoneNumber)
                     }
                     primaryContactRow(kind: .email, value: email) {
                         TextField("Email", text: $email)
@@ -357,10 +356,14 @@ struct PersonEditorView: View {
                                     draftContacts[index].starred = false
                                 }
                             }
-                            TextField(draft.kind.label, text: $draft.value, axis: draft.kind == .address ? .vertical : .horizontal)
-                                .keyboardType(keyboard(for: draft.kind))
-                                .textInputAutocapitalization(draft.kind == .email ? .never : .sentences)
-                                .autocorrectionDisabled(draft.kind == .email)
+                            if draft.kind == .phone {
+                                PhoneNumberField(text: $draft.value, title: draft.kind.label)
+                            } else {
+                                TextField(draft.kind.label, text: $draft.value, axis: draft.kind == .address ? .vertical : .horizontal)
+                                    .keyboardType(keyboard(for: draft.kind))
+                                    .textInputAutocapitalization(draft.kind == .email ? .never : .sentences)
+                                    .autocorrectionDisabled(draft.kind == .email)
+                            }
                             Button {
                                 toggleStar(draft.id)
                             } label: {
@@ -682,7 +685,7 @@ struct PersonEditorView: View {
         hometown = person.hometown
         howWeMet = person.howWeMet
         foodPreferences = person.foodPreferences
-        phoneNumber = person.phoneNumber
+        phoneNumber = PhoneNumberFormatter.display(person.phoneNumber)
         email = person.email
         address = person.address
         relationshipToUser = person.relationshipToUser
@@ -695,7 +698,11 @@ struct PersonEditorView: View {
             .map { DraftDate(label: $0.label, date: $0.date, remindersEnabled: $0.remindersEnabled) }
         draftContacts = person.contactFieldsArray
             .sorted { $0.sortOrder < $1.sortOrder }
-            .map { DraftContact(kind: ContactField.Kind(rawValue: $0.kind) ?? .phone, value: $0.value, starred: $0.isPreferred) }
+            .map { field in
+                let kind = ContactField.Kind(rawValue: field.kind) ?? .phone
+                let value = kind == .phone ? PhoneNumberFormatter.display(field.value) : field.value
+                return DraftContact(kind: kind, value: value, starred: field.isPreferred)
+            }
         draftProjects = person.projectsArray
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { DraftProject(name: $0.name, isCompleted: $0.isCompleted) }

@@ -177,37 +177,45 @@ struct QuickInfoView: View {
     private func contactRows(_ kind: ContactField.Kind, primary: String) -> some View {
         let preferred = person.preferredContact(kind)
         if let preferred {
-            preferredRow(icon: kind.icon, label: kind.label, value: preferred.value)
+            preferredRow(kind: kind, value: preferred.value)
         }
         if !primary.isEmpty {
-            InfoRow(icon: kind.icon, label: kind.label, value: primary)
+            InfoRow(icon: kind.icon, label: kind.label, value: displayValue(kind, primary)) {
+                countryFlag(kind, primary)
+            }
         }
         ForEach(person.additionalContacts(kind).filter {
             $0.persistentModelID != preferred?.persistentModelID
         }) { field in
-            InfoRow(icon: kind.icon, label: kind.label, value: field.value)
+            InfoRow(icon: kind.icon, label: kind.label, value: displayValue(kind, field.value)) {
+                countryFlag(kind, field.value)
+            }
+        }
+    }
+
+    /// Phone numbers are grouped the way iOS Contacts groups them; every other
+    /// kind shows exactly what was entered.
+    private func displayValue(_ kind: ContactField.Kind, _ raw: String) -> String {
+        kind == .phone ? PhoneNumberFormatter.display(raw) : raw
+    }
+
+    /// Only a number that names its own country (a `+` or `00` prefix) gets a flag.
+    @ViewBuilder
+    private func countryFlag(_ kind: ContactField.Kind, _ raw: String) -> some View {
+        if kind == .phone, let region = PhoneNumberFormatter.region(for: raw) {
+            CountryFlagView(region: region)
         }
     }
 
     /// Same layout as `InfoRow`, plus the trailing star that marks the
     /// user's preferred contact method of its kind.
-    private func preferredRow(icon: String, label: String, value: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.body)
-            }
-            Spacer(minLength: 0)
+    private func preferredRow(kind: ContactField.Kind, value: String) -> some View {
+        InfoRow(icon: kind.icon, label: kind.label, value: displayValue(kind, value)) {
+            countryFlag(kind, value)
             Image(systemName: "star.fill")
                 .font(.caption)
                 .foregroundStyle(Theme.gold)
-                .accessibilityLabel("Preferred \(label.lowercased())")
+                .accessibilityLabel("Preferred \(kind.label.lowercased())")
         }
     }
 
