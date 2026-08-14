@@ -4,9 +4,9 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 
 ## Repo pre-flight (verified 2026-07-24)
 
-- **Release build:** compiles clean in the Release configuration — zero warnings, zero errors on a full *clean* build (re-verified 2026-07-26; incremental builds hide compiler diagnostics, so always judge from a clean build).
+- **Release build:** compiles clean in the Release configuration — zero warnings, zero errors on a full *clean* build (re-verified 2026-08-14 for 1.1; incremental builds hide compiler diagnostics, so always judge from a clean build).
 - **No dev tooling in the shipping binary:** `StressSeeder` and the `--ui-probe` verification hooks are `#if DEBUG` only — confirmed absent from the Release build's strings.
-- **Version:** `MARKETING_VERSION 1.0`, `CURRENT_PROJECT_VERSION 2` (bump the build number for every upload).
+- **Version:** `MARKETING_VERSION 1.1`, `CURRENT_PROJECT_VERSION 3` (bump the build number for every upload).
 - **Deployment target:** iOS 17.0 (a stray project-level 26.5 default is overridden by the target; effective value is 17.0).
 - **Export compliance:** `ITSAppUsesNonExemptEncryption = NO` set — no per-upload encryption prompt.
 - **Category:** Productivity. **Bundle id:** `brickcedar.Memento`. **Team:** `7V79F7AY68`.
@@ -15,6 +15,29 @@ Everything needed to publish Memento to the App Store (iPhone + iPad) and make i
 - **Privacy:** `PrivacyInfo.xcprivacy` declares Product Interaction (anonymous usage counts, not linked, no tracking); `PRIVACY.md` and the App Store description below now match that (the description no longer claims "no analytics").
 
 Still requires a human with the developer account: distribution certificate, CloudKit production schema deploy, App Store Connect record + metadata, screenshots, archive & upload, TestFlight, and submit — all below.
+
+---
+
+## Version 1.1 (August 2026) — what's left before upload
+
+The repo work is done (version bumped, clean Release build re-verified, PRIVACY.md updated, review pass fixed and merged). The remaining steps, in order:
+
+1. **CloudKit schema — required, do it first.** 1.1 adds two stored `Person` fields: `currentCity` and `didAutoPinAsPartner`. Fields only exist in the Development schema once a record carrying them has been saved by a debug build **signed into iCloud** (the same trap as `CD_Project` last time). Run a debug build on an iCloud-signed-in device, save any person (defaults are enough), then CloudKit Console → `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production** and confirm `CD_Person` shows `CD_currentCity` and `CD_didAutoPinAsPartner` in Production. Shipping without this breaks sync for updated users.
+2. **Archive & upload** — Xcode → Product → Archive → Distribute App → App Store Connect (distribution cert already verified present).
+3. **TestFlight on real hardware** — beyond the standing checks (two-device CloudKit sync, calendar sync, dictation, app lock), 1.1 specifically needs: **Take Photo** on a real camera (simulator only has a synthetic feed), the city autocomplete on-device, typed birthday entry with the real keyboard, and the ⓘ popovers on an iPhone.
+4. **App Store Connect** — paste the release notes below into the version; the privacy *label* needs no change (city search sends queries to Apple's Maps servers only — the developer still collects nothing new); the privacy-policy URL already serves the updated PRIVACY.md. Optionally refresh one screenshot to show the filter menu or the camera badge. Submit.
+
+**Release notes (paste as "What's New"):**
+
+> Phone numbers now format themselves as you type — with the right spacing and brackets for each country, and a flag when the number starts with a country code.
+>
+> Birthdays and dates can be typed directly (day/month, with or without a year) as well as picked, and dates across the app now show as DD/MM/YYYY — changeable in Settings → Dates.
+>
+> Hometown and a new "Currently based in" field suggest real cities as you type, powered by Apple Maps — the one new network feature, and it only ever sends what you type in those two fields, to Apple alone.
+>
+> Sort your people by age or by city, hide folders or cities from the list, and change a profile photo right from the profile — take a photo or pick one. Your partner gets a heart and sits pinned on top, Family leads the folder order, and tips now sit behind a tap of the ⓘ.
+
+(The city-search sentence keeps PRIVACY.md's promise that network-behavior changes are called out in release notes.)
 
 ---
 
@@ -108,7 +131,7 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [x] Signing & Capabilities → confirm iCloud (CloudKit, container `iCloud.brickcedar.Memento`) shows no errors, and add **Background Modes → Remote notifications** if the checkbox isn't already reflected. Verified 2026-07-26 from the exported App Store `.ipa` itself: iCloud/CloudKit entitlements and the `remote-notification` background mode are all present in the shipping package. (The optional Push Notifications capability remains unadded — fine for CloudKit pushes.)
 
 **CloudKit — critical, easy to forget**
-- [x] CloudKit Console (icloud.developer.apple.com) → container `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production**. Deployed and verified in Production 2026-07-26: all ten `CD_*` record types plus `UsagePing` with its queryable `pingDate`/`installID` indexes. (`CD_Project` had never materialized in Development — no debug build had ever saved a `Project`, the stress seeder included — and had to be created first by saving a real record; a schema type only exists once a record of it has been saved.) **Redo this any time the SwiftData schema changes** — and if a new `@Model` is added, save at least one record of it in a debug build first, or the type won't be in the schema to deploy.
+- [x] CloudKit Console (icloud.developer.apple.com) → container `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production**. Deployed and verified in Production 2026-07-26: all ten `CD_*` record types plus `UsagePing` with its queryable `pingDate`/`installID` indexes. (`CD_Project` had never materialized in Development — no debug build had ever saved a `Project`, the stress seeder included — and had to be created first by saving a real record; a schema type only exists once a record of it has been saved.) **Redo this any time the SwiftData schema changes** — and if a new `@Model` is added, save at least one record of it in a debug build first, or the type won't be in the schema to deploy. **⚠️ 1.1 needs this redone** — see "Version 1.1" above (`CD_currentCity`, `CD_didAutoPinAsPartner` on `CD_Person`).
 
 **App Store Connect**
 - [x] Create the app: bundle ID `brickcedar.Memento`, store name "Memento Vivere" (plain "Memento" was taken). iOS platform only — Mac availability comes from the "Make this app available on Mac" checkbox, not the macOS platform.
@@ -127,4 +150,4 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [ ] If the app name on the store ends up different, update the About screen copy if desired.
 
 **Housekeeping per release**
-- [ ] Bump `MARKETING_VERSION` (user-facing) and `CURRENT_PROJECT_VERSION` (build number) for every upload.
+- [ ] Bump `MARKETING_VERSION` (user-facing) and `CURRENT_PROJECT_VERSION` (build number) for every upload. (Done for 1.1 → 1.1 (3), 2026-08-14.)
