@@ -332,6 +332,51 @@ struct AvatarView: View {
     }
 }
 
+// MARK: - Section tips (ⓘ)
+
+/// A section header whose explanatory text lives behind a right-aligned ⓘ
+/// instead of a permanent footer. Tap ⓘ to read the tip in a popover; tap ⓘ
+/// again or anywhere outside to dismiss. Rendered as an anchored popover on
+/// iPhone too (not a sheet), so it behaves the same on iPad and Mac.
+///
+/// For *tips* only — text a user needs once, not status. Anything dynamic
+/// (permission errors, sync results, validation notes) stays an inline
+/// footer, because feedback the user needs *now* can't hide behind a tap.
+struct TipHeader: View {
+    let title: String
+    let tip: String
+    @State private var showingTip = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            if !title.isEmpty {
+                Text(title)
+            }
+            Spacer()
+            Button {
+                showingTip.toggle()
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.aegean)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(title.isEmpty ? "About this section" : "About \(title)")
+            .popover(isPresented: $showingTip) {
+                Text(tip)
+                    // The header environment uppercases its Texts; the tip is
+                    // body copy, not a header.
+                    .textCase(nil)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
+                    .frame(idealWidth: 300, maxWidth: 320)
+                    .presentationCompactAdaptation(.popover)
+            }
+        }
+    }
+}
+
 // MARK: - Quick-info row
 
 struct InfoRow<Accessory: View>: View {

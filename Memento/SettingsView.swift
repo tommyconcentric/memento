@@ -73,14 +73,14 @@ struct SettingsView: View {
                 Section {
                     Toggle("Birthday & date reminders", isOn: $remindersEnabled)
                 } header: {
-                    Text("Reminders")
+                    TipHeader(
+                        title: "Reminders",
+                        tip: "9 AM alerts for birthdays and important dates. Skips in-memoriam people and dates you've turned off; keeps the nearest 60."
+                    )
                 } footer: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("9 AM alerts for birthdays and important dates. Skips in-memoriam people and dates you've turned off; keeps the nearest 60.")
-                        if let reminderNote {
-                            Text(reminderNote)
-                                .foregroundStyle(Theme.terracotta)
-                        }
+                    if let reminderNote {
+                        Text(reminderNote)
+                            .foregroundStyle(Theme.terracotta)
                     }
                 }
 
@@ -98,10 +98,13 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Apple Calendar")
+                    TipHeader(
+                        title: "Apple Calendar",
+                        tip: "Adds a “Memento” calendar of everyone's dates that you can show or hide in the Calendar app. Includes dates with reminders off."
+                    )
                 } footer: {
+                    // Sync status is feedback, not a tip — it stays visible.
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Adds a “Memento” calendar of everyone's dates that you can show or hide in the Calendar app. Includes dates with reminders off.")
                         if calendarSyncEnabled {
                             if manualSyncOnly {
                                 Text("Changes reach Apple Calendar only when you tap Sync Now.")
@@ -122,9 +125,10 @@ struct SettingsView: View {
                         Label("Import from Contacts…", systemImage: "square.and.arrow.down")
                     }
                 } header: {
-                    Text("Contacts")
-                } footer: {
-                    Text("Import contacts with their names, photos, birthdays and details.")
+                    TipHeader(
+                        title: "Contacts",
+                        tip: "Import contacts with their names, photos, birthdays and details."
+                    )
                 }
 
                 Section {
@@ -146,9 +150,10 @@ struct SettingsView: View {
                         Label("Import Backup or CSV…", systemImage: "arrow.down.doc")
                     }
                 } header: {
-                    Text("Backup & Transfer")
-                } footer: {
-                    Text("Export a complete backup — everyone in both workspaces, notes, dates, photos and family links — as a single file you can save or move to another device, and import it back on any version of Memento. The CSV holds people, notes and dates in a spreadsheet (no photos or family tree) and imports back too.")
+                    TipHeader(
+                        title: "Backup & Transfer",
+                        tip: "Export a complete backup — everyone in both workspaces, notes, dates, photos and family links — as a single file you can save or move to another device, and import it back on any version of Memento. The CSV holds people, notes and dates in a spreadsheet (no photos or family tree) and imports back too."
+                    )
                 }
 
                 Section {
@@ -158,9 +163,10 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Dates")
-                } footer: {
-                    Text("Used everywhere Memento shows a date. System follows your device's region settings.")
+                    TipHeader(
+                        title: "Dates",
+                        tip: "Used everywhere Memento shows a date. System follows your device's region settings."
+                    )
                 }
 
                 Section {
@@ -172,17 +178,19 @@ struct SettingsView: View {
                         Button("Change PIN") { showingPINSetup = true }
                     }
                 } header: {
-                    Text("App Lock")
-                } footer: {
-                    Text("Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Reinstall — iCloud restores your data.")
+                    TipHeader(
+                        title: "App Lock",
+                        tip: "Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Reinstall — iCloud restores your data."
+                    )
                 }
 
                 Section {
                     Toggle("Share anonymous usage statistics", isOn: shareUsageBinding)
                 } header: {
-                    Text("Anonymous Usage Statistics")
-                } footer: {
-                    Text("Sends a daily count of app opens and contacts created under a random identifier — never your name, notes, photos, dates or anything you've written. Turning this off also deletes the counts this device already sent.")
+                    TipHeader(
+                        title: "Anonymous Usage Statistics",
+                        tip: "Sends a daily count of app opens and contacts created under a random identifier — never your name, notes, photos, dates or anything you've written. Turning this off also deletes the counts this device already sent."
+                    )
                 }
 
                 Section {
@@ -197,11 +205,15 @@ struct SettingsView: View {
                         Label("Send Feedback & Suggestions", systemImage: "envelope")
                     }
                 } header: {
-                    Text("Help & Feedback")
+                    TipHeader(
+                        title: "Help & Feedback",
+                        tip: "Reviews help others find Memento; feedback reaches the developer."
+                    )
                 } footer: {
                     // The About sheet is gone; this is the version's home now.
+                    // The version line stays inline — it's information (and
+                    // the dashboard's door), not a tip.
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Reviews help others find Memento; feedback reaches the developer.")
                         Text(aboutLine)
                             // The developer's hidden usage dashboard —
                             // seven taps, same spirit as build-number
@@ -218,13 +230,15 @@ struct SettingsView: View {
                     } label: {
                         Label("Reset All Data…", systemImage: "trash")
                     }
+                } header: {
+                    TipHeader(
+                        title: "",
+                        tip: "Permanently deletes every profile and note from all devices on your iCloud. Folders stay, emptied."
+                    )
                 } footer: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Permanently deletes every profile and note from all devices on your iCloud. Folders stay, emptied.")
-                        if let resetNote {
-                            Text(resetNote)
-                                .foregroundStyle(Theme.terracotta)
-                        }
+                    if let resetNote {
+                        Text(resetNote)
+                            .foregroundStyle(Theme.terracotta)
                     }
                 }
             }
