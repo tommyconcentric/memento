@@ -38,7 +38,9 @@ struct SettingsView: View {
     @State private var resetNote: String?
 
     @State private var showingImport = false
-    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.system.rawValue
+    // Default mirrors AppDateFormat.current — the picker must show the
+    // format actually in effect when nothing is stored yet.
+    @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.dayMonthYear.rawValue
     @AppStorage(UsageAnalytics.optOutKey) private var usageOptOut = false
     @State private var showingUsageDashboard = false
 

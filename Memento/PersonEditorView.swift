@@ -204,14 +204,18 @@ struct PersonEditorView: View {
                             // placeholder — instead of latching open and
                             // re-presenting the sentinel 1904.
                             AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness,
+                                          yearlessStyle: .placeholderYear,
                                           expanded: $editingYearlessBirthday)
                         }
                     }
                 } header: {
-                    Text("Birthday")
+                    TipHeader(
+                        title: "Birthday",
+                        tip: "Type the date directly — \(AppDateFormat.current.fullPattern?.uppercased() ?? "e.g. 12 Mar 1991"), or leave the year off to keep just the day and month — or pick it in the calendar."
+                    )
                 } footer: {
                     if hasBirthday && birthday.hasPlaceholderYear {
-                        Text("No year is recorded — only the day and month are kept. Pick a year in the calendar to add one.")
+                        Text("No year is recorded — only the day and month are kept. Type a full date or pick a year in the calendar to add one.")
                     }
                 }
 
@@ -614,23 +618,35 @@ struct PersonEditorView: View {
     /// (or add a genuine year).
     private var yearlessBirthdayRow: some View {
         let accent = isBusiness ? Theme.graphite : Theme.aegean
-        return Button {
-            withAnimation(.snappy(duration: 0.22)) { editingYearlessBirthday = true }
-        } label: {
-            HStack {
-                Text("Birthday")
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text(birthday.appFormattedMonthDay())
-                    .foregroundStyle(accent)
-                    .fontWeight(.medium)
+        // Same anatomy as AppDatePicker's collapsed header: the date text is
+        // typed-editable in place, the title and chevron open the calendar.
+        return HStack {
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { editingYearlessBirthday = true }
+            } label: {
+                HStack {
+                    Text("Birthday")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            DateEntryText(date: $birthday, accent: accent, yearlessStyle: .placeholderYear)
+
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { editingYearlessBirthday = true }
+            } label: {
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(accent)
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show calendar")
         }
-        .buttonStyle(.plain)
     }
 
     private var importantDatesSection: some View {

@@ -10,6 +10,9 @@ struct AppDatePicker: View {
     let title: String
     @Binding var date: Date
     var business = false
+    /// What a typed date without a year means — birthdays keep "no year
+    /// recorded", anything else assumes the current year.
+    var yearlessStyle: TypedDateParser.YearlessStyle = .currentYear
 
     @State private var isExpanded: Bool
     // When a caller passes `expanded`, the header's collapse/expand writes
@@ -22,10 +25,12 @@ struct AppDatePicker: View {
     @State private var gridWidth: CGFloat = 0
 
     init(title: String, date: Binding<Date>, business: Bool = false,
+         yearlessStyle: TypedDateParser.YearlessStyle = .currentYear,
          initiallyExpanded: Bool = false, expanded: Binding<Bool>? = nil) {
         self.title = title
         self._date = date
         self.business = business
+        self.yearlessStyle = yearlessStyle
         self._isExpanded = State(initialValue: initiallyExpanded)
         self.externalExpanded = expanded
     }
@@ -72,24 +77,36 @@ struct AppDatePicker: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button {
-                toggleExpanded()
-            } label: {
-                HStack {
-                    Text(title)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(date.appFormatted())
-                        .foregroundStyle(accent)
-                        .fontWeight(.medium)
+            // The date readout is a text field — typing is often quicker than
+            // the calendar — so only the title and chevron toggle expansion.
+            HStack {
+                Button {
+                    toggleExpanded()
+                } label: {
+                    HStack {
+                        Text(title)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                DateEntryText(date: $date, accent: accent, yearlessStyle: yearlessStyle)
+
+                Button {
+                    toggleExpanded()
+                } label: {
                     Image(systemName: "chevron.down")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(accent)
                         .rotationEffect(.degrees(expandedNow ? 180 : 0))
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .accessibilityLabel(expandedNow ? "Hide calendar" : "Show calendar")
             }
-            .buttonStyle(.plain)
 
             if expandedNow {
                 calendarBody

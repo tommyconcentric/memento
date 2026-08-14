@@ -140,8 +140,10 @@ enum AppDateFormat: String, CaseIterable, Identifiable {
 
     static let storageKey = "appDateFormat"
 
+    /// DD/MM/YYYY unless the user has chosen otherwise in Settings — an
+    /// explicit choice (including "System") is always honoured.
     static var current: AppDateFormat {
-        AppDateFormat(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .system
+        AppDateFormat(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .dayMonthYear
     }
 
     var id: String { rawValue }
