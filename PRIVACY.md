@@ -8,7 +8,7 @@ Memento is a personal-CRM app for remembering the people in your life. It is bui
 
 **Nothing you create.** Memento has no accounts, no advertising, no third-party SDKs, and no servers of our own. We cannot see, access, or recover anything you put in the app — not a name, note, photo, date, or relationship.
 
-The only thing Memento reports is **anonymous usage statistics**: once a day it can send a random install identifier (a coin-flip ID created on first launch, tied to nothing about you), the number of times the app was opened that day, the number of contacts created that day, the app version, and the device type (iPhone/iPad/Mac). That's the entire list. These counters exist so the developer can answer "how many people use Memento?" — they can't identify you, and they are never used for tracking or advertising.
+The only thing Memento reports is **anonymous usage statistics**: once a day it can send a random install identifier (a coin-flip ID created on first launch, tied to nothing about you), the number of times the app was opened that day, the number of contacts created that day, the app version, and the device type (iPhone/iPad/Mac). That's the entire list. These counters exist so the developer can answer "how many people use Memento?" — they can't identify you, and they are never used for tracking or advertising. (Typing in the two city fields also queries Apple Maps directly — see "City search" below; those queries go to Apple, and we never see them either.)
 
 You can turn this off any time in **Settings → Anonymous Usage Statistics**; switching it off also deletes the counts your device already sent. The counters are stored in the app's public CloudKit database (Apple infrastructure — no third parties).
 
@@ -41,7 +41,7 @@ Memento is not directed at children and collects no personal data from anyone; t
 
 ## Changes
 
-If Memento's privacy practices ever change (for example, if a future feature required a network service), this policy will be updated and the change called out in the App Store release notes before it ships.
+If Memento's privacy practices ever change, this policy will be updated and the change called out in the App Store release notes before it ships. Changes so far: **August 2026** — added Apple Maps city search (the "City search" section above), the app's first network feature beyond your own iCloud sync.
 
 ## Contact
 
