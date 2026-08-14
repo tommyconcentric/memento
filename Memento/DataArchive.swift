@@ -74,6 +74,7 @@ nonisolated struct ArchivePerson: Codable {
     var isGhost: Bool?
     var isBusiness: Bool?
     var isPinned: Bool?
+    var didAutoPinAsPartner: Bool?   // added later; optional so any version reads any file
     var isDeceased: Bool?
     var groupID: UUID?
     var createdAt: Date?
@@ -234,6 +235,7 @@ enum DataArchiveExport {
                 isGhost: person.isGhost ? true : nil,
                 isBusiness: person.isBusiness ? true : nil,
                 isPinned: person.isPinned ? true : nil,
+                didAutoPinAsPartner: person.didAutoPinAsPartner ? true : nil,
                 isDeceased: person.isDeceased ? true : nil,
                 groupID: person.group.flatMap { groupIDs[$0.persistentModelID] },
                 createdAt: person.createdAt,
@@ -497,6 +499,9 @@ enum DataArchiveImport {
         if !fillEmptyOnly {
             person.isBusiness = ap.isBusiness ?? person.isBusiness
             person.isPinned = ap.isPinned ?? person.isPinned
+            // Restoring the latch keeps a deliberately unpinned partner
+            // unpinned — without it, the next editor save would re-pin them.
+            person.didAutoPinAsPartner = ap.didAutoPinAsPartner ?? person.didAutoPinAsPartner
             person.isDeceased = ap.isDeceased ?? person.isDeceased
             // nil here means "was true at export" — the exporter omits the
             // default; the self node keeps its own setting regardless.

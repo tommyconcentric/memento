@@ -156,8 +156,9 @@ struct PeopleListView: View {
         // deletion that has already saved. The row-swipe path clears the
         // selection by hand; this catches every other route — the editor's
         // Delete Person, Settings' reset, a deletion synced from another
-        // device.
-        .onChange(of: people.count) {
+        // device. Keyed on the array, not its count: a synced batch can
+        // delete one person and insert another in the same query update.
+        .onChange(of: people) {
             guard let selected = selectedPerson,
                   !people.contains(where: { $0.persistentModelID == selected.persistentModelID })
             else { return }

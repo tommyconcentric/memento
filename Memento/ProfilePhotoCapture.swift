@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import AVFoundation
 import UniformTypeIdentifiers
 
 /// The camera badge on a profile photo: take a photo, pick one from Photos,
@@ -21,6 +22,7 @@ struct ProfilePhotoEditButton: View {
     // drops the sheet.
     @State private var capturedImage: UIImage?
     @State private var pendingCropImage: UIImage?
+    @State private var showingCameraDenied = false
 
     var body: some View {
         Button {
@@ -37,10 +39,23 @@ struct ProfilePhotoEditButton: View {
         .accessibilityLabel("Change profile photo")
         .confirmationDialog("Change Photo", isPresented: $showingOptions, titleVisibility: .visible) {
             if CameraCapture.isAvailable {
-                Button("Take Photo") { showingCamera = true }
+                Button("Take Photo") {
+                    // A denied permission presents as a black, dead capture
+                    // screen — explain instead. (.notDetermined is fine: the
+                    // picker raises the system prompt itself.)
+                    switch AVCaptureDevice.authorizationStatus(for: .video) {
+                    case .denied, .restricted: showingCameraDenied = true
+                    default: showingCamera = true
+                    }
+                }
             }
             Button("Choose from Photos") { showingPhotos = true }
             Button("Choose from Files") { showingFiles = true }
+        }
+        .alert("Camera Access Is Off", isPresented: $showingCameraDenied) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Turn on Camera access for Memento in \(ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"), then try again — or choose a photo from Photos or Files instead.")
         }
         .photosPicker(isPresented: $showingPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in

@@ -18,7 +18,7 @@ import SwiftData
 enum MementoCSV {
     static let columns = [
         "Type", "ID", "PersonID", "Workspace", "Folder", "Name",
-        "Birthday", "Deceased", "Pinned", "Relationship",
+        "Birthday", "Deceased", "Pinned", "Partner Auto-Pin", "Relationship",
         "Job Title", "Company", "Hobbies", "Hometown", "Currently Based", "How We Met",
         "Food & Drink", "Phone", "Email", "Address",
         "Date", "Label", "Title", "Text", "Location"
@@ -56,6 +56,7 @@ enum MementoCSV {
                 "Birthday": person.birthday.map { birthdayString($0) } ?? "",
                 "Deceased": person.isDeceased ? "Yes" : "",
                 "Pinned": person.isPinned ? "Yes" : "",
+                "Partner Auto-Pin": person.didAutoPinAsPartner ? "Yes" : "",
                 "Relationship": person.relationshipToUser,
                 "Job Title": person.jobTitle,
                 "Company": person.company,
@@ -171,6 +172,7 @@ enum MementoCSV {
             person.isBusiness = isBusiness
             person.isDeceased = isYes(value(fields, "Deceased"))
             person.isPinned = isYes(value(fields, "Pinned"))
+            person.didAutoPinAsPartner = isYes(value(fields, "Partner Auto-Pin"))
             person.group = folder(named: value(fields, "Folder"))
             person.birthday = parseBirthday(value(fields, "Birthday"))
             person.relationshipToUser = value(fields, "Relationship")

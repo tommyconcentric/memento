@@ -1202,6 +1202,13 @@ struct FamilyLinksEditor: View {
             if l.isEmpty || (FamilyRelation.isChartable(other.relationshipToUser) && !fits) {
                 other.relationshipToUser = generic
             }
+            // Becoming your partner pins them to the top of the list — the
+            // same one-time nudge the editor gives, whichever path made
+            // them your partner. Latched, so unpinning them later sticks.
+            if other.isYourPartner, !other.didAutoPinAsPartner {
+                other.didAutoPinAsPartner = true
+                other.isPinned = true
+            }
         }
     }
 

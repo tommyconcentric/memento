@@ -89,9 +89,13 @@ enum TypedDateParser {
         let isYearless = year == nil
         var resolvedYear: Int
         if var typed = year {
-            // "91" means 1991, "05" means 2005 — expand around today.
+            // "91" means 1991, "05" means 2005 — expand into the century
+            // nearest today *in the parsing calendar*, so Buddhist (2569)
+            // and Hebrew (5786) system calendars expand correctly too.
             if typed < 100 {
-                typed += (typed <= (currentYear + 10) % 100) ? 2000 : 1900
+                let century = (currentYear / 100) * 100
+                typed += century
+                if typed > currentYear + 10 { typed -= 100 }
             }
             guard (1900...currentYear + 10).contains(typed) else { return nil }
             resolvedYear = typed
@@ -176,8 +180,12 @@ enum TypedDateParser {
 
 /// The date readout that is also a text field: shows the date in the app's
 /// format, lets the user type one directly — with or without a year — and
-/// validates as they go. Invalid text tints terracotta and reverts on blur;
-/// a valid entry commits on return or when focus leaves.
+/// validates as they go. Every keystroke that parses commits immediately, so
+/// the date is never lost to a Save (or a sheet dismissal) that arrives while
+/// the field still has focus; blur and ⏎ just normalize the text back to the
+/// display form. An external change — a tap in the day grid — always wins,
+/// resetting whatever was mid-typing: the calendar and the text must never
+/// disagree about the date they both show.
 struct DateEntryText: View {
     @Binding var date: Date
     var accent: Color = Theme.aegean
@@ -187,6 +195,9 @@ struct DateEntryText: View {
 
     @State private var text = ""
     @State private var isInvalid = false
+    // Distinguishes our own live commit from an external date change (the
+    // calendar), which must reset the text even mid-typing.
+    @State private var committingOwnEdit = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -202,12 +213,29 @@ struct DateEntryText: View {
             .frame(maxWidth: 170)
             .onAppear { text = displayText }
             .onChange(of: date) {
-                if !focused { text = displayText }
+                if committingOwnEdit {
+                    committingOwnEdit = false
+                } else {
+                    text = displayText
+                    isInvalid = false
+                }
             }
             .onChange(of: text) {
                 guard focused else { return }
-                isInvalid = !text.trimmed.isEmpty
-                    && TypedDateParser.parse(text, yearless: yearlessStyle) == nil
+                if let parsed = TypedDateParser.parse(text, yearless: yearlessStyle) {
+                    isInvalid = false
+                    // Live-commit only full dates: committing a year-less
+                    // parse mid-typing would flip a birthday to the
+                    // placeholder year while "12/3" is still on its way to
+                    // "12/3/1991" — and the editor swaps views on that,
+                    // killing the keyboard. Year-less entries commit on blur.
+                    if !parsed.isYearless, parsed.date != date {
+                        committingOwnEdit = true
+                        date = parsed.date
+                    }
+                } else {
+                    isInvalid = !text.trimmed.isEmpty
+                }
             }
             .onChange(of: focused) { _, isFocused in
                 if !isFocused { commit() }
@@ -233,8 +261,12 @@ struct DateEntryText: View {
         AppDateFormat.current.fullPattern?.uppercased() ?? "Date"
     }
 
+    /// Blur/⏎: full dates are already committed keystroke-by-keystroke; this
+    /// commits a pending year-less entry, then settles the text into the
+    /// canonical display form (reverting leftover invalid text).
     private func commit() {
-        if let parsed = TypedDateParser.parse(text, yearless: yearlessStyle) {
+        if let parsed = TypedDateParser.parse(text, yearless: yearlessStyle), parsed.date != date {
+            committingOwnEdit = true
             date = parsed.date
         }
         text = displayText

@@ -25,11 +25,13 @@ extension PersonGroup {
     /// The starter set, in the order a new user meets them.
     static let starterFolderNames = ["Family", "Close Friends", "Work Colleagues", "Friends"]
 
-    /// Where a folder sits before anyone drags it: the closest relationships
-    /// first, everything else alphabetically after. `sortOrder` stays the
-    /// source of truth for display — this only decides what that order starts
-    /// out as, so reordering by hand always wins.
-    private static let rankedFolderNames = ["Family", "Close Friends", "Friends"]
+    /// Where a folder sits before anyone drags it: the starter folders in
+    /// their seeded order, everything else alphabetically after. Must match
+    /// `starterFolderNames`, or a fresh install would already violate the
+    /// order new folders are slotted in by. `sortOrder` stays the source of
+    /// truth for display — this only decides what that order starts out as,
+    /// so reordering by hand always wins.
+    private static let rankedFolderNames = starterFolderNames
 
     static func defaultRank(of name: String) -> Int {
         let match = rankedFolderNames.firstIndex {
@@ -167,8 +169,10 @@ extension Person {
 
     /// True when this person is *your* partner. Ex-partners deliberately
     /// don't count — "Ex-partner" is exactly what the linking writes when a
-    /// partnership is marked former.
+    /// partnership is marked former — and neither do business contacts,
+    /// where a custom "Partner" label means the other kind of partner.
     var isYourPartner: Bool {
+        guard !isBusiness else { return false }
         let label = relationshipToUser.trimmed.lowercased()
         guard !label.hasPrefix("ex"), !label.hasPrefix("former") else { return false }
         return Self.partnerLabels.contains(label)
@@ -286,10 +290,11 @@ extension Person {
         return based.isEmpty ? hometown.trimmed : based
     }
 
-    /// Age usable for ordering — nil when there's no birthday or only a
-    /// year-less one (the placeholder year would fake a 120-year-old).
+    /// Age usable for ordering — nil when there's no birthday, only a
+    /// year-less one (the placeholder year would fake a 120-year-old), or
+    /// the person is deceased (no age math for in-memoriam profiles).
     var sortableAge: Int? {
-        guard let birthday, !birthday.hasPlaceholderYear else { return nil }
+        guard let birthday, !birthday.hasPlaceholderYear, !isDeceased else { return nil }
         return age
     }
 
