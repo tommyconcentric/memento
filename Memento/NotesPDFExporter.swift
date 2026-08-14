@@ -190,7 +190,8 @@ enum NotesPDFExporter {
             if !work.isEmpty {
                 drawParagraph(attributed(work, font: style.font(11, .medium), color: style.accent), spacingAfter: 3)
             }
-            let contact = [person.phoneNumber, person.email].filter { !$0.isEmpty }.joined(separator: "   ·   ")
+            let contact = [PhoneNumberFormatter.display(person.phoneNumber), person.email]
+                .filter { !$0.isEmpty }.joined(separator: "   ·   ")
             if !contact.isEmpty {
                 drawParagraph(attributed(contact, font: style.font(9.5, .regular), color: style.subInk), spacingAfter: 3)
             }

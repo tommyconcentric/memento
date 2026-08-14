@@ -136,12 +136,29 @@ struct GroupsManagerView: View {
                 return
             }
         }
+        // A hidden folder that gets renamed un-hides (documented behavior),
+        // so retire the old name from the filter — otherwise a future folder
+        // re-using it would be born hidden.
+        removeFromHiddenFilters(target.name)
         target.name = trimmed
         try? context.save()
     }
 
+    /// Drops a folder name from the sidebar's hidden-folders filter (stored
+    /// name-keyed in AppStorage by PeopleListView).
+    private func removeFromHiddenFilters(_ name: String) {
+        let key = "hiddenFolderNames"
+        let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: key) ?? ""
+        let remaining = stored.components(separatedBy: "\n").filter { !$0.isEmpty && $0 != name }
+        defaults.set(remaining.joined(separator: "\n"), forKey: key)
+    }
+
     private func delete(at offsets: IndexSet) {
         for index in offsets {
+            // A deleted folder leaves the hidden-folders filter too — a
+            // later folder with the same name must not be born hidden.
+            removeFromHiddenFilters(groups[index].name)
             context.delete(groups[index])
         }
         try? context.save()

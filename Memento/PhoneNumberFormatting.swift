@@ -95,14 +95,34 @@ enum PhoneNumberFormatter {
     static func formatWhileTyping(old: String, new: String, defaultRegion: String? = nil) -> String {
         let deleting = new.count < old.count
         var candidate = new
-        if deleting, digitCount(of: new) == digitCount(of: old),
-           let lastDigit = candidate.lastIndex(where: { digits.contains($0) }) {
-            candidate.remove(at: lastDigit)
+        // Only a genuine single-separator backspace takes a digit with it:
+        // exactly one character gone, and it wasn't a digit. Anything else
+        // with matching digit counts — pasting a number over a selected,
+        // formatted one — must keep every digit.
+        if old.count - new.count == 1, digitCount(of: new) == digitCount(of: old) {
+            // The digit that owned the separator is the one just before the
+            // removal point — not the number's last digit, which a
+            // mid-string delete must leave alone.
+            let removalPoint = firstDivergence(old: old, new: new)
+            if let owner = candidate[..<removalPoint].lastIndex(where: { digits.contains($0) }) {
+                candidate.remove(at: owner)
+            }
         }
         guard let result = formatted(candidate, defaultRegion: defaultRegion) else { return new }
         guard deleting else { return result }
         // Don't hand back the separator they were trying to delete.
         return String(result.reversed().drop { punctuation.contains($0) }.reversed())
+    }
+
+    /// Where `new` (which is `old` minus one character) stops matching `old`.
+    private static func firstDivergence(old: String, new: String) -> String.Index {
+        var oldIndex = old.startIndex
+        var newIndex = new.startIndex
+        while newIndex < new.endIndex, oldIndex < old.endIndex, old[oldIndex] == new[newIndex] {
+            oldIndex = old.index(after: oldIndex)
+            newIndex = new.index(after: newIndex)
+        }
+        return newIndex
     }
 
     // MARK: Parsing
