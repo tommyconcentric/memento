@@ -48,9 +48,10 @@ struct GroupsManagerView: View {
                     .onDelete(perform: delete)
                     .onMove(perform: move)
                 } header: {
-                    Text("Drag ≡ to reorder")
-                } footer: {
-                    Text("Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people — they move to Ungrouped.")
+                    TipHeader(
+                        title: "Drag ≡ to reorder",
+                        tip: "Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people — they move to Ungrouped."
+                    )
                 }
             }
             .navigationTitle("Folders")

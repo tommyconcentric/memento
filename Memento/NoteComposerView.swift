@@ -126,9 +126,10 @@ struct NoteComposerView: View {
                         )
                     }
                 } header: {
-                    Text("Event Photos")
-                } footer: {
-                    Text("Photos are saved with this note's date and location. Use the ⊖ button to remove one.")
+                    TipHeader(
+                        title: "Event Photos",
+                        tip: "Photos are saved with this note's date and location. Use the ⊖ button to remove one."
+                    )
                 }
             }
             .navigationTitle(note == nil ? "New Note" : "Edit Note")

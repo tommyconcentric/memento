@@ -161,9 +161,10 @@ struct PersonEditorView: View {
                         Text("Memento Business").tag(true)
                     }
                 } header: {
-                    Text("Workspace")
-                } footer: {
-                    Text("Business contacts live in Memento Business; switch from the badge by the logo.")
+                    TipHeader(
+                        title: "Workspace",
+                        tip: "Business contacts live in Memento Business; switch from the badge by the logo."
+                    )
                 }
 
                 Section {
@@ -181,11 +182,12 @@ struct PersonEditorView: View {
                         )
                     }
                 } header: {
-                    Text(isBusiness ? "Working Relationship to You" : "Family Relationship to You")
-                } footer: {
-                    Text(isBusiness
-                        ? "Places them on your corporate ladder. Other… is custom and won't join the ladder."
-                        : "For relatives only — places them on your family tree. Leave “Not set” for non-family; Other… is custom and won't join the tree.")
+                    TipHeader(
+                        title: isBusiness ? "Working Relationship to You" : "Family Relationship to You",
+                        tip: isBusiness
+                            ? "Places them on your corporate ladder. Other… is custom and won't join the ladder."
+                            : "For relatives only — places them on your family tree. Leave “Not set” for non-family; Other… is custom and won't join the tree."
+                    )
                 }
                 }
 
@@ -270,9 +272,10 @@ struct PersonEditorView: View {
                         TextField("Other family (parents, siblings…)", text: $otherFamily, axis: .vertical)
                     }
                 } header: {
-                    Text("Family")
-                } footer: {
-                    Text("Builds this person's family tree. Tap \u{1F50D} to link someone in Memento — the link is written both ways.")
+                    TipHeader(
+                        title: "Family",
+                        tip: "Builds this person's family tree. Tap \u{1F50D} to link someone in Memento — the link is written both ways."
+                    )
                 }
 
                 Section("Work") {
@@ -393,9 +396,10 @@ struct PersonEditorView: View {
                         Label("Add Phone, Email or Address", systemImage: "plus.circle")
                     }
                 } header: {
-                    Text("Contact")
-                } footer: {
-                    Text("The first phone, email and address show in Quick Info. Tap ★ to move another to the top.")
+                    TipHeader(
+                        title: "Contact",
+                        tip: "The first phone, email and address show in Quick Info. Tap ★ to move another to the top."
+                    )
                 }
 
                 importantDatesSection
@@ -404,9 +408,10 @@ struct PersonEditorView: View {
                     Section {
                         Toggle("Mark as deceased", isOn: $isDeceased)
                     } header: {
-                        Text("Remembrance")
-                    } footer: {
-                        Text("Grays their profile and hides birthday countdowns.")
+                        TipHeader(
+                            title: "Remembrance",
+                            tip: "Grays their profile and hides birthday countdowns."
+                        )
                     }
                 }
             }
@@ -594,9 +599,10 @@ struct PersonEditorView: View {
                 Label("Add Project", systemImage: "plus.circle")
             }
         } header: {
-            Text("Projects")
-        } footer: {
-            Text("Work you share. Mark Completed when it wraps; it stays as history.")
+            TipHeader(
+                title: "Projects",
+                tip: "Work you share. Mark Completed when it wraps; it stays as history."
+            )
         }
     }
 
@@ -648,9 +654,10 @@ struct PersonEditorView: View {
                 Label("Add Important Date", systemImage: "plus.circle")
             }
         } header: {
-            Text("Important Dates")
-        } footer: {
-            Text("Anniversaries, birthdays and big events.")
+            TipHeader(
+                title: "Important Dates",
+                tip: "Anniversaries, birthdays and big events."
+            )
         }
     }
 

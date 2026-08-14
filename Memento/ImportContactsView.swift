@@ -257,10 +257,13 @@ struct ImportContactsView: View {
                     )
                 }
                 .disabled(newCandidateCount == 0)
-            } footer: {
-                Text(newCandidateCount == candidates.count
-                    ? "Brings everyone in at once — or tick people individually and use Import at the top."
-                    : "Brings in everyone not already in Memento — \"Already in Memento\" rows stay out unless you tick them.")
+            } header: {
+                TipHeader(
+                    title: "",
+                    tip: newCandidateCount == candidates.count
+                        ? "Brings everyone in at once — or tick people individually and use Import at the top."
+                        : "Brings in everyone not already in Memento — \"Already in Memento\" rows stay out unless you tick them."
+                )
             }
             .listRowBackground(Theme.card)
 
