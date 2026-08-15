@@ -25,8 +25,8 @@ Prepared through the console on 2026-08-15; only the on-device TestFlight pass a
 1. [x] **CloudKit schema deployed to Production** (2026-08-15). `CD_currentCity` (String) and `CD_didAutoPinAsPartner` (Int64) added to `CD_Person` directly in the Development schema via the console — types mirror `CD_hometown`/`CD_isPinned` — then Deploy Schema Changes confirmed showing exactly those two fields, and verified present in the Production schema afterwards. (No debug-run materialization was needed; the console's manual field editor covered it.)
 2. [x] **Archived & uploaded**: build **1.1 (3)** archived with `xcodebuild -allowProvisioningUpdates` and uploaded via `-exportArchive` with `destination: upload` (Xcode's saved account session authenticated). Processed in App Store Connect same day.
 3. [x] **Version 1.1 created in App Store Connect** — release notes below pasted into What's New, build 3 attached, saved. Status: *Prepare for Submission*. Privacy label unchanged (city search is Apple-bound; nothing new collected).
-4. [ ] **TestFlight on real hardware** — beyond the standing checks (two-device CloudKit sync — watch the new city/pin fields — calendar sync, dictation, app lock), 1.1 specifically needs: **Take Photo** on a real camera (simulator only has a synthetic feed), city autocomplete on-device, typed birthday entry with the real keyboard, and the ⓘ popovers on an iPhone.
-5. [ ] **Add for Review** on the 1.1 version page, then release. Optionally refresh one screenshot first (filter menu or camera badge).
+4. [x] **TestFlight on real hardware** — hardware pass confirmed by the developer 2026-08-15 (camera capture, city autocomplete, typed dates, popovers, sync).
+5. [x] **Submitted for review** 2026-08-15 — iOS App 1.1 (3), "1 Item Submitted", review within ~48h, email on completion. Release follows approval.
 
 **Release notes (paste as "What's New"):**
 
