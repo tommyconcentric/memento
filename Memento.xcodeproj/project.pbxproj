@@ -14,7 +14,10 @@
 		7256F0AA3004302600C5751B /* Exceptions for "Memento" folder in "Memento" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				CLAUDE.md,
 				Info.plist,
+				README.md,
+				"memento-logo.svg",
 			);
 			target = 7256F0473004302400C5751B /* Memento */;
 		};
