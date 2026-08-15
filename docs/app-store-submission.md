@@ -18,14 +18,15 @@ Still requires a human with the developer account: distribution certificate, Clo
 
 ---
 
-## Version 1.1 (August 2026) — what's left before upload
+## Version 1.1 (August 2026) — status
 
-The repo work is done (version bumped, clean Release build re-verified, PRIVACY.md updated, review pass fixed and merged). The remaining steps, in order:
+Prepared through the console on 2026-08-15; only the on-device TestFlight pass and the final submission remain.
 
-1. **CloudKit schema — required, do it first.** 1.1 adds two stored `Person` fields: `currentCity` and `didAutoPinAsPartner`. Fields only exist in the Development schema once a record carrying them has been saved by a debug build **signed into iCloud** (the same trap as `CD_Project` last time). Run a debug build on an iCloud-signed-in device, save any person (defaults are enough), then CloudKit Console → `iCloud.brickcedar.Memento` → **Deploy Schema Changes to Production** and confirm `CD_Person` shows `CD_currentCity` and `CD_didAutoPinAsPartner` in Production. Shipping without this breaks sync for updated users.
-2. **Archive & upload** — Xcode → Product → Archive → Distribute App → App Store Connect (distribution cert already verified present).
-3. **TestFlight on real hardware** — beyond the standing checks (two-device CloudKit sync, calendar sync, dictation, app lock), 1.1 specifically needs: **Take Photo** on a real camera (simulator only has a synthetic feed), the city autocomplete on-device, typed birthday entry with the real keyboard, and the ⓘ popovers on an iPhone.
-4. **App Store Connect** — paste the release notes below into the version; the privacy *label* needs no change (city search sends queries to Apple's Maps servers only — the developer still collects nothing new); the privacy-policy URL already serves the updated PRIVACY.md. Optionally refresh one screenshot to show the filter menu or the camera badge. Submit.
+1. [x] **CloudKit schema deployed to Production** (2026-08-15). `CD_currentCity` (String) and `CD_didAutoPinAsPartner` (Int64) added to `CD_Person` directly in the Development schema via the console — types mirror `CD_hometown`/`CD_isPinned` — then Deploy Schema Changes confirmed showing exactly those two fields, and verified present in the Production schema afterwards. (No debug-run materialization was needed; the console's manual field editor covered it.)
+2. [x] **Archived & uploaded**: build **1.1 (3)** archived with `xcodebuild -allowProvisioningUpdates` and uploaded via `-exportArchive` with `destination: upload` (Xcode's saved account session authenticated). Processed in App Store Connect same day.
+3. [x] **Version 1.1 created in App Store Connect** — release notes below pasted into What's New, build 3 attached, saved. Status: *Prepare for Submission*. Privacy label unchanged (city search is Apple-bound; nothing new collected).
+4. [ ] **TestFlight on real hardware** — beyond the standing checks (two-device CloudKit sync — watch the new city/pin fields — calendar sync, dictation, app lock), 1.1 specifically needs: **Take Photo** on a real camera (simulator only has a synthetic feed), city autocomplete on-device, typed birthday entry with the real keyboard, and the ⓘ popovers on an iPhone.
+5. [ ] **Add for Review** on the 1.1 version page, then release. Optionally refresh one screenshot first (filter menu or camera badge).
 
 **Release notes (paste as "What's New"):**
 
