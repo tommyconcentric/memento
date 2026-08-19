@@ -211,8 +211,8 @@ enum CalendarSyncManager {
         // away from same-titled calendars in other accounts. The adopted
         // calendar could still be one the *user* made by hand, so it's
         // marked adopted: rebuilds then remove only app-generated events
-        // from it (`isAppGenerated`) and toggle-off strips those events
-        // instead of deleting the calendar.
+        // from it (`isAppGenerated`), and toggle-off strips those
+        // events instead of deleting the calendar.
         if let adopted = store.calendars(for: .event).first(where: {
             $0.title == calendarTitle
                 && $0.source?.sourceIdentifier == source.sourceIdentifier
@@ -243,15 +243,15 @@ enum CalendarSyncManager {
     }
 
     /// Stamped into the notes of every event this manager writes, so a
-    /// later rebuild can recognise its own events exactly instead of
-    /// guessing from the title.
+    /// rebuild can recognise its own events exactly instead of guessing
+    /// from the title.
     nonisolated private static let signature = "Added by Memento"
 
-    /// Whether an event was written by this manager. Events written from
-    /// version 1.2 onward carry `signature` in their notes, which is an
-    /// exact test. Older events have no stamp, so fall back to the title
-    /// shapes earlier versions wrote. Keep this list in step with the
-    /// snapshot loop in `refresh`:
+    /// Whether an event was written by this manager. Anything written from
+    /// version 1.2 on carries `signature` in its notes, which is an exact
+    /// test. Events from earlier versions have no stamp, so fall back to
+    /// the title shapes those versions wrote. Keep this list in step with
+    /// the snapshot loop in `refresh`:
     ///   "🎂 <name>'s Birthday"   someone's birthday
     ///   "🎂 Your Birthday"       the self node's birthday
     ///   "Your <label>"           a self important date
@@ -265,8 +265,8 @@ enum CalendarSyncManager {
         if title.hasPrefix("Your ") { return true }
         // The one em dash left in the project, and no user ever reads it.
         // Version 1.1 and earlier titled someone's important date as the
-        // label, this dash, then the name. Those events still exist in
-        // people's calendars, and they have to stay removable.
+        // label, this dash, then the name. Those events are still sitting
+        // in people's calendars, so they have to stay removable.
         if title.contains(" — ") { return true }
         return false
     }
@@ -325,6 +325,7 @@ enum CalendarSyncManager {
         }
         let event = EKEvent(eventStore: store)
         event.title = title
+        event.notes = signature
         event.calendar = calendar
         event.isAllDay = true
         event.startDate = recentAnchor(for: date)
@@ -336,6 +337,7 @@ enum CalendarSyncManager {
     nonisolated private static func addSingleEvent(title: String, on date: Date, calendar: EKCalendar) {
         let event = EKEvent(eventStore: store)
         event.title = title
+        event.notes = signature
         event.calendar = calendar
         event.isAllDay = true
         event.startDate = Calendar.current.startOfDay(for: date)

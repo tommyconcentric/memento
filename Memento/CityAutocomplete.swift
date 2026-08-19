@@ -84,8 +84,8 @@ extension CityAutocomplete: MKLocalSearchCompleterDelegate {
 
 /// A text field that offers city completions as you type. Tap a suggestion
 /// and it lands as "City, Country" ("City, ST, Country" in the US/Canada);
-/// keep typing and whatever you wrote is stored as-is. A place Apple Maps
-/// doesn't know never blocks saving, and neither does being offline.
+/// keep typing and whatever you wrote is stored as-is. You can always save,
+/// whether you're offline or typing a place Apple Maps has never heard of.
 struct CityField: View {
     let title: String
     @Binding var text: String

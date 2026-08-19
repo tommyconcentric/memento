@@ -5,9 +5,9 @@ import Charts
 /// The developer's hidden usage dashboard: aggregates the anonymous
 /// `UsagePing` records from the app's public CloudKit database into
 /// daily actives, sessions and contacts-created. Opened by tapping the
-/// version line in Settings seven times. Nothing gates it. It is only
-/// hard to find, and that is enough, because everything it shows is
-/// anonymous aggregate data from the world-readable public database.
+/// version line in Settings seven times. It is hidden on purpose but not
+/// gated, because everything it shows is anonymous aggregate data from
+/// the world-readable public database.
 ///
 /// Downloads are NOT here: the app can't measure its own installs.
 /// That number lives in App Store Connect → Analytics.
@@ -217,7 +217,7 @@ struct UsageDashboardView: View {
 
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Downloads aren't collected by the app. App Store Connect → Analytics has installs and store metrics.")
+            Text("The app can't count downloads. Check App Store Connect → Analytics for installs and store metrics.")
             Text("Counts are anonymous daily pings (random install id, sessions, contacts created) from installs sharing usage statistics. Debug builds read CloudKit's development environment.")
         }
         .font(.caption2)

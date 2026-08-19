@@ -55,7 +55,7 @@ struct ProfilePhotoEditButton: View {
         .alert("Camera Access Is Off", isPresented: $showingCameraDenied) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Turn on Camera access for Memento in \(ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"), then try again. You can also choose a photo from Photos or Files instead.")
+            Text("Turn on Camera access for Memento in \(ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"), then try again. You can also choose a photo from Photos or Files.")
         }
         .photosPicker(isPresented: $showingPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in

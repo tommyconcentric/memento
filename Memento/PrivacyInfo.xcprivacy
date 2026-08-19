@@ -9,7 +9,7 @@
 	     install id with daily session and contacts-created counts, sent to
 	     the app's public CloudKit database, on by default with an opt-out
 	     in Settings. Keep this manifest, PRIVACY.md and the App Store
-	     privacy label in step — they must always tell the same story. -->
+	     privacy label in step. They must always tell the same story. -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>

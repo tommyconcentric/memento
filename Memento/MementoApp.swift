@@ -120,7 +120,7 @@ struct MementoApp: App {
 /// (first launch, or after a full reset). When two devices each seeded and
 /// *used* their own "You" before CloudKit merged, deleting only edgeless
 /// duplicates left both forever. The pedigree, My Profile and new edges
-/// were each free to land on a different one. Duplicates are now merged:
+/// could then each land on a different one. Duplicates are now merged:
 /// their edges re-point onto the canonical (earliest-created) node, profile
 /// fields the keeper lacks carry over, and only then is the duplicate
 /// deleted.

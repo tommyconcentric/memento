@@ -36,8 +36,8 @@ Rules, forever (enforced by convention, like the privacy manifest):
 3. Dates are ISO-8601 **without fractional seconds**. Both coders use the
    strict `.iso8601` strategy, which rejects them. Never switch the encoder
    to emit fractional seconds, or old apps will reject whole files. Photos
-   are base64. The file stays inspectable and stable across time zones and
-   platforms.
+   are base64. Together those two choices keep the file inspectable and
+   stable across time zones and platforms.
 
 Honest boundary: an app only preserves fields it understands, so round-tripping
 a *newer* file *through* an older app drops the newer fields. Importing directly
@@ -70,7 +70,8 @@ One file holds several row kinds, told apart by a leading **Type** column
 (`Person`, `Note`, `Date`, `Contact`). `Note`/`Date`/`Contact` rows point at
 their owner through the `PersonID` written on the matching `Person` row, so the
 whole file re-imports as connected data. Unknown `Type` values and unknown
-columns are ignored, the same forward/backward tolerance as the JSON archive.
+columns are ignored. That gives the CSV the same forward and backward
+tolerance as the JSON archive.
 Birthdays use `yyyy-MM-dd`, or `--MM-dd` for a year-less birthday (matching the
 contact-import convention).
 

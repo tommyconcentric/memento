@@ -41,7 +41,7 @@ The design language got a refresh too: New York serif display type, a clean rect
 
 1. Xcode → **File → New → Project…** → **iOS → App**.
 2. Name it **Memento**, Interface **SwiftUI**, Language **Swift**. Leave Core Data and tests unchecked.
-3. Delete the two generated Swift files (`MementoApp.swift` and `ContentView.swift`), choosing "Move to Trash".
+3. Delete the two generated Swift files (`MementoApp.swift` and `ContentView.swift`). Choose "Move to Trash".
 4. Drag all the `.swift` files from this folder into the project navigator. Tick **"Copy items if needed"**, target **Memento** checked.
 5. Project → target **Memento** → General → **Minimum Deployments: iOS 17.0**.
 6. Target → **Info** tab → add two keys (required, or dictation will crash):

@@ -53,8 +53,9 @@ enum StressSeeder {
             // Birthdays: most people have one; every 50th is Feb 29, every
             // 10th uses the year-less 1904 placeholder. Leap-day people skip
             // the no-birthday gate (index 67 would otherwise lose its Feb 29)
-            // and get a fixed leap year. 1950 + 17 is 1967, where
-            // Calendar.date(from:) silently rolls Feb 29 over to Mar 1.
+            // and get a fixed leap year: the usual 1950 + 17 is 1967, which
+            // isn't one, and Calendar.date(from:) would silently roll their
+            // Feb 29 over to Mar 1.
             let isLeapDay = index % 50 == 17
             if index % 4 != 3 || isLeapDay {
                 let year = index % 10 == 5 ? Date.placeholderYear : (isLeapDay ? 1968 : 1950 + (index % 50))

@@ -97,8 +97,8 @@ enum PhoneNumberFormatter {
         var candidate = new
         // Only a genuine single-separator backspace takes a digit with it:
         // exactly one character gone, and it wasn't a digit. Anything else
-        // with matching digit counts must keep every digit, such as pasting
-        // a number over a selected, formatted one.
+        // with matching digit counts (pasting a number over a selected,
+        // formatted one) must keep every digit.
         if old.count - new.count == 1, digitCount(of: new) == digitCount(of: old) {
             // The digit that owned the separator is the one just before the
             // removal point, not the number's last digit. A mid-string

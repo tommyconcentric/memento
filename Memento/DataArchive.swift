@@ -175,7 +175,7 @@ struct ImportSummary {
         if photosAdded > 0 { parts.append(counted(photosAdded, "photo", "photos")) }
         if datesAdded > 0 { parts.append(counted(datesAdded, "date", "dates")) }
         if contactsAdded > 0 { parts.append(counted(contactsAdded, "contact detail", "contact details")) }
-        guard !parts.isEmpty else { return "Nothing new to add. Everything in that file is already here." }
+        guard !parts.isEmpty else { return "Nothing new to add. Everything in that file is already here" }
         return parts.joined(separator: " · ")
     }
 

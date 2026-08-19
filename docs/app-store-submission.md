@@ -32,11 +32,11 @@ Prepared through the console on 2026-08-15; only the on-device TestFlight pass a
 
 > Phone numbers now format themselves as you type, with the right spacing and brackets for each country. You get a flag when the number starts with a country code.
 >
-> You can now type birthdays and dates instead of only picking them: day and month, with or without a year. Dates across the app now show as DD/MM/YYYY, and you can change that in Settings → Dates.
+> You can now type birthdays and dates as well as pick them. A day and month is enough, with or without a year. Dates across the app now show as DD/MM/YYYY, and you can change that in Settings → Dates.
 >
-> Hometown and a new "Currently based in" field suggest real cities as you type, using Apple Maps. That is the one new network feature. It only ever sends what you type in those two fields, and only to Apple.
+> Hometown and a new "Currently based in" field suggest real cities as you type, using Apple Maps. That is the only new part of the app that goes online. It only ever sends what you type in those two fields, and only to Apple.
 >
-> Sort your people by age or by city, hide folders or cities from the list, and change a profile photo right from the profile. Take a new photo or pick one you already have. Your partner gets a heart and sits pinned on top, Family leads the folder order, and tips now sit behind a tap of the ⓘ.
+> Sort your people by age or by city, hide folders or cities from the list, and change someone's photo right from their profile. Take a new one or pick one you already have. Your partner gets a heart and sits pinned on top, Family leads the folder order, and tips now sit behind a tap of the ⓘ.
 
 (The city-search sentence keeps PRIVACY.md's promise that network-behavior changes are called out in release notes.)
 
@@ -66,10 +66,10 @@ Prepared through the console on 2026-08-15; only the on-device TestFlight pass a
 > Birthdays and important dates appear on a beautiful calendar, fire gentle 9 AM reminders, and can sync into Apple Calendar as their own toggleable calendar.
 >
 > FAST TO FILL
-> Import from your contacts: names, photos, birthdays, and every number, email and address come along. Dictate notes hands-free with on-device transcription.
+> Import from your contacts and it all comes along: names, photos, birthdays, and every number, email and address. Dictate notes hands-free with on-device transcription.
 >
 > PRIVATE BY DESIGN
-> No accounts, no ads, no tracking. Everything you write lives on your device and in your own private iCloud, never on our servers, and it syncs across your iPhone, iPad and Mac. The only thing Memento reports is an anonymous, opt-out count of app opens and contacts added, so we know how many people use it. Lock the app with a PIN and Face ID.
+> No accounts, no ads, no tracking. Everything you write lives on your device and in your own private iCloud, never on our servers. It syncs across your iPhone, iPad and Mac. The only thing Memento reports is an anonymous, opt-out count of app opens and contacts added, so we know how many people use it. Lock the app with a PIN and Face ID.
 
 **Keywords** (100 chars max):
 `personal crm,contacts,relationships,birthday,reminder,family tree,notes,networking,friends,people`
@@ -147,7 +147,7 @@ Simulator: `xcrun simctl status_bar <device> override --time 9:41 --batteryLevel
 - [ ] Submit for review.
 
 **After the listing exists**
-- [x] Put the numeric Apple ID of the app into `SettingsView.appStoreID` so "Rate Memento" deep-links to the review page (set to `6791973402`, 2026-07-26, and it ships with the first build).
+- [x] Put the numeric Apple ID of the app into `SettingsView.appStoreID` so "Rate Memento" deep-links to the review page (set to `6791973402` on 2026-07-26; it ships with the first build).
 - [ ] If the app name on the store ends up different, update the About screen copy if desired.
 
 **Housekeeping per release**

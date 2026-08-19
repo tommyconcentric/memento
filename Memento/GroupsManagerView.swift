@@ -50,7 +50,7 @@ struct GroupsManagerView: View {
                 } header: {
                     TipHeader(
                         title: "Drag ≡ to reorder",
-                        tip: "Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people. They move to Ungrouped."
+                        tip: "Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people, and they move to Ungrouped."
                     )
                 }
             }

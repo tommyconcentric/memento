@@ -170,8 +170,8 @@ extension Person {
     /// True when this person is *your* partner. Ex-partners deliberately
     /// don't count, since "Ex-partner" is exactly what the linking writes
     /// when a partnership is marked former. Business contacts don't count
-    /// either: there a custom "Partner" label means the other kind of
-    /// partner.
+    /// either, because a "Partner" label on a business profile means a
+    /// business partner.
     var isYourPartner: Bool {
         guard !isBusiness else { return false }
         let label = relationshipToUser.trimmed.lowercased()

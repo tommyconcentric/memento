@@ -70,11 +70,11 @@ Personal-CRM app for remembering friends, colleagues and family: per-person note
 
 ## Writing style: no em dashes, plain words
 
-Nothing written for this project uses an em dash (—) or an en dash (–). That covers on-screen
-copy, the ⓘ tip popovers, the App Store listing in `docs/app-store-submission.md`, `PRIVACY.md`,
-the docs in this repo, code comments, commit messages, and PR titles and descriptions.
+Nothing written for this project uses an em dash or an en dash. That covers on-screen copy, the ⓘ
+tip popovers, the App Store listing in `docs/app-store-submission.md`, `PRIVACY.md`, the docs in
+this repo, code comments, commit messages, and PR titles and descriptions.
 
-Don't swap in another dash. No `--`, no ` - `, no `–`. Rewrite the sentence instead:
+Don't swap in another dash. No `--`, no ` - `, no en dash. Rewrite the sentence instead:
 
 - split it into two short sentences (usually the best answer)
 - use a comma, on its own or with "and" / "so" / "but"
@@ -82,7 +82,7 @@ Don't swap in another dash. No `--`, no ` - `, no `–`. Rewrite the sentence in
 - use brackets for a real aside
 - cut the aside if it wasn't earning its place
 
-For ranges, write "8 to 9pt", not "8–9pt".
+For ranges, write "8 to 9pt". Don't join the two numbers with a dash.
 
 The wider point is that the writing should sound like a person, not a product page:
 
@@ -93,9 +93,12 @@ The wider point is that the writing should sound like a person, not a product pa
 - No filler. Drop "simply", "just", "seamlessly", "powerful", "beautiful".
 - If the rewrite came out shorter, that is usually a good sign.
 
-One deliberate exception exists: `CalendarSyncManager.isAppGenerated` still matches `" — "` in a
-title, because calendar events written by version 1.1 and earlier use that shape and have to stay
-removable. It is a comparison, never something a user reads. Don't delete it in a future sweep.
+One deliberate exception exists, in `CalendarSyncManager.isAppGenerated`. It matches a spaced em
+dash in an event title. Version 1.1 and earlier titled someone's important date as the label, that
+dash, then the name, and those events are still sitting in people's calendars, so they have to
+stay removable. That dash only ever sits in a comparison, and no user reads it. Everything the app
+writes now carries an "Added by Memento" note instead, which identifies it exactly. Don't delete
+the fallback in a future sweep.
 
 ## No AI attribution in PRs or commits
 

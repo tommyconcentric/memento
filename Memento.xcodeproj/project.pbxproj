@@ -279,7 +279,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Memento adds a calendar of everyone's birthdays and important dates so you can see them in the Calendar app.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Memento uses the camera only when you choose Take Photo for a profile picture.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Memento reads your contacts only to import the people you choose — nothing is imported without your review.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Memento reads your contacts only to import the people you choose. Nothing is imported without your review.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Memento uses Face ID to keep your notes private.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Memento uses the microphone to\ndictate notes and capture conversations.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Memento transcribes your\nrecordings into notes.";
@@ -325,7 +325,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Memento adds a calendar of everyone's birthdays and important dates so you can see them in the Calendar app.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Memento uses the camera only when you choose Take Photo for a profile picture.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Memento reads your contacts only to import the people you choose — nothing is imported without your review.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Memento reads your contacts only to import the people you choose. Nothing is imported without your review.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Memento uses Face ID to keep your notes private.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Memento uses the microphone to\ndictate notes and capture conversations.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Memento transcribes your\nrecordings into notes.";

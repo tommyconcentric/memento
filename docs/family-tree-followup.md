@@ -91,8 +91,8 @@ Replace the generation-lane + horizontal-`ScrollView` layout:
 
 1. Assign generations from the edge graph (BFS from self across parent/child).
 2. Order within each generation so partners are adjacent and sibling groups sit
-   centered under their parents' union; minimize edge crossings
-   (a tidy per-subtree layout, like Reingold and Tilford or Walker).
+   centered under their parents' union; minimize edge crossings (a tidy
+   per-subtree layout, as in the Reingold and Tilford or Walker algorithms).
 3. Emit node coordinates + typed connector segments: couple bars, union→sibling
    descent drops, sibling bars, and per-child stubs.
 4. Render with a custom SwiftUI `Layout` + `Canvas`; dashed vs solid per edge

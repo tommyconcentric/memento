@@ -5,9 +5,9 @@ import SwiftData
 
 /// A single standalone CSV that round-trips through Memento. Unlike the full
 /// `.memento` archive it can't carry photos or the family-tree graph, but it
-/// covers the everyday data in a file that opens cleanly in any spreadsheet:
-/// every listed person in both workspaces, their quick-info fields, their
-/// notes and their important dates.
+/// covers the everyday data: every listed person in both workspaces, their
+/// quick-info fields, their notes and their important dates. The file opens
+/// cleanly in any spreadsheet.
 ///
 /// One CSV holds several kinds of row, told apart by a leading **Type**
 /// column (`Person`, `Note`, `Date`, `Contact`). `Note`/`Date`/`Contact`

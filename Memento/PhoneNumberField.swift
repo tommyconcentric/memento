@@ -8,7 +8,7 @@ struct PhoneNumberField: View {
     var title = "Phone"
 
     /// What this field last wrote back. Rewriting the text fires `onChange`
-    /// again, and regrouping can shorten it: "(415) 5551" becomes "415-5551",
+    /// again, and regrouping can shorten it. "(415) 5551" becomes "415-5551",
     /// which is indistinguishable from a backspace. Recognising our own echo
     /// is what stops that from swallowing the digit just typed.
     @State private var lastWritten: String?
