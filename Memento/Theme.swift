@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Memento's palette — a Greek island summer, Mamma Mia style:
+/// Memento's palette, a Greek island summer in Mamma Mia style:
 /// Aegean water, whitewashed walls, bougainvillea, taverna pots and sun.
 enum Theme {
     static let aegean = Color(red: 0.118, green: 0.431, blue: 0.624)        // #1E6E9F
@@ -11,7 +11,7 @@ enum Theme {
     static let olive = Color(red: 0.478, green: 0.545, blue: 0.310)         // #7A8B4F
     static let terracotta = Color(red: 0.788, green: 0.435, blue: 0.290)    // #C96F4A
     static let gold = Color(red: 0.753, green: 0.541, blue: 0.176)          // #C08A2D
-    static let bark = Color(red: 0.478, green: 0.333, blue: 0.224)          // #7A5539 — tree trunks
+    static let bark = Color(red: 0.478, green: 0.333, blue: 0.224)          // #7A5539 (tree trunks)
 
     // Business workspace: boardroom slate in place of holiday blues.
     static let graphite = Color(red: 0.239, green: 0.290, blue: 0.361)      // #3D4A5C
@@ -72,7 +72,7 @@ enum Workspace: String, CaseIterable {
 }
 
 extension Person {
-    /// The workspace this person belongs to — the hook for per-person
+    /// The workspace this person belongs to. It's the hook for per-person
     /// theming (detail hero, row cards) matching their side of the app.
     var workspace: Workspace { isBusiness ? .business : .personal }
 }

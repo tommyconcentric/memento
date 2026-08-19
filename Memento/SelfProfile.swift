@@ -4,7 +4,7 @@ import SwiftData
 // MARK: - Profile card (share format)
 
 /// The shareable profile: a structured plain-text card. Plain text on
-/// purpose — AirDrop needs a type the receiving OS already knows, so a
+/// purpose: AirDrop needs a type the receiving OS already knows, so a
 /// friend *without* Memento can still read the card or keep it in Apple
 /// Notes, while a friend *with* Memento gets "Open in Memento" (the app
 /// registers as a plain-text viewer) and can add the person in a tap.
@@ -27,8 +27,9 @@ enum ProfileCard {
         func add(_ key: String, _ value: String) {
             // The card is line-oriented; an interior newline (the address
             // field is multi-line in the editor) would truncate the value
-            // on parse — or let a continuation line that happens to read
-            // "Company: …" masquerade as another key on the receiver.
+            // on parse. It could also let a continuation line that happens
+            // to read "Company: …" masquerade as another key on the
+            // receiver.
             let flattened = value
                 .replacingOccurrences(of: "\r\n", with: ", ")
                 .replacingOccurrences(of: "\n", with: ", ")
@@ -54,14 +55,14 @@ enum ProfileCard {
         add("Partner", person.partnerName)
         add("Children", person.childrenNames)
         lines.append("")
-        lines.append("Shared from Memento — a personal notebook for the people in your life.")
+        lines.append("Shared from Memento, a personal notebook for the people in your life.")
         return lines.joined(separator: "\n")
     }
 
     /// Writes the card into a shareable temp file named after the person.
     static func writeTemporaryFile(for person: Person) -> URL? {
         let safeName = person.name.trimmed.replacingOccurrences(of: "/", with: "-")
-        let filename = "\(safeName.isEmpty ? "My" : safeName) — Memento Profile.txt"
+        let filename = "\(safeName.isEmpty ? "My" : safeName) Memento Profile.txt"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
         do {
             try text(for: person).write(to: url, atomically: true, encoding: .utf8)
@@ -120,9 +121,9 @@ enum ProfileCard {
             return full
         }
         // A year-less card line ("14 March") lands on the placeholder year,
-        // the same convention as contact import — via the Gregorian
-        // calendar explicitly, where 1904 means 1904 (and is a leap year)
-        // regardless of the device's calendar setting.
+        // the same convention as contact import. It goes through the
+        // Gregorian calendar explicitly, where 1904 means 1904 (and is a
+        // leap year) regardless of the device's calendar setting.
         if let partial = birthdayFormatter("d MMMM").date(from: value) {
             var comps = Date.gregorian.dateComponents([.month, .day], from: partial)
             comps.year = Date.placeholderYear
@@ -166,7 +167,7 @@ struct MyProfileSheet: View {
         storedWorkspace == Workspace.business.rawValue
     }
 
-    /// The self node starts life as a hidden "You" — treat that as unset.
+    /// The self node starts life as a hidden "You". Treat that as unset.
     private var hasRealName: Bool {
         let name = person.name.trimmed
         return !name.isEmpty && name.caseInsensitiveCompare("You") != .orderedSame
@@ -200,7 +201,7 @@ struct MyProfileSheet: View {
                                     .foregroundStyle(.secondary)
                             }
                         } else {
-                            Text("Add your name and details — they travel with your shared profile.")
+                            Text("Add your name and details. They travel with your shared profile.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -208,8 +209,8 @@ struct MyProfileSheet: View {
                     }
 
                     VStack(spacing: 10) {
-                        // The tree lives with your profile — it's your
-                        // family it draws. (Business opens the ladder.)
+                        // The tree lives with your profile, because it's
+                        // your family it draws. (Business opens the ladder.)
                         Button {
                             showingTree = true
                         } label: {
@@ -232,7 +233,7 @@ struct MyProfileSheet: View {
                         if let shareURL {
                             ShareLink(
                                 item: shareURL,
-                                preview: SharePreview("\(displayName) — Memento Profile")
+                                preview: SharePreview("\(displayName) Memento Profile")
                             ) {
                                 Label("Share My Profile", systemImage: "square.and.arrow.up")
                                     .frame(maxWidth: .infinity)
@@ -265,7 +266,7 @@ struct MyProfileSheet: View {
             }
             // The tree sheet reaches the family-links editor, whose save
             // mutates card fields (partner, family rows) on this very
-            // person — rebuild on dismissal like the profile editor's.
+            // person, so rebuild on dismissal like the profile editor's.
             .sheet(isPresented: $showingTree, onDismiss: regenerateShareFile) {
                 MyFamilyTreeView()
             }
@@ -282,8 +283,8 @@ struct MyProfileSheet: View {
 
 // MARK: - Receiving a shared profile card
 
-/// Preview-and-confirm for a profile card opened from AirDrop/Files —
-/// nothing lands in the store until "Add to Memento".
+/// Preview-and-confirm for a profile card opened from AirDrop/Files.
+/// Nothing lands in the store until "Add to Memento".
 struct ProfileImportSheet: View {
     let profile: ParsedProfile
 
@@ -335,7 +336,7 @@ struct ProfileImportSheet: View {
                     .mementoCard()
 
                     if alreadyExists {
-                        Text("You already have someone called \(profile.name) in Memento — adding will create a second profile.")
+                        Text("You already have someone called \(profile.name) in Memento. Adding this card will create a second profile.")
                             .font(.footnote)
                             .foregroundStyle(Theme.terracotta)
                             .multilineTextAlignment(.center)
@@ -371,8 +372,8 @@ struct ProfileImportSheet: View {
 
     private func add() {
         let person = Person(name: profile.name)
-        // Join whichever workspace is open, same as the contacts importer —
-        // a card accepted while in Business would otherwise land invisibly
+        // Join whichever workspace is open, same as the contacts importer.
+        // A card accepted while in Business would otherwise land invisibly
         // in Personal.
         person.isBusiness = UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
         person.birthday = profile.birthday

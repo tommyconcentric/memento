@@ -4,7 +4,7 @@ import MapKit
 
 // MARK: - City search
 
-/// Autocompletes city names through MapKit as the user types — every city in
+/// Autocompletes city names through MapKit as the user types. Every city in
 /// Apple Maps is reachable, and results arrive ranked by relevance (the big
 /// city rises above its namesakes; typing narrows to the small one).
 ///
@@ -21,7 +21,7 @@ final class CityAutocomplete: NSObject, ObservableObject {
         completer.delegate = self
         completer.resultTypes = .address
         if #available(iOS 18.0, *) {
-            // Cities only — no street addresses in the dropdown.
+            // Cities only: no street addresses in the dropdown.
             completer.addressFilter = MKAddressFilter(including: [.locality, .subLocality])
         }
     }
@@ -41,8 +41,8 @@ final class CityAutocomplete: NSObject, ObservableObject {
         completer.cancel()
     }
 
-    /// A picked completion resolved to its canonical "City, Country" form —
-    /// with the state slotted in for the US and Canada, whose cities repeat
+    /// A picked completion resolved to its canonical "City, Country" form.
+    /// The state is slotted in for the US and Canada, whose cities repeat
     /// across states ("Portland, OR, United States").
     func resolve(_ completion: MKLocalSearchCompletion) async -> String? {
         let search = MKLocalSearch(request: MKLocalSearch.Request(completion: completion))
@@ -75,7 +75,7 @@ extension CityAutocomplete: MKLocalSearchCompleterDelegate {
     }
 
     nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        // Offline or throttled — the field keeps working as free text.
+        // Offline or throttled. The field keeps working as free text.
         Task { @MainActor in completions = [] }
     }
 }
@@ -84,8 +84,8 @@ extension CityAutocomplete: MKLocalSearchCompleterDelegate {
 
 /// A text field that offers city completions as you type. Tap a suggestion
 /// and it lands as "City, Country" ("City, ST, Country" in the US/Canada);
-/// keep typing and whatever you wrote is stored as-is, so places Apple Maps
-/// doesn't know — or no network — never block saving.
+/// keep typing and whatever you wrote is stored as-is. A place Apple Maps
+/// doesn't know never blocks saving, and neither does being offline.
 struct CityField: View {
     let title: String
     @Binding var text: String

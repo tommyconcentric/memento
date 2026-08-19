@@ -79,7 +79,7 @@ struct PersonDetailView: View {
         .background(person.workspace.background)
         .navigationTitle(person.name)
         .navigationBarTitleDisplayMode(.inline)
-        // A pencil straight to the editor — the old ⋯ menu's other actions
+        // A pencil straight to the editor. The old ⋯ menu's other actions
         // moved to where they're used: PDF export to the foot of the Notes
         // tab, deletion (and deceased) to the foot of the editor.
         .toolbar {
@@ -125,7 +125,7 @@ struct PersonDetailView: View {
                         .accessibilityLabel("Your partner")
                 }
             }
-            // Change the photo right here — no detour through Edit Person.
+            // Change the photo right here, with no detour through Edit Person.
             // Bottom corner (iOS's photo-edit spot); the heart owns the top.
             .overlay(alignment: .bottomTrailing) {
                 ProfilePhotoEditButton(person: person)

@@ -5,8 +5,8 @@ import OSLog
 
 /// Anonymous usage statistics: a random install identifier, a day, how many
 /// times the app was opened and how many contacts were created that day.
-/// Never a name, note, photo, date or anything else the user typed — and
-/// never any identifier tied to them or their iCloud account.
+/// Never a name, note, photo, date or anything else the user typed.
+/// Never any identifier tied to them or their iCloud account.
 ///
 /// Pings land in the app's CloudKit *public* database (one `UsagePing`
 /// record per install per day) where the developer reads aggregate totals;
@@ -16,8 +16,8 @@ import OSLog
 ///
 /// The Settings toggle ("Share anonymous usage statistics", on by default)
 /// gates every send; switching it off also deletes the pings this install
-/// already sent (best effort — it needs a network and an iCloud account,
-/// like the sends themselves).
+/// already sent (best effort, since it needs a network and an iCloud
+/// account, like the sends themselves).
 @MainActor
 enum UsageAnalytics {
     /// Stored inverted ("opt out") so the default `false` means sharing is
@@ -28,8 +28,9 @@ enum UsageAnalytics {
     private static let lastSeenKey = "usageLastSeenAt"
     private static let pendingKey = "usagePendingDays"
     private static let recordType = "UsagePing"
-    /// A reopen within this window is the same visit, not a new session —
-    /// vital on the Mac, where every window focus reactivates the scene.
+    /// A reopen within this window is the same visit, not a new session.
+    /// That matters on the Mac, where every window focus reactivates the
+    /// scene.
     private static let sessionGap: TimeInterval = 30 * 60
     /// Days kept locally while waiting for a successful upload. An install
     /// that can never upload (no iCloud account) stops accumulating here
@@ -52,8 +53,8 @@ enum UsageAnalytics {
     }
 
     /// Random, minted once per install, never derived from the user or
-    /// device. Distinguishes "30 opens by one person" from "30 people" —
-    /// nothing more.
+    /// device. It distinguishes "30 opens by one person" from "30 people",
+    /// and nothing more.
     static var installID: String {
         let defaults = UserDefaults.standard
         if let existing = defaults.string(forKey: installIDKey) { return existing }
@@ -87,7 +88,7 @@ enum UsageAnalytics {
         scheduleFlush()
     }
 
-    /// Real contacts the user added — editor saves and imports. Ghost
+    /// Real contacts the user added: editor saves and imports. Ghost
     /// relatives and the hidden self node never come through here.
     static func recordContactsCreated(_ count: Int) {
         guard isEnabled, count > 0 else { return }
@@ -171,7 +172,7 @@ enum UsageAnalytics {
                 try await upsert(dayKey: dayKey, counters: counters)
                 pending[dayKey]?.dirty = false
             } catch {
-                // Offline, no iCloud account, rate limited — the counters
+                // Offline, no iCloud account, rate limited. The counters
                 // stay dirty and the next flush retries. Never user-facing.
                 logger.info("usage flush deferred for \(dayKey, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 break
@@ -222,7 +223,7 @@ enum UsageAnalytics {
 
     /// Opt-out cleanup: remove every ping this install ever sent. Needs the
     /// `installID` field to be queryable (see the CloudKit schema note in
-    /// CLAUDE.md). Failures are logged and swallowed — the opt-out itself
+    /// CLAUDE.md). Failures are logged and swallowed. The opt-out itself
     /// (no further sends) never depends on this succeeding.
     private static func deleteRemotePings() async {
         do {

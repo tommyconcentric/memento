@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// The Memento mark: a small tree whose canopy is three connected
-/// people-nodes — family tree meets relationship graph. Drawn in code so
+/// people-nodes. Family tree meets relationship graph. Drawn in code so
 /// it stays crisp at any size; the 1024px app icon uses the same geometry.
 struct LogoMark: View {
     var size: CGFloat = 40
 
-    // The one and only palette — the recolor feature (alternate icons +
+    // The one and only palette. The recolor feature (alternate icons +
     // in-app scheme picker) was removed; the logo is always the default.
     private let bg1 = Color(red: 0.09, green: 0.34, blue: 0.49)
     private let bg2 = Theme.sky

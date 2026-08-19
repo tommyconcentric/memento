@@ -23,8 +23,8 @@ enum FamilyRelation {
         "Mother-in-law", "Father-in-law", "Parent-in-law",
         "Sister-in-law", "Brother-in-law", "Sibling-in-law",
         "Daughter-in-law", "Son-in-law", "Child-in-law",
-        // Adopted and foster relations — same generations as the blood
-        // relatives they mirror, so the tree places them correctly.
+        // Adopted and foster relations sit in the same generations as the
+        // blood relatives they mirror, so the tree places them correctly.
         "Adoptive mother", "Adoptive father", "Adoptive parent",
         "Adopted daughter", "Adopted son", "Adopted child",
         "Foster mother", "Foster father", "Foster parent",
@@ -62,7 +62,7 @@ enum FamilyRelation {
     }
 
     /// Only preset relations earn a place on the family tree. Custom
-    /// "Other…" relationships stay off the chart by design — and keyword
+    /// "Other…" relationships stay off the chart by design. Keyword
     /// sniffing is no substitute, since a custom label like "childhood
     /// neighbour" would substring-match "child" straight into the
     /// children's lane. Nothing but the editor's preset picker has ever
@@ -99,7 +99,7 @@ enum BusinessRelation {
 
     /// Ladder level relative to you: people you answer to sit above,
     /// people who answer to you sit below, and everyone you work
-    /// alongside — colleagues, clients, collaborators — shares your rung.
+    /// alongside (colleagues, clients, collaborators) shares your rung.
     static func level(of label: String) -> Int {
         let l = label.lowercased()
         if l.contains("mentee") || l.contains("report") || l.contains("intern")
@@ -113,7 +113,7 @@ enum BusinessRelation {
         return 0
     }
 
-    /// Only preset working relationships climb the ladder — custom
+    /// Only preset working relationships climb the ladder. Custom
     /// "Other…" labels describe the relationship without charting it.
     static func isChartable(_ label: String) -> Bool {
         presets.contains { $0.compare(label, options: .caseInsensitive) == .orderedSame }
@@ -198,7 +198,7 @@ struct FamilyGraph {
     struct SiblingGroup: Identifiable {
         let id = UUID()
         let parents: [Person]   // the one or more shared parents
-        let children: [Person]  // full siblings — they share this exact parent set
+        let children: [Person]  // full siblings: they share this exact parent set
     }
 
     static func build(rootedAt root: Person, among people: [Person]) -> FamilyGraph {
@@ -236,7 +236,7 @@ struct FamilyGraph {
         }
 
         // Sibling groups: bucket children by their exact parent set, keyed
-        // on object identity — persistentModelID's string form isn't
+        // on object identity, because persistentModelID's string form isn't
         // guaranteed distinct for unsaved models, and a collision would
         // silently merge unrelated sibling groups.
         var buckets: [String: (parents: [Person], children: [Person])] = [:]
@@ -362,7 +362,7 @@ struct FamilyTreeLayout {
             let parentPts = placedParents.map(\.point)
             guard !parentPts.isEmpty else { continue }
             // Co-parents with no recorded partnership still get a joining
-            // bar — without one, their shared trunk would hang from the
+            // bar. Without one, their shared trunk would hang from the
             // empty space between them, touching neither. Three or more
             // co-parents (say bio mother + bio father + step-parent) get a
             // bar spanning them all, one segment per adjacent pair.
@@ -376,12 +376,13 @@ struct FamilyTreeLayout {
                 x: (parentPts[0].x + parentPts[parentPts.count - 1].x) / 2,
                 y: parentPts.map(\.y).reduce(0, +) / CGFloat(parentPts.count))
             // A couple's anchor stays at centre height: it sits on the
-            // (possibly just-added) bar between the two portraits. But a
-            // trunk starting within a portrait's span — a single parent,
-            // or an odd co-parent count whose bar midpoint lands behind
-            // the middle portrait — hangs from the *bottom edge* instead:
-            // from centre height it would show through the ring halo
-            // around the circle (the nodeR + 3 trim rule).
+            // (possibly just-added) bar between the two portraits. A
+            // trunk starting within a portrait's span hangs from the
+            // *bottom edge* instead. That covers a single parent, and an
+            // odd co-parent count whose bar midpoint lands behind the
+            // middle portrait. From centre height the trunk would show
+            // through the ring halo around the circle (the nodeR + 3
+            // trim rule).
             let anchor = parentPts.contains(where: { abs($0.x - midAnchor.x) < nodeR + 3 })
                 ? CGPoint(x: midAnchor.x, y: midAnchor.y + nodeR + 3)
                 : midAnchor
@@ -432,7 +433,7 @@ struct PedigreeTreeView: View {
                 .onEnded { _ in pinchStart = scale }
         )
         // Click-reachable zoom: pinch works on touch screens and trackpads,
-        // but a mouse on the Mac has no pinch input at all — without these
+        // but a mouse on the Mac has no pinch input at all. Without these
         // buttons, Mac mouse users could never zoom the pedigree.
         .overlay(alignment: .bottomTrailing) { zoomControls }
     }
@@ -489,7 +490,7 @@ struct PedigreeTreeView: View {
     }
 
     /// Where lines meet portraits: at the outer bark rule (circle radius
-    /// + 3), never the centre — a centre-anchored segment shows through
+    /// + 3), never the centre. A centre-anchored segment shows through
     /// the transparent halo between the avatar's edge and its outer ring.
     private static let lineEnd = FamilyTreeLayout.nodeR + 3
 
@@ -540,7 +541,7 @@ struct PedigreeTreeView: View {
         // The view's geometric frame is the circle alone, so `.position`
         // puts the circle's CENTRE exactly on the layout point every line
         // aims at. Folding the name into the frame (the old VStack) shifted
-        // every circle up by half the label's height — lines stopped short
+        // every circle up by half the label's height, so lines stopped short
         // of some portraits and cut through the ring halo of others.
         AvatarView(data: person.profilePhotoData,
                    name: person.isSelf ? "You" : person.name,
@@ -566,7 +567,7 @@ struct PedigreeTreeView: View {
 
 // MARK: - Tree rendering
 
-/// Generation rows joined by a spine — designed to live inside a ScrollView.
+/// Generation rows joined by a spine, designed to live inside a ScrollView.
 /// When `onDropInGeneration` is set, people can be held and dragged between
 /// rows; the handler receives the dropped person's name and the target row.
 private struct LaneWidthKey: PreferenceKey {
@@ -617,7 +618,7 @@ struct FamilyTreeContent: View {
     /// The frame width an export needs so its widest generation fits.
     /// The in-app chart hides an overflowing row behind its horizontal
     /// ScrollView; the export lays lanes out flat, and the fixed-width
-    /// portrait cells can't compress — a narrower frame slices the
+    /// portrait cells can't compress. A narrower frame slices the
     /// outermost people off both edges of the PNG.
     static func exportWidth(for rows: [TreeRow], minimum: CGFloat) -> CGFloat {
         let widestRow = rows.map { row in
@@ -657,7 +658,7 @@ struct FamilyTreeContent: View {
                     )
             }
             // The anchors are live, so a crowded lane scrolled sideways
-            // reports portrait centres past the chart's edges — clip so
+            // reports portrait centres past the chart's edges. Clip so
             // their stubs and the spanning bar never stroke beyond the
             // plate onto the surrounding page.
             .clipped()
@@ -949,14 +950,14 @@ struct MyFamilyTreeView: View {
         )
     }
 
-    /// Shown when you've recorded no family yet — the pedigree would
+    /// Shown when you've recorded no family yet, since the pedigree would
     /// otherwise be a lone "You". Points at the same editor the toolbar's
     /// "Edit Family Links" opens.
     private var newTreeEmptyState: some View {
         ContentUnavailableView {
             Label("No Family Yet", systemImage: "tree")
         } description: {
-            Text("Add your parents, partner and children — or link relatives you already keep in Memento — and your tree draws itself.")
+            Text("Add your parents, partner and children, or link relatives you already keep in Memento. Your tree draws itself.")
         } actions: {
             Button("Add Family") { showingSelfLinks = true }
                 .buttonStyle(.borderedProminent)
@@ -967,7 +968,7 @@ struct MyFamilyTreeView: View {
 
     var body: some View {
         // Build the pedigree once per render (and not at all in Business
-        // mode, where the ladder is shown instead) — it was computed twice,
+        // mode, where the ladder is shown instead). It was computed twice,
         // here and again in the toolbar's `.disabled`, each a full graph
         // BFS + layout pass.
         let layout = isLadder ? nil : pedigreeLayout
@@ -1031,12 +1032,12 @@ struct MyFamilyTreeView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { move in
-                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship — only ones that belong on that rung are offered.")
+                Text("They're currently your \(move.person.relationshipToUser.lowercased()). Nothing changes until you pick their new relationship. You'll only see the ones that belong on that rung.")
             }
         }
     }
 
-    /// The Business ladder keeps the classic lane chart — reporting lines
+    /// The Business ladder keeps the classic lane chart. Reporting lines
     /// are labels, not graph edges, and drag-between-rungs suits them.
     private var ladderBody: some View {
         ScrollView {
@@ -1044,7 +1045,7 @@ struct MyFamilyTreeView: View {
                 ContentUnavailableView {
                     Label("No Ladder Yet", systemImage: "building.2")
                 } description: {
-                    Text("Set \"Working Relationship to You\" on your business contacts in Edit Person — manager, client, direct report — and your corporate ladder builds itself.")
+                    Text("In Edit Person, set \"Working Relationship to You\" on your business contacts: manager, client, direct report. Your corporate ladder builds itself.")
                 }
                 .padding(.top, 60)
             } else {
@@ -1068,7 +1069,7 @@ struct MyFamilyTreeView: View {
         level == 0 ? "your rung" : BusinessRelation.rowTitle(for: level).lowercased()
     }
 
-    /// Renders the visible tree — pedigree or ladder — into a watermarked
+    /// Renders the visible tree (pedigree or ladder) into a watermarked
     /// PNG and hands it to the share sheet.
     private func exportTreeImage() {
         if isLadder {
@@ -1087,9 +1088,9 @@ struct MyFamilyTreeView: View {
 
     private func handleDrop(name: String, generation: Int) {
         // The drag payload is a display name, so resolve it only among the
-        // people this tree actually renders, and refuse ambiguous duplicates
-        // — same convention as applyReciprocalLinks; guessing risks
-        // rewriting the relationship of the wrong person.
+        // people this tree actually renders, and refuse ambiguous
+        // duplicates. Same convention as applyReciprocalLinks: guessing
+        // risks rewriting the relationship of the wrong person.
         let matches = labeled.filter {
             $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
@@ -1100,7 +1101,7 @@ struct MyFamilyTreeView: View {
 
     private func apply(label: String, to person: Person) {
         person.relationshipToUser = label
-        // Keep the edge graph in step — without this, the drag would move
+        // Keep the edge graph in step. Without this, the drag would move
         // them on the classic chart while the (default) pedigree kept
         // drawing the old relationship indefinitely.
         FamilyEdgeSync.apply(around: person, context: context)
@@ -1132,7 +1133,7 @@ struct PersonFamilySection: View {
             )
         ]
 
-        // The same relative can arrive from two sources — a FamilyMember
+        // The same relative can arrive from two sources: a FamilyMember
         // row and the free-text partner/children fields (reciprocal links
         // and the links editor write rows without filling those fields,
         // which the user may later fill by hand). Dedupe by the same
@@ -1158,13 +1159,13 @@ struct PersonFamilySection: View {
 
     private func node(named rawName: String, relation: String) -> TreeNode {
         let name = rawName.trimmed
-        // Link only on an unambiguous match — same convention as
+        // Link only on an unambiguous match, the same convention as
         // handleDrop and applyReciprocalLinks. With two profiles sharing
         // this name, guessing would lend the wrong person's photo,
         // deceased state and tap-through profile to the row, so an
         // ambiguous name renders unlinked instead.
         // Real profiles are matched first, hidden graph nodes only as a
-        // fallback — an invisible ghost sharing a contact's name must not
+        // fallback. An invisible ghost sharing a contact's name must not
         // spoil the one-match rule for the real profile (the same split
         // applyReciprocalLinks and import's duplicate check make).
         let named = people.filter {
@@ -1176,7 +1177,7 @@ struct PersonFamilySection: View {
             ? real.first
             : (real.isEmpty && named.count == 1 ? named.first : nil)
         // Hidden graph nodes (the "You" self node, name-only ghosts) lend
-        // their photo to the chart but never a navigation link — a tappable
+        // their photo to the chart but never a navigation link. A tappable
         // self node would expose Delete Person, which cascades away every
         // family-tree edge. Mirrors PedigreeTreeView.pedigreeNode.
         let linkable = (match?.isSelf == true || match?.isGhost == true) ? nil : match
@@ -1192,9 +1193,10 @@ struct PersonFamilySection: View {
     }
 
     /// Presets read naturally lowercased mid-sentence ("Your mother");
-    /// custom text renders verbatim so names and acronyms survive — the
-    /// same rule Quick Info's relationship row applies, both vocabularies
-    /// checked because a workspace flip can leave either kind of label.
+    /// custom text renders verbatim so names and acronyms survive. That is
+    /// the same rule Quick Info's relationship row applies, and both
+    /// vocabularies are checked because a workspace flip can leave either
+    /// kind of label.
     private var relationshipChipText: String {
         let relation = person.relationshipToUser
         let isPreset = (FamilyRelation.presets + BusinessRelation.presets).contains {
@@ -1237,7 +1239,7 @@ struct PersonFamilySection: View {
                     .historicalTreePlate()
                     .mementoCard(padding: 10)
                     // Share this tree as a watermarked picture, from right
-                    // on the plate — same export the big tree offers.
+                    // on the plate. Same export the big tree offers.
                     .overlay(alignment: .topTrailing) {
                         Button {
                             let exportRows = buildTreeRows(nodes: nodes, subjectTitle: person.name)
@@ -1247,7 +1249,7 @@ struct PersonFamilySection: View {
                             exportedTree = TreeImageExport.export(
                                 content,
                                 background: Theme.background,
-                                filename: "\(person.name) — Family Tree"
+                                filename: "\(person.name)'s Family Tree"
                             )
                         } label: {
                             Image(systemName: "square.and.arrow.up")

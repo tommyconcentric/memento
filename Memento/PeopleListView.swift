@@ -14,8 +14,8 @@ struct PeopleListView: View {
     @State private var selectedPerson: Person?
     @State private var searchText = ""
     @State private var showingAddPerson = false
-    // Row deletion asks first, matching the detail view's confirmation —
-    // deleting a person permanently destroys their notes and photos.
+    // Row deletion asks first, matching the detail view's confirmation.
+    // Deleting a person permanently destroys their notes and photos.
     @State private var personPendingDelete: Person?
     @State private var showingFolders = false
     @State private var showingSettings = false
@@ -45,12 +45,12 @@ struct PeopleListView: View {
     }
 
     @AppStorage("peopleSortOrder") private var sortRaw = PeopleSort.alphabetical.rawValue
-    // Newline-joined names — folder and city names can contain commas.
+    // Newline-joined names. Folder and city names can contain commas.
     // Name-keyed so the filter survives relaunch and sync; a renamed folder
     // simply un-hides, which errs on showing people rather than losing them.
     @AppStorage("hiddenFolderNames") private var hiddenFoldersRaw = ""
     @AppStorage("hiddenCityNames") private var hiddenCitiesRaw = ""
-    /// Stands in for "no folder" in the hidden set — a real folder could be
+    /// Stands in for "no folder" in the hidden set. A real folder could be
     /// named "Ungrouped".
     private static let ungroupedFilterKey = "\u{1}ungrouped"
 
@@ -80,7 +80,7 @@ struct PeopleListView: View {
     }
 
     private var filteredPeople: [Person] {
-        // Hidden folders and cities come out first — hiding a group hides
+        // Hidden folders and cities come out first. Hiding a group hides
         // its people everywhere, pinned included.
         let folders = hiddenFolders
         let cities = hiddenCities
@@ -93,7 +93,7 @@ struct PeopleListView: View {
                 return true
             }
         }
-        // Match on the trimmed query too — a trailing space (easy via
+        // Match on the trimmed query too. A trailing space (easy via
         // dictation or QuickType) would otherwise hide exact-name matches.
         let query = searchText.trimmed
         guard !query.isEmpty else { return result }
@@ -106,8 +106,8 @@ struct PeopleListView: View {
     }
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    // Bound so our custom header's collapse button can hide the sidebar —
-    // the system's own toggle lived in the navigation bar we no longer
+    // Bound so our custom header's collapse button can hide the sidebar.
+    // The system's own toggle lived in the navigation bar we no longer
     // show. Starts at .all: .automatic resolves to detail-only in iPad
     // portrait, which would launch the app to an empty "Pick Someone".
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -144,8 +144,9 @@ struct PeopleListView: View {
         // The editor's "Shown in" picker can move the open person to the
         // other workspace; the sidebar filter drops them instantly, which
         // would strand a Business-styled detail under a Personal list (or
-        // vice versa). Keep the switcher's invariant — the selection never
-        // crosses workspaces — by clearing it when the person moves.
+        // vice versa). Clearing the selection when the person moves keeps
+        // the switcher's invariant: the selection never crosses
+        // workspaces.
         .onChange(of: selectedPerson?.isBusiness) {
             guard let person = selectedPerson, person.workspace != workspace else { return }
             selectedPerson = nil
@@ -154,7 +155,7 @@ struct PeopleListView: View {
         // showing their stale profile: `isDeleted` is only true while the
         // deletion is pending, so the detail's own guard can't catch a
         // deletion that has already saved. The row-swipe path clears the
-        // selection by hand; this catches every other route — the editor's
+        // selection by hand; this catches every other route: the editor's
         // Delete Person, Settings' reset, a deletion synced from another
         // device. Keyed on the array, not its count: a synced batch can
         // delete one person and insert another in the same query update.
@@ -181,7 +182,7 @@ struct PeopleListView: View {
     // MARK: - Sidebar sections (one per sort order)
 
     /// The default view: folder sections in the folders' own order.
-    /// Bucketed in a single pass — `filteredPeople` is name-sorted, and
+    /// Bucketed in a single pass. `filteredPeople` is name-sorted, and
     /// appending preserves that order per bucket.
     @ViewBuilder
     private func folderSections(_ people: [Person]) -> some View {
@@ -272,7 +273,7 @@ struct PeopleListView: View {
         let unpinned = visible.filter { !$0.isPinned }
         return List(selection: $selectedPerson) {
             // Pinned people ride at the very top, whatever the sort, until
-            // unpinned — handy for someone you're about to see.
+            // unpinned. Handy for someone you're about to see.
             if !pinned.isEmpty {
                 Section {
                     ForEach(pinned) { person in
@@ -309,7 +310,7 @@ struct PeopleListView: View {
         // The sidebar's navigation bar is hidden entirely: its height caps
         // any toolbar view (the Mac titlebar clipped a row-sized avatar),
         // and its auto-generated "…" overflow is broken there anyway. The
-        // pinned bar below is the header now — full-size profile circle,
+        // pinned bar below is the header now: full-size profile circle,
         // wordmark, sidebar toggle and search, all on one designed surface.
         .toolbar(.hidden, for: .navigationBar)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
@@ -322,7 +323,7 @@ struct PeopleListView: View {
                     )
                 } description: {
                     Text(workspace == .business
-                        ? "Add the people you meet through work — clients, colleagues, networking contacts — and keep notes on them just like everyone else."
+                        ? "Add the people you meet through work: clients, colleagues, networking contacts. Keep notes on them just like everyone else."
                         : "Add your first person to start keeping notes about the people in your life.")
                 } actions: {
                     Button("Add Person") { showingAddPerson = true }
@@ -403,9 +404,9 @@ struct PeopleListView: View {
 
     // MARK: - Filter & sort menu
 
-    /// Every distinct city across the workspace — from the *unfiltered*
-    /// list, so a hidden city stays in the menu to be un-hidden. Biggest
-    /// first, matching the city sections.
+    /// Every distinct city across the workspace, taken from the
+    /// *unfiltered* list so a hidden city stays in the menu to be
+    /// un-hidden. Biggest first, matching the city sections.
     private var allCities: [String] {
         var counts: [String: Int] = [:]
         for person in workspacePeople {
@@ -467,11 +468,11 @@ struct PeopleListView: View {
                 .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
-        .accessibilityLabel(isFiltering ? "Filter and sort — filters active" : "Filter and sort")
+        .accessibilityLabel(isFiltering ? "Filter and sort, filters active" : "Filter and sort")
     }
 
-    /// Your own circle — the same 48pt as every row avatar, so it reads as
-    /// a peer of the other portraits. Opens My Profile (edit + share).
+    /// Your own circle, at the same 48pt as every row avatar, so it reads
+    /// as a peer of the other portraits. Opens My Profile (edit + share).
     private var myProfileButton: some View {
         Button {
             showingMyProfile = true
@@ -518,8 +519,8 @@ struct PeopleListView: View {
         )
     }
 
-    /// The pinned bar's tiles (the family tree moved into My Profile — it's
-    /// your family it draws): calendar, folders, settings.
+    /// The pinned bar's tiles: calendar, folders, settings. (The family
+    /// tree moved into My Profile, since it's your family it draws.)
     private var calendarButton: some View {
         Button {
             showingCalendar = true
@@ -606,7 +607,7 @@ struct PeopleListView: View {
                 } label: {
                     Label(option.title, systemImage: option.icon)
                         // Both segments use one font (Business's sans) rather
-                        // than each option's own display design — otherwise
+                        // than each option's own display design. Otherwise
                         // "Personal" renders in serif and "Business" in sans,
                         // which reads as a mismatch inside a single control.
                         .font(.system(.subheadline, design: Workspace.business.displayFontDesign).weight(isActive ? .semibold : .regular))
@@ -667,8 +668,8 @@ struct PeopleListView: View {
 struct PersonRow: View {
     let person: Person
     var isSelected = false
-    /// Age sort shows each person's age on the row — the order would look
-    /// arbitrary without it.
+    /// Age sort shows each person's age on the row. Without it the order
+    /// would look arbitrary.
     var showsAge = false
     /// The last row of a section skips its divider, like a system list.
     var showsDivider = true
@@ -676,7 +677,7 @@ struct PersonRow: View {
     var onTogglePin: () -> Void
 
     /// Selection paints the row in the workspace accent, so every color in
-    /// the row is chosen explicitly against it — relying on `.primary` /
+    /// the row is chosen explicitly against it. Relying on `.primary` /
     /// `.secondary` is what made selected names vanish on the Mac, where the
     /// system flips row content to white over our custom row background.
     private var selectionAccent: Color {
@@ -764,7 +765,7 @@ struct PersonRow: View {
                     .frame(width: 32, height: 32)
                     .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            // Borderless keeps the tap on the pin itself — a default button
+            // Borderless keeps the tap on the pin itself. A default button
             // inside a List row would swallow taps meant to select the row.
             .buttonStyle(.borderless)
             .accessibilityLabel(person.isPinned ? "Unpin \(person.name)" : "Pin \(person.name) to top")
@@ -776,14 +777,14 @@ struct PersonRow: View {
         // (iOS adds ~11pt each side, the Mac idiom nearly none), which put
         // the drawn divider close under a row's text but far above the
         // next row's. With the row's geometry fully ours, the divider sits
-        // exactly on the boundary — the same 10pt from both neighbours,
+        // exactly on the boundary: the same 10pt from both neighbours,
         // everywhere.
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         // The boundary between rows is drawn by hand: SwiftUI's list
         // separators simply don't render on macOS ("Designed for iPad"),
-        // so the system separator is hidden everywhere and this hairline —
-        // starting under the text, tinted with the workspace's own
-        // neutral — renders identically on iPhone, iPad and the Mac.
+        // so the system separator is hidden everywhere and this hairline
+        // renders identically on iPhone, iPad and the Mac. It starts
+        // under the text, tinted with the workspace's own neutral.
         .listRowSeparator(.hidden)
         .overlay(alignment: .bottom) {
             if showsDivider && !isSelected {

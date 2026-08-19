@@ -3,7 +3,7 @@ import UIKit
 import LocalAuthentication
 import Combine
 
-/// App-lock settings and state. The PIN is the source of truth — Face ID/Touch
+/// App-lock settings and state. The PIN is the source of truth. Face ID/Touch
 /// ID (when turned on) is a faster path to the same unlock, never a
 /// replacement, so nobody can end up locked out with no way back in.
 enum AppLock {
@@ -11,7 +11,7 @@ enum AppLock {
     static let useBiometricsKey = "appLockUseBiometrics"
     private static let pinKeychainKey = "MementoAppLockPIN"
     // Brute-force throttle state. Persisted in UserDefaults so relaunching
-    // the app can't reset it — a 4-digit PIN is only 10,000 combinations,
+    // the app can't reset it. A 4-digit PIN is only 10,000 combinations,
     // and without a cost per attempt the lock is trivially defeated by
     // someone with the (unlocked) device in hand.
     private static let failCountKey = "appLockFailCount"
@@ -22,7 +22,7 @@ enum AppLock {
     }
 
     /// Returns true only once the PIN is verified to have actually landed in
-    /// the Keychain — callers must not enable the lock on a false positive.
+    /// the Keychain. Callers must not enable the lock on a false positive.
     @discardableResult
     static func savePIN(_ pin: String) -> Bool {
         KeychainHelper.save(pin, for: pinKeychainKey)
@@ -114,14 +114,14 @@ enum AppLock {
 /// separate UIKit presentations that render above the window's root view
 /// hierarchy, so an in-hierarchy overlay leaves an open sheet (calendar,
 /// settings, an editor mid-edit) visible and interactive while "locked".
-/// A dedicated window above the alert level covers everything — including
-/// the app-switcher snapshot — and keeps the sheets' state intact for
+/// A dedicated window above the alert level covers everything, including
+/// the app-switcher snapshot, and keeps the sheets' state intact for
 /// after the unlock.
 @MainActor
 enum LockScreenPresenter {
     private static var windows: [UIWindow] = []
 
-    /// Covers EVERY connected window scene, not just one — on iPad and Mac
+    /// Covers EVERY connected window scene, not just one. On iPad and Mac
     /// the user can open several windows, and any scene left uncovered
     /// would show its content fully interactive while "locked". Safe to
     /// call repeatedly: scenes that already have a lock window are skipped,
@@ -137,7 +137,7 @@ enum LockScreenPresenter {
             .filter { $0.activationState != .unattached }
 
         for scene in scenes where !covered.contains(ObjectIdentifier(scene)) {
-            // Only the first lock window auto-prompts biometrics — several
+            // Only the first lock window auto-prompts biometrics. Several
             // windows racing to evaluate Face ID/Touch ID at once would
             // stack prompts.
             let lockView = AppLockView(autoAttemptsBiometrics: windows.isEmpty, onUnlock: onUnlock)
@@ -161,7 +161,7 @@ private struct PINDotsView: View {
     let filled: Int
     // A running failure count, not a Bool: ShakeEffect only animates when
     // its animatableData *changes*, so each failure must move the travel
-    // by a full unit — collapsing to true/false pins it at 1 after the
+    // by a full unit. Collapsing to true/false pins it at 1 after the
     // first failure and every later wrong PIN would shake nothing.
     var shakeTick: CGFloat = 0
 
@@ -317,18 +317,18 @@ struct AppLockView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
         // The PIN is device-only (ThisDeviceOnly Keychain) with no way to
-        // read or reset it from outside the lock, by design — so the only
+        // read or reset it from outside the lock, by design, so the only
         // recovery is to clear it by reinstalling. The data itself is safe
         // in the user's iCloud and restores automatically.
         .alert("Forgot Your PIN?", isPresented: $showingForgotPIN) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Your people and notes are safely stored in your iCloud. To reset a forgotten PIN, delete Memento and download it again — your data restores automatically, and only the PIN is cleared.")
+            Text("Your people and notes are safely stored in your iCloud. To reset a forgotten PIN, delete Memento and download it again. Your data comes back on its own, and only the PIN is cleared.")
         }
-        // The lock window is created at the moment of *locking* — usually
+        // The lock window is created at the moment of *locking*, usually
         // while the app is leaving the foreground. An onAppear-only prompt
         // would fire (and be consumed) right then, latch, and never re-run
-        // when the user actually comes back — so the advertised auto-unlock
+        // when the user actually comes back, so the advertised auto-unlock
         // effectively never happened on reopen. Attempt only while active,
         // and re-arm on every departure so each return gets one prompt.
         //
@@ -336,7 +336,7 @@ struct AppLockView: View {
         // notifications, not \.scenePhase: this view lives in
         // LockScreenPresenter's own UIWindow, outside the App's scene
         // graph, and a UIHostingController there never receives scenePhase
-        // updates — the environment value stays frozen at its initial
+        // updates. The environment value stays frozen at its initial
         // (background) reading, so a scenePhase-driven attempt never fires
         // and its onChange never re-arms.
         .onAppear {
@@ -360,7 +360,7 @@ struct AppLockView: View {
             for: UIApplication.didEnterBackgroundNotification)) { _ in
             // Re-arm only on a genuine departure. The Face ID/Touch ID
             // system dialog itself dips the app to inactive and back to
-            // active — re-arming on that dip meant every Cancel
+            // active. Re-arming on that dip meant every Cancel
             // re-presented the prompt instantly, an endless loop standing
             // between the user and the PIN pad. Real backgrounding always
             // reaches didEnterBackground, so each true return still gets
@@ -409,7 +409,7 @@ struct AppLockView: View {
             // so without this the button (and the auto-attempt) is a silent
             // no-op that reads as broken. The PIN is the source of truth,
             // so don't widen the unlock to the device passcode
-            // (.deviceOwnerAuthentication) — explain and point at the pad.
+            // (.deviceOwnerAuthentication). Explain and point at the pad.
             biometricNote = Self.biometricUnavailableMessage(for: error)
             return
         }
@@ -426,11 +426,11 @@ struct AppLockView: View {
     private static func biometricUnavailableMessage(for error: NSError?) -> String {
         switch error.flatMap({ LAError.Code(rawValue: $0.code) }) {
         case .biometryLockout:
-            return "\(AppLock.biometryName) is locked after too many tries — enter your PIN."
+            return "\(AppLock.biometryName) is locked after too many tries. Enter your PIN."
         case .biometryNotEnrolled:
-            return "\(AppLock.biometryName) isn't set up on this device — enter your PIN."
+            return "\(AppLock.biometryName) isn't set up on this device. Enter your PIN."
         default:
-            return "\(AppLock.biometryName) isn't available right now — enter your PIN."
+            return "\(AppLock.biometryName) isn't available right now. Enter your PIN."
         }
     }
 }
@@ -499,7 +499,7 @@ struct PINSetupView: View {
                 onComplete(entered)
             } else {
                 withAnimation(.default) { shakeTick += 1 }
-                errorMessage = "PINs didn't match — try again."
+                errorMessage = "Those PINs didn't match. Try again."
                 stage = .enter
                 firstEntry = ""
                 entered = ""

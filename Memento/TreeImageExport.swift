@@ -3,7 +3,7 @@ import UIKit
 
 /// Renders any family-tree view into a shareable PNG with the Memento
 /// watermark along the bottom. Used by the pedigree, the Business ladder
-/// and each person's Family-tab tree — one pipeline, one look.
+/// and each person's Family-tab tree: one pipeline, one look.
 enum TreeImageExport {
 
     /// A rendered export ready for the share sheet.
@@ -50,7 +50,7 @@ enum TreeImageExport {
     }
 }
 
-/// UIActivityViewController bridged for SwiftUI — presented as a sheet's
+/// UIActivityViewController bridged for SwiftUI. It's presented as a sheet's
 /// content so it needs no popover anchoring on iPad or the Mac.
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let url: URL

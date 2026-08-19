@@ -57,7 +57,7 @@ final class SpeechTranscriber {
             return
         }
         // The permission prompt can outlive the composer (or a second tap
-        // can supersede this start) — never start the engine for a request
+        // can supersede this start). Never start the engine for a request
         // nobody is waiting on.
         guard generation == startGeneration else { return }
 
@@ -77,11 +77,11 @@ final class SpeechTranscriber {
             let format = inputNode.outputFormat(forBus: 0)
             // On Macs with no input device (Mac mini/Studio/Pro without a
             // mic) this format comes back 0 Hz / 0 channels, and installTap
-            // raises an Objective-C exception that do/catch can't catch —
+            // raises an Objective-C exception that do/catch can't catch, so
             // the app would abort. Permissions don't guard this: macOS
             // grants mic access independently of whether a mic exists.
             guard format.sampleRate > 0, format.channelCount > 0 else {
-                errorMessage = "No microphone is available on this device — connect one and try again."
+                errorMessage = "No microphone is available on this device. Connect one and try again."
                 deactivateSession()
                 return
             }
@@ -94,7 +94,7 @@ final class SpeechTranscriber {
         } catch {
             errorMessage = "Couldn't start the microphone: \(error.localizedDescription)"
             // The session is already active (still ducking other apps) when
-            // the engine is what threw — release it here: isRecording never
+            // the engine is what threw. Release it here: isRecording never
             // became true, so nothing else would.
             audioEngine.inputNode.removeTap(onBus: 0)
             deactivateSession()
@@ -108,7 +108,7 @@ final class SpeechTranscriber {
     @MainActor
     func stop() {
         // Always invalidate a pending start, even when nothing is running
-        // yet — the guard below must not swallow that.
+        // yet. The guard below must not swallow that.
         startGeneration += 1
         guard isRecording || audioEngine.isRunning || sessionActive else { return }
         isRecording = false
@@ -122,7 +122,7 @@ final class SpeechTranscriber {
     }
 
     /// Releases the shared audio session if this transcriber activated it.
-    /// Idempotent — safe from any cleanup path, releases at most once.
+    /// Idempotent: safe from any cleanup path, releases at most once.
     @MainActor
     private func deactivateSession() {
         guard sessionActive else { return }
@@ -134,14 +134,14 @@ final class SpeechTranscriber {
 
     @MainActor
     private func startRecognitionSegment() {
-        // Retire the previous segment explicitly — its callbacks are
+        // Retire the previous segment explicitly. Its callbacks are
         // already ignored (request-identity guard below), but the task
         // shouldn't keep transcribing a request nothing reads.
         task?.cancel()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        // Keep the audio on the phone when the device supports it — more
-        // private, and on-device recognition allows long recordings.
+        // Keep the audio on the phone when the device supports it. That's
+        // more private, and on-device recognition allows long recordings.
         if recognizer?.supportsOnDeviceRecognition == true {
             request.requiresOnDeviceRecognition = true
         }
@@ -153,8 +153,8 @@ final class SpeechTranscriber {
                 // its terminal error in a later one; once a new segment has
                 // replaced this request, that late error must not finalize
                 // the new segment's partial and spawn a duplicate task on
-                // top of it — two live tasks alternate-writing `transcript`
-                // and garble the note.
+                // top of it. Two live tasks would alternate-write
+                // `transcript` and garble the note.
                 guard let self, self.request === request else { return }
                 self.process(result: result, error: error)
             }

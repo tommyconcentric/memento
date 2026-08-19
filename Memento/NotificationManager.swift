@@ -32,15 +32,15 @@ enum NotificationManager {
 
         var events: [PendingEvent] = []
         // Ghost nodes (name-only relatives) are skipped. So is the self
-        // node's *birthday* — it would notify "It's <your name>'s birthday
-        // — send them a message!" at yourself — but the important dates the
+        // node's *birthday*: it would notify "It's <your name>'s birthday
+        // today. Send them a message." at yourself. The important dates the
         // My Profile editor accepts do remind, phrased as "Your …" rather
         // than addressing you by name.
         for person in people where !person.isDeceased && !person.isGhost {
             if let birthday = person.birthday, person.birthdayReminderEnabled, !person.isSelf {
                 events.append(PendingEvent(
                     title: "🎂 \(person.name)'s birthday",
-                    body: "It's \(person.name)'s birthday today — send them a message!",
+                    body: "It's \(person.name)'s birthday today. Send them a message.",
                     date: birthday,
                     daysAway: Date.daysUntilNextOccurrence(of: birthday) ?? Int.max
                 ))
@@ -66,7 +66,7 @@ enum NotificationManager {
                 // a literal Feb 29 would skip non-leap years, and a Feb 28
                 // remap would fire a day early in leap years. Aim a one-shot
                 // at the actual next occurrence (Feb 29 in leap years,
-                // Feb 28 otherwise) — the refresh on every save re-arms it.
+                // Feb 28 otherwise). The refresh on every save re-arms it.
                 if let nineAM = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: next),
                    nineAM <= .now {
                     // nextOccurrence returns *today* on the day itself; a

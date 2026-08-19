@@ -4,10 +4,10 @@ import SwiftData
 // MARK: - Full data archive (.memento / JSON)
 
 /// Memento's portable backup format: one self-describing JSON file holding
-/// **everything** — every person in both workspaces, their profile fields,
-/// notes, important dates, family links, projects, extra contacts, the
-/// folders, the hidden "You" node and the family-tree edges — with profile
-/// photos and note photos embedded as base64.
+/// **everything**. That means every person in both workspaces, their profile
+/// fields, notes, important dates, family links, projects, extra contacts,
+/// the folders, the hidden "You" node and the family-tree edges. Profile
+/// photos and note photos are embedded as base64.
 ///
 /// ## Compatibility contract (read before changing this file)
 ///
@@ -16,11 +16,11 @@ import SwiftData
 /// change is **additive and optional**:
 ///
 /// - Every field on every archive struct is optional (or has a default), so a
-///   file missing a field an app expects just falls back to the default —
-///   an **older** file always loads into a **newer** app.
+///   file missing a field an app expects just falls back to the default.
+///   An **older** file always loads into a **newer** app.
 /// - `JSONDecoder` ignores keys it doesn't know, so a file carrying fields a
-///   feature added later loads fine into an app that predates them — a
-///   **newer** file always loads into an **older** app (it simply drops the
+///   feature added later loads fine into an app that predates them. A
+///   **newer** file always loads into an **older** app (it drops the
 ///   parts it has nowhere to store).
 ///
 /// The rules, forever:
@@ -28,7 +28,7 @@ import SwiftData
 ///    one, never change a field's meaning or type. A retired feature's field
 ///    stays in the struct (kept, ignored) so old files still parse.
 /// 2. Bump `formatVersion` only for a genuinely breaking change, and add a
-///    migration path keyed on it — never as routine version bumping. The
+///    migration path keyed on it. Never bump it as routine versioning. The
 ///    importer refuses a file whose `formatVersion` is above its own rather
 ///    than import it wrong.
 /// 3. Dates are ISO-8601 **without fractional seconds** (both coders use the
@@ -175,7 +175,7 @@ struct ImportSummary {
         if photosAdded > 0 { parts.append(counted(photosAdded, "photo", "photos")) }
         if datesAdded > 0 { parts.append(counted(datesAdded, "date", "dates")) }
         if contactsAdded > 0 { parts.append(counted(contactsAdded, "contact detail", "contact details")) }
-        guard !parts.isEmpty else { return "Nothing new to add — everything in that file is already here" }
+        guard !parts.isEmpty else { return "Nothing new to add. Everything in that file is already here." }
         return parts.joined(separator: " · ")
     }
 
@@ -193,7 +193,7 @@ enum DataArchiveError: LocalizedError {
         case .notAnArchive:
             return "That file isn't a Memento backup."
         case .unreadable:
-            return "That backup couldn't be read — it may be from a much newer version of Memento, or damaged."
+            return "That backup couldn't be read. It may be damaged, or from a much newer version of Memento."
         }
     }
 }
@@ -306,7 +306,7 @@ enum DataArchiveExport {
         return archive
     }
 
-    /// Encodes an already-built archive (base64-ing every photo — the heavy
+    /// Encodes an already-built archive (base64-ing every photo, the heavy
     /// part) and writes it to a temp file for the share sheet. Pure value
     /// work, so callers run it off the main thread; build the archive with
     /// `makeArchive` on the main context first.
@@ -395,7 +395,7 @@ enum DataArchiveImport {
                 // filling only blanks so a restore never clobbers current
                 // "You" data; each collection (notes, dates, family rows,
                 // contacts, projects) comes in only where this node has none
-                // of its own — addChildren skips any that aren't empty.
+                // of its own, since addChildren skips any that aren't empty.
                 let selfNode = existingPeople.canonicalSelfNode ?? {
                     let node = Person(name: name.isEmpty ? "You" : name)
                     node.isSelf = true
@@ -500,11 +500,11 @@ enum DataArchiveImport {
             person.isBusiness = ap.isBusiness ?? person.isBusiness
             person.isPinned = ap.isPinned ?? person.isPinned
             // Restoring the latch keeps a deliberately unpinned partner
-            // unpinned — without it, the next editor save would re-pin them.
+            // unpinned. Without it, the next editor save would re-pin them.
             person.didAutoPinAsPartner = ap.didAutoPinAsPartner ?? person.didAutoPinAsPartner
             person.isDeceased = ap.isDeceased ?? person.isDeceased
-            // nil here means "was true at export" — the exporter omits the
-            // default; the self node keeps its own setting regardless.
+            // nil here means "was true at export", since the exporter omits
+            // the default; the self node keeps its own setting regardless.
             person.birthdayReminderEnabled = ap.birthdayReminderEnabled ?? true
             if let created = ap.createdAt { person.createdAt = created }
         }
@@ -531,7 +531,7 @@ enum DataArchiveImport {
 
     /// Creates the notes, dates, family members, contacts and projects that
     /// belong to an imported person. Each collection fills only when the
-    /// target has none of its own — for a freshly created person that's all
+    /// target has none of its own. For a freshly created person that's all
     /// of them, and for the self node it means a restore adds to "You"
     /// without ever replacing rows that already exist.
     private static func addChildren(of ap: ArchivePerson, to person: Person,

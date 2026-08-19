@@ -5,8 +5,8 @@ import Charts
 /// The developer's hidden usage dashboard: aggregates the anonymous
 /// `UsagePing` records from the app's public CloudKit database into
 /// daily actives, sessions and contacts-created. Opened by tapping the
-/// version line in Settings seven times — deliberately discoverable-by-
-/// accident-only rather than gated, because everything it shows is
+/// version line in Settings seven times. Nothing gates it. It is only
+/// hard to find, and that is enough, because everything it shows is
 /// anonymous aggregate data from the world-readable public database.
 ///
 /// Downloads are NOT here: the app can't measure its own installs.
@@ -37,14 +37,14 @@ struct UsageDashboardView: View {
     @State private var state: LoadState = .loading
     @State private var days: [DailyUsage] = []
     @State private var distinctInstalls = 0
-    // One selection per chart — Charts clears it when the finger lifts.
+    // One selection per chart. Charts clears it when the finger lifts.
     @State private var selectedActivesDay: Date?
     @State private var selectedSessionsDay: Date?
     @State private var selectedContactsDay: Date?
 
     // Marks keep ≥3:1 against both card surfaces; aegean alone drops to
-    // 2.7:1 on the dark card, so dark mode steps up to sky — a chosen
-    // lighter step of the same hue, not an automatic flip.
+    // 2.7:1 on the dark card, so dark mode steps up to sky. That is a
+    // chosen lighter step of the same hue, not an automatic flip.
     private let activesColor = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.310, green: 0.651, blue: 0.835, alpha: 1)   // Theme.sky
@@ -82,7 +82,7 @@ struct UsageDashboardView: View {
                             ContentUnavailableView {
                                 Label("No Pings Yet", systemImage: "chart.bar.xaxis")
                             } description: {
-                                Text("No usage pings in this window. Debug builds read CloudKit's development environment — TestFlight and App Store installs report into production.")
+                                Text("No usage pings in this window. Debug builds read CloudKit's development environment. TestFlight and App Store installs report into production.")
                             }
                             .padding(.top, 40)
                         } else {
@@ -125,7 +125,7 @@ struct UsageDashboardView: View {
                 }
                 #if DEBUG
                 ToolbarItem(placement: .topBarLeading) {
-                    // Chart preview without network or pings — dev only,
+                    // Chart preview without network or pings. Dev only,
                     // same spirit as StressSeeder.
                     Button("Sample") { loadSampleData() }
                 }
@@ -217,7 +217,7 @@ struct UsageDashboardView: View {
 
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Downloads aren't collected by the app — App Store Connect → Analytics has installs and store metrics.")
+            Text("Downloads aren't collected by the app. App Store Connect → Analytics has installs and store metrics.")
             Text("Counts are anonymous daily pings (random install id, sessions, contacts created) from installs sharing usage statistics. Debug builds read CloudKit's development environment.")
         }
         .font(.caption2)

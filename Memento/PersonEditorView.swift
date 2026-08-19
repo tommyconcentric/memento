@@ -4,9 +4,9 @@ import PhotosUI
 
 /// Creates a new person, or edits an existing one when `person` is set.
 /// Covers the profile photo, folder and every quick-info field. Editing
-/// the hidden self node ("My Profile") uses this same editor with the
-/// sections that describe someone *else* — folder, workspace, their
-/// relationship to you, remembrance — folded away.
+/// the hidden self node ("My Profile") uses this same editor, with the
+/// sections that describe someone *else* folded away: folder, workspace,
+/// their relationship to you, and remembrance.
 struct PersonEditorView: View {
     let person: Person?
 
@@ -94,7 +94,7 @@ struct PersonEditorView: View {
     }
 
     // Legacy free-text family fields are only shown when they already
-    // hold data from an earlier version — new profiles record family
+    // hold data from an earlier version. New profiles record family
     // through named members instead. Captured once at load so a field
     // doesn't vanish mid-edit the moment it's cleared.
     @State private var showsLegacyChildren = false
@@ -188,7 +188,7 @@ struct PersonEditorView: View {
                         title: isBusiness ? "Working Relationship to You" : "Family Relationship to You",
                         tip: isBusiness
                             ? "Places them on your corporate ladder. Other… is custom and won't join the ladder."
-                            : "For relatives only — places them on your family tree. Leave “Not set” for non-family; Other… is custom and won't join the tree."
+                            : "For relatives only. Places them on your family tree. Leave “Not set” for non-family. Other… is custom and won't join the tree."
                     )
                 }
                 }
@@ -203,8 +203,8 @@ struct PersonEditorView: View {
                             // editingYearlessBirthday, so collapsing the
                             // calendar hands the header back to the
                             // month/day row while the year is still the
-                            // placeholder — instead of latching open and
-                            // re-presenting the sentinel 1904.
+                            // placeholder. Otherwise it would latch open
+                            // and re-present the sentinel 1904.
                             AppDatePicker(title: "Birthday", date: $birthday, business: isBusiness,
                                           yearlessStyle: .placeholderYear,
                                           expanded: $editingYearlessBirthday)
@@ -213,11 +213,11 @@ struct PersonEditorView: View {
                 } header: {
                     TipHeader(
                         title: "Birthday",
-                        tip: "Type the date directly — \(AppDateFormat.current.fullPattern?.uppercased() ?? "e.g. 12 Mar 1991"), or leave the year off to keep just the day and month — or pick it in the calendar."
+                        tip: "Type the date directly: \(AppDateFormat.current.fullPattern?.uppercased() ?? "e.g. 12 Mar 1991"). Leave the year off to keep only the day and month. You can also pick the date in the calendar."
                     )
                 } footer: {
                     if hasBirthday && birthday.hasPlaceholderYear {
-                        Text("No year is recorded — only the day and month are kept. Type a full date or pick a year in the calendar to add one.")
+                        Text("This birthday has no year. Only the day and month are kept. Type a full date or pick a year in the calendar to add one.")
                     }
                 }
 
@@ -234,7 +234,7 @@ struct PersonEditorView: View {
                         .accessibilityLabel("Link an existing person as partner")
                     }
                     // Identified by the draft's stable id, like the other
-                    // draft lists — index-based identity shifts every later
+                    // draft lists. Index-based identity shifts every later
                     // row's bindings when one is removed mid-edit.
                     ForEach($draftFamilyMembers) { $member in
                         HStack {
@@ -249,8 +249,8 @@ struct PersonEditorView: View {
                             .accessibilityLabel("Link an existing person")
                             Picker("", selection: $member.relation) {
                                 // Reciprocal links can write labels outside
-                                // the presets ("Godchild", "Family") —
-                                // without a matching tag the picker renders
+                                // the presets ("Godchild", "Family").
+                                // Without a matching tag the picker renders
                                 // blank and silently mismatches.
                                 if !member.relation.isEmpty && !FamilyRelation.presets.contains(member.relation) {
                                     Text(member.relation).tag(member.relation)
@@ -280,7 +280,7 @@ struct PersonEditorView: View {
                 } header: {
                     TipHeader(
                         title: "Family",
-                        tip: "Builds this person's family tree. Tap \u{1F50D} to link someone in Memento — the link is written both ways."
+                        tip: "Builds this person's family tree. Tap \u{1F50D} to link someone in Memento. The link is written both ways."
                     )
                 }
 
@@ -306,7 +306,7 @@ struct PersonEditorView: View {
                 } header: {
                     TipHeader(
                         title: "Background",
-                        tip: "Start typing and pick a city — it's saved as city and country (with the state for the US and Canada). Anything else you type is kept as written."
+                        tip: "Start typing and pick a city. It's saved as city and country (with the state for the US and Canada). Anything else you type is kept as written."
                     )
                 }
 
@@ -318,7 +318,7 @@ struct PersonEditorView: View {
                     // Primary rows share the extras' anatomy: kind icon on
                     // the left, star on the right. The primary leads Quick
                     // Info by default, so its star shows filled unless an
-                    // extra of the same kind holds the preference — tapping
+                    // extra of the same kind holds the preference. Tapping
                     // it reclaims the lead.
                     primaryContactRow(kind: .phone, value: phoneNumber) {
                         PhoneNumberField(text: $phoneNumber)
@@ -358,9 +358,9 @@ struct PersonEditorView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Change kind — currently \(draft.kind.label.lowercased())")
+                            .accessibilityLabel("Change kind, currently \(draft.kind.label.lowercased())")
                             // A starred row changing kind must displace any
-                            // star already held in the new kind — otherwise
+                            // star already held in the new kind. Otherwise
                             // two stars show, and the save's first-wins
                             // dedupe keeps the older one over the star the
                             // user set most recently.
@@ -427,7 +427,7 @@ struct PersonEditorView: View {
                     }
 
                     // Deletion lives at the very foot of the editor, under
-                    // Remembrance — the profile's other end-of-the-road —
+                    // Remembrance (the profile's other end-of-the-road),
                     // and only for someone who already exists.
                     if person != nil {
                         Section {
@@ -440,9 +440,10 @@ struct PersonEditorView: View {
             }
             .navigationTitle(person == nil ? "New Person" : (isSelfProfile ? "My Profile" : "Edit Person"))
             // No swipe-to-dismiss: leaving the editor is an explicit choice
-            // between Cancel (discards every draft edit — nothing touches
-            // the store until Save) and Save. An accidental swipe silently
-            // throwing away a half-filled form is the failure mode.
+            // between Cancel and Save. Cancel discards every draft edit,
+            // since nothing touches the store until Save. An accidental
+            // swipe silently throwing away a half-filled form is the
+            // failure mode.
             .interactiveDismissDisabled()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -586,7 +587,7 @@ struct PersonEditorView: View {
                 ? "This \(kind.label.lowercased()) is preferred"
                 : "Prefer this \(kind.label.lowercased())")
             // Ghost of the extras' delete button: identical metrics, zero
-            // ink — keeps the star column aligned across both row types.
+            // ink. It keeps the star column aligned across both row types.
             Image(systemName: "minus.circle.fill")
                 .opacity(0)
                 .accessibilityHidden(true)
@@ -652,7 +653,7 @@ struct PersonEditorView: View {
 
     /// Collapsed birthday row for a year-less imported date: the same
     /// anatomy as `AppDatePicker`'s collapsed row, but rendering only the
-    /// month and day — the sentinel year is a stand-in the user never
+    /// month and day. The sentinel year is a stand-in the user never
     /// entered, and showing it would present a fabricated birth year as
     /// saved data. Tapping opens the real calendar to adjust the date
     /// (or add a genuine year).
@@ -818,7 +819,7 @@ struct PersonEditorView: View {
         target.email = email.trimmed
         target.address = address.trimmed
         target.relationshipToUser = isOtherRelationship ? customRelationship.trimmed : relationshipToUser
-        // Your partner rides at the top of the list — but only the first time
+        // Your partner rides at the top of the list, but only the first time
         // they become your partner. Unpinning them afterwards sticks.
         if target.isYourPartner, !target.didAutoPinAsPartner {
             target.didAutoPinAsPartner = true
@@ -852,7 +853,7 @@ struct PersonEditorView: View {
             context.delete(old)
         }
         // A row's kind can change after it was starred, so two same-kind
-        // stars are possible in the drafts — keep only the first per kind.
+        // stars are possible in the drafts. Keep only the first per kind.
         var starredKinds: Set<String> = []
         for (index, draft) in draftContacts.enumerated() where !draft.value.trimmed.isEmpty {
             let field = ContactField(kind: draft.kind, value: draft.value.trimmed, sortOrder: index)
@@ -874,7 +875,7 @@ struct PersonEditorView: View {
 
         applyReciprocalLinks(around: target)
         // Mirror the edited relationship/partner/children/family fields into
-        // the Parentage/Partnership graph — the default pedigree tree draws
+        // the Parentage/Partnership graph. The default pedigree tree draws
         // only from edges, and the one-time migration won't run again.
         FamilyEdgeSync.apply(around: target, context: context)
 
@@ -892,7 +893,7 @@ struct PersonEditorView: View {
         func find(_ name: String) -> Person? {
             let trimmed = name.trimmed
             guard !trimmed.isEmpty else { return nil }
-            // Only real profiles can carry the reciprocal — the self node
+            // Only real profiles can carry the reciprocal. The self node
             // and ghosts have no visible profile to show it on, and a
             // hidden ghost sharing the name must not spoil the one-match
             // rule below (the picker that stored this name hides both).
@@ -901,7 +902,7 @@ struct PersonEditorView: View {
                 $0.persistentModelID != target.persistentModelID &&
                 $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
             }
-            // Only auto-link on an unambiguous match — guessing among
+            // Only auto-link on an unambiguous match. Guessing among
             // several people sharing a name risks writing a fabricated
             // family member onto the wrong profile.
             return matches.count == 1 ? matches.first : nil

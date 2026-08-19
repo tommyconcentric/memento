@@ -41,8 +41,8 @@ struct CalendarView: View {
                     selectedDaySection(events)
                 }
                 .padding()
-                // Grow with the sheet/window up to a tidy width, then centre
-                // — a calendar stretched across a wide Mac window would just
+                // Grow with the sheet/window up to a tidy width, then centre.
+                // A calendar stretched across a wide Mac window would just
                 // scatter the numbers into huge gaps.
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
@@ -220,7 +220,7 @@ struct CalendarView: View {
         let daysInDisplayedMonth = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 31
 
         // Ghost nodes (name-only relatives) stay hidden. The self node's
-        // dates do show — the My Profile editor accepts them, so dropping
+        // dates do show. The My Profile editor accepts them, so dropping
         // them here would silently discard what the user entered. Self rows
         // are labeled "You" and don't navigate (see eventRow): the detail
         // view would expose Delete Person, which cascades away every
@@ -295,7 +295,7 @@ struct CalendarView: View {
     @ViewBuilder
     private func eventRow(_ event: DayEvent) -> some View {
         if event.person.isSelf {
-            // The self node's row must not open PersonDetailView — it
+            // The self node's row must not open PersonDetailView. It
             // exposes Delete Person, which cascades away every family-tree
             // edge. Your own dates are display-only here; edit them in
             // My Profile.
@@ -342,7 +342,7 @@ struct CalendarView: View {
         var detail = event.title
         if event.isBirthday, !event.person.isDeceased,
            let year = event.sourceYear,
-           // Year-less imported birthdays carry a placeholder year — any
+           // Year-less imported birthdays carry a placeholder year. Any
            // "turns N" from it would be fabricated (e.g. "turns 119" when
            // browsing past months).
            year != Date.placeholderYear {

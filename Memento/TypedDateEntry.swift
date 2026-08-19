@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - Parsing typed dates
 
-/// Turns what a user types — "12/03/1991", "12/3", "12.3.91", "Mar 12",
-/// "12 Mar 1991" — into a date, reading the components in the order of the
+/// Turns what a user types into a date: "12/03/1991", "12/3", "12.3.91",
+/// "Mar 12", "12 Mar 1991". It reads the components in the order of the
 /// app's chosen date format. A date without a year is valid: birthdays keep
 /// only the day and month via the placeholder year.
 enum TypedDateParser {
@@ -41,7 +41,7 @@ enum TypedDateParser {
         guard words.count <= 1, numbers.count + words.count == tokens.count else { return nil }
 
         if let word = words.first {
-            // A written month — "Mar", "March", "mars" — in the user's
+            // A written month ("Mar", "March", "mars") in the user's
             // locale or English.
             guard let named = monthNumber(for: word, calendar: calendar) else { return nil }
             month = named
@@ -50,7 +50,7 @@ enum TypedDateParser {
                 day = numbers[0]
             case 2:
                 // The year trails a written month in every format that shows
-                // one ("Mar 12, 1991" / "12 Mar 1991") — unless the first
+                // one ("Mar 12, 1991" / "12 Mar 1991"), unless the first
                 // number can't be a day ("1991 Mar 12").
                 if numbers[0] > 31 {
                     (year, day) = (numbers[0], numbers[1])
@@ -89,7 +89,7 @@ enum TypedDateParser {
         let isYearless = year == nil
         var resolvedYear: Int
         if var typed = year {
-            // "91" means 1991, "05" means 2005 — expand into the century
+            // "91" means 1991, "05" means 2005. Expand into the century
             // nearest today *in the parsing calendar*, so Buddhist (2569)
             // and Hebrew (5786) system calendars expand correctly too.
             if typed < 100 {
@@ -117,8 +117,8 @@ enum TypedDateParser {
         return Parsed(date: date, isYearless: isYearless)
     }
 
-    /// The order the user types components in — the same order the format
-    /// displays them.
+    /// The order the user types components in, which is the same order the
+    /// format displays them.
     private static func componentOrder(for format: AppDateFormat) -> [Component] {
         switch format {
         case .dayMonthYear, .dayMonthName: return [.day, .month, .year]
@@ -142,7 +142,7 @@ enum TypedDateParser {
     }
 
     /// The explicit formats are pinned Gregorian (matching their display
-    /// formatters); System follows the device — with the same sub-1900-era
+    /// formatters); System follows the device, with the same sub-1900-era
     /// defense as AppDatePicker.
     private static func parsingCalendar(for format: AppDateFormat) -> Calendar {
         guard format == .system else { return Date.gregorian }
@@ -179,13 +179,13 @@ enum TypedDateParser {
 // MARK: - Editable date text
 
 /// The date readout that is also a text field: shows the date in the app's
-/// format, lets the user type one directly — with or without a year — and
+/// format, lets the user type one directly (with or without a year) and
 /// validates as they go. Every keystroke that parses commits immediately, so
 /// the date is never lost to a Save (or a sheet dismissal) that arrives while
 /// the field still has focus; blur and ⏎ just normalize the text back to the
-/// display form. An external change — a tap in the day grid — always wins,
-/// resetting whatever was mid-typing: the calendar and the text must never
-/// disagree about the date they both show.
+/// display form. An external change, such as a tap in the day grid, always
+/// wins and resets whatever was mid-typing: the calendar and the text must
+/// never disagree about the date they both show.
 struct DateEntryText: View {
     @Binding var date: Date
     var accent: Color = Theme.aegean
@@ -227,8 +227,8 @@ struct DateEntryText: View {
                     // Live-commit only full dates: committing a year-less
                     // parse mid-typing would flip a birthday to the
                     // placeholder year while "12/3" is still on its way to
-                    // "12/3/1991" — and the editor swaps views on that,
-                    // killing the keyboard. Year-less entries commit on blur.
+                    // "12/3/1991". The editor swaps views on that, which
+                    // kills the keyboard. Year-less entries commit on blur.
                     if !parsed.isYearless, parsed.date != date {
                         committingOwnEdit = true
                         date = parsed.date
@@ -255,7 +255,7 @@ struct DateEntryText: View {
         }
     }
 
-    /// "DD/MM/YYYY" for the numeric formats — the pattern doubles as the
+    /// "DD/MM/YYYY" for the numeric formats. The pattern doubles as the
     /// how-to-type hint.
     private var placeholder: String {
         AppDateFormat.current.fullPattern?.uppercased() ?? "Date"

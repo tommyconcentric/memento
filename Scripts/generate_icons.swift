@@ -10,7 +10,7 @@ import AppKit
 //
 // Re-draws the Memento tree-of-people mark (same geometry as AppLogo.swift's
 // LogoMark) as a full-bleed square with no transparency, per Apple's app
-// icon requirements — the OS applies its own corner mask at display time.
+// icon requirements. The OS applies its own corner mask at display time.
 struct IconArt: View {
     var bg1: Color
     var bg2: Color
@@ -104,7 +104,7 @@ MainActor.assumeIsolated {
             print("FAILED: \(variant.name)")
             continue
         }
-        // Flatten onto an explicitly alpha-free RGB context — Apple's app
+        // Flatten onto an explicitly alpha-free RGB context. Apple's app
         // icon validator rejects any icon with an alpha channel, even if
         // fully opaque, and ImageRenderer always produces one otherwise.
         let width = cgImage.width, height = cgImage.height

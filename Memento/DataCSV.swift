@@ -5,16 +5,16 @@ import SwiftData
 
 /// A single standalone CSV that round-trips through Memento. Unlike the full
 /// `.memento` archive it can't carry photos or the family-tree graph, but it
-/// covers the everyday data — every listed person in both workspaces, their
-/// quick-info fields, their notes and their important dates — in a file that
-/// opens cleanly in any spreadsheet.
+/// covers the everyday data in a file that opens cleanly in any spreadsheet:
+/// every listed person in both workspaces, their quick-info fields, their
+/// notes and their important dates.
 ///
 /// One CSV holds several kinds of row, told apart by a leading **Type**
 /// column (`Person`, `Note`, `Date`, `Contact`). `Note`/`Date`/`Contact`
 /// rows reference their owner by the `PersonID` written on the matching
 /// `Person` row, so the whole file re-imports as connected data. Unknown
-/// `Type` values and unknown columns are ignored, so — like the JSON archive
-/// — a CSV written by a newer Memento still imports into an older one.
+/// `Type` values and unknown columns are ignored. Like the JSON archive, a
+/// CSV written by a newer Memento still imports into an older one.
 enum MementoCSV {
     static let columns = [
         "Type", "ID", "PersonID", "Workspace", "Folder", "Name",
@@ -110,7 +110,7 @@ enum MementoCSV {
     static func importCSV(_ text: String, into context: ModelContext) throws -> ImportSummary {
         let table = parseRows(text)
         guard let header = table.first else { throw DataArchiveError.unreadable }
-        // Tolerant of a spreadsheet with repeated column names — first wins,
+        // Tolerant of a spreadsheet with repeated column names: first wins,
         // and a duplicate header must never trap.
         let index = Dictionary(header.enumerated().map { ($1.trimmed.lowercased(), $0) },
                                uniquingKeysWith: { first, _ in first })
@@ -119,7 +119,7 @@ enum MementoCSV {
             return fields[i].trimmed
         }
         guard index["type"] != nil, index["name"] != nil else {
-            // Not a Memento CSV — a plain contacts CSV goes through the
+            // Not a Memento CSV. A plain contacts CSV goes through the
             // Import from Contacts screen instead.
             throw DataArchiveError.notAnArchive
         }
@@ -129,7 +129,7 @@ enum MementoCSV {
         var existingPeople = (try? context.fetch(FetchDescriptor<Person>())) ?? []
         // Only people created by *this* import go in the ID map, so
         // Note/Date/Contact rows belonging to someone already here are
-        // skipped — re-importing the same CSV never duplicates their rows
+        // skipped. Re-importing the same CSV never duplicates their rows
         // (the same rule the JSON archive applies to merged people).
         var personByCSVID: [String: Person] = [:]
         // And, as in the archive import, each existing person can be
@@ -282,13 +282,13 @@ enum MementoCSV {
         return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
 
-    /// Quote-aware parse of the whole file into rows of fields — tolerant of
+    /// Quote-aware parse of the whole file into rows of fields. It tolerates
     /// embedded newlines in quoted values and doubled `""` escapes.
     private static func parseRows(_ text: String) -> [[String]] {
         // Normalize line endings to a lone "\n" first. Swift treats "\r\n"
         // (a CRLF, as Excel and this exporter write) as a *single*
         // Character, so a char-by-char scan would never see it as a line
-        // break — the whole file would parse as one giant row.
+        // break. The whole file would parse as one giant row.
         var stripped = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
         stripped = stripped.replacingOccurrences(of: "\r\n", with: "\n")
                            .replacingOccurrences(of: "\r", with: "\n")

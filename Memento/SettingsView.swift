@@ -10,14 +10,14 @@ struct SettingsView: View {
     @Environment(\.requestReview) private var requestReview
     @Environment(\.openURL) private var openURL
 
-    /// Fill in once Memento has an App Store listing — enables the direct
+    /// Fill in once Memento has an App Store listing. That turns on the direct
     /// write-review deep link (works for both the iOS and Mac App Store).
     /// While empty, the Rate button falls back to the system's in-app
     /// review prompt instead.
     private static let appStoreID = "6791973402"
     private static let feedbackAddress = "tommy@concentric.health"
     /// Where permission recovery actually lives: there is no "iOS Settings
-    /// app" when the app runs on a Mac — pointing users there is misleading
+    /// app" when the app runs on a Mac, so pointing users there is misleading
     /// exactly when they need unblocking.
     private static let systemSettingsName =
         ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"
@@ -38,7 +38,7 @@ struct SettingsView: View {
     @State private var resetNote: String?
 
     @State private var showingImport = false
-    // Default mirrors AppDateFormat.current — the picker must show the
+    // Default mirrors AppDateFormat.current. The picker must show the
     // format actually in effect when nothing is stored yet.
     @AppStorage(AppDateFormat.storageKey) private var dateFormatRaw = AppDateFormat.dayMonthYear.rawValue
     @AppStorage(UsageAnalytics.optOutKey) private var usageOptOut = false
@@ -105,7 +105,7 @@ struct SettingsView: View {
                         tip: "Adds a “Memento” calendar of everyone's dates that you can show or hide in the Calendar app. Includes dates with reminders off."
                     )
                 } footer: {
-                    // Sync status is feedback, not a tip — it stays visible.
+                    // Sync status is feedback, not a tip, so it stays visible.
                     VStack(alignment: .leading, spacing: 4) {
                         if calendarSyncEnabled {
                             if manualSyncOnly {
@@ -154,7 +154,7 @@ struct SettingsView: View {
                 } header: {
                     TipHeader(
                         title: "Backup & Transfer",
-                        tip: "Export a complete backup — everyone in both workspaces, notes, dates, photos and family links — as a single file you can save or move to another device, and import it back on any version of Memento. The CSV holds people, notes and dates in a spreadsheet (no photos or family tree) and imports back too."
+                        tip: "The backup is one file with everything in it: everyone in both workspaces, notes, dates, photos and family links. Save it, move it to another device, and import it back on any version of Memento. The CSV holds people, notes and dates in a spreadsheet (no photos or family tree), and it imports back too."
                     )
                 }
 
@@ -182,7 +182,7 @@ struct SettingsView: View {
                 } header: {
                     TipHeader(
                         title: "App Lock",
-                        tip: "Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Reinstall — iCloud restores your data."
+                        tip: "Locks Memento with your PIN\(AppLock.biometryType != .none ? " or \(AppLock.biometryName)" : "") when you leave it. Forgot your PIN? Delete Memento and install it again. Your data comes back from iCloud."
                     )
                 }
 
@@ -191,7 +191,7 @@ struct SettingsView: View {
                 } header: {
                     TipHeader(
                         title: "Anonymous Usage Statistics",
-                        tip: "Sends a daily count of app opens and contacts created under a random identifier — never your name, notes, photos, dates or anything you've written. Turning this off also deletes the counts this device already sent."
+                        tip: "Sends a daily count of app opens and contacts created, under a random identifier. It never sends your name, notes, photos, dates or anything you've written. Turning this off also deletes the counts this device already sent."
                     )
                 }
 
@@ -213,11 +213,11 @@ struct SettingsView: View {
                     )
                 } footer: {
                     // The About sheet is gone; this is the version's home now.
-                    // The version line stays inline — it's information (and
+                    // The version line stays inline. It's information (and
                     // the dashboard's door), not a tip.
                     VStack(alignment: .leading, spacing: 4) {
                         Text(aboutLine)
-                            // The developer's hidden usage dashboard —
+                            // The developer's hidden usage dashboard:
                             // seven taps, same spirit as build-number
                             // easter eggs. Harmless if found: it shows only
                             // the anonymous aggregate counts described in
@@ -268,7 +268,7 @@ struct SettingsView: View {
                 PINSetupView(
                     onComplete: { pin in
                         // Only trust the Keychain write if it's verified to have
-                        // landed — never enable the lock on a false positive,
+                        // landed. Never enable the lock on a false positive,
                         // or the PIN becomes the only key and it doesn't exist.
                         if AppLock.savePIN(pin) {
                             appLockEnabled = true
@@ -295,11 +295,11 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 // A failed change-PIN can leave the previous PIN in place
-                // (delete failed too) — "left off" would then be a lie
-                // about which key opens the app.
+                // (delete failed too), so "App Lock is off" would then be a
+                // lie about which key opens the app.
                 Text(AppLock.storedPIN == nil
-                    ? "Your PIN wasn't saved. App Lock has been left off — please try again."
-                    : "Your new PIN wasn't saved — your previous PIN is still in effect.")
+                    ? "Your PIN wasn't saved, so App Lock is off. Please try again."
+                    : "Your new PIN wasn't saved. Your old PIN still opens Memento.")
             }
             .onChange(of: remindersEnabled) { _, isOn in
                 Task { @MainActor in
@@ -326,14 +326,14 @@ struct SettingsView: View {
                             return
                         }
                         calendarSyncNote = nil
-                        // Populate immediately even in manual mode — an
+                        // Populate immediately even in manual mode. An
                         // empty calendar until the first Sync Now would
                         // read as broken.
                         CalendarSyncManager.syncNow(context)
                     } else {
                         // Don't clear calendarSyncNote here: the denial path
                         // above flips the toggle off, which re-fires this
-                        // handler — clearing the note in that re-entrant pass
+                        // handler. Clearing the note in that re-entrant pass
                         // would erase the explanation the instant it was set.
                         // (The granted path clears it on the next attempt.)
                         CalendarSyncManager.removeCalendar()
@@ -344,7 +344,7 @@ struct SettingsView: View {
             .onChange(of: manualSyncOnly) { _, isManual in
                 // Edits made while in manual mode never reached the calendar
                 // (refreshFromContext is gated on this flag), so switching
-                // back to Automatically must catch up now — otherwise the
+                // back to Automatically must catch up now. Otherwise the
                 // calendar stays stale until the next date-affecting save,
                 // which reads as broken. (syncNow no-ops if sync is off.)
                 if !isManual {
@@ -392,7 +392,7 @@ struct SettingsView: View {
             for edge in try context.fetch(FetchDescriptor<Partnership>()) { context.delete(edge) }
             // The hidden "You" node the family tree roots on went down with
             // everything else. Recreate it now rather than waiting for the
-            // next launch — until then the tree's "Add Family" editor would
+            // next launch. Until then the tree's "Add Family" editor would
             // open as a blank sheet.
             let selfNode = Person(name: "You")
             selfNode.isSelf = true
@@ -401,7 +401,7 @@ struct SettingsView: View {
             resetNote = nil
         } catch {
             // Without the rollback, every queued deletion stays pending in
-            // the shared main context — the next successful save from
+            // the shared main context. The next successful save from
             // anywhere would silently commit the full wipe (and sync it to
             // every device) right after this message promised nothing was
             // deleted.
@@ -456,7 +456,7 @@ struct SettingsView: View {
             let data = try Data(contentsOf: url)
             // Sniff by content, not extension: try a full backup first (it's
             // marked with `format`), then read it as a Memento CSV. Only
-            // "wrong format" falls through to the next attempt — a real
+            // "wrong format" falls through to the next attempt. A real
             // failure (a backup from a newer breaking format, or the save
             // failing) surfaces through the outer catch instead.
             do {
@@ -490,7 +490,7 @@ struct SettingsView: View {
         components.path = Self.feedbackAddress
         components.queryItems = [
             URLQueryItem(name: "subject", value: "Memento feedback"),
-            URLQueryItem(name: "body", value: "\n\n—\nMemento \(version)")
+            URLQueryItem(name: "body", value: "\n\nMemento \(version)")
         ]
         if let url = components.url {
             openURL(url)

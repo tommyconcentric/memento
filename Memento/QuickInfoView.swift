@@ -12,7 +12,7 @@ struct QuickInfoView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // Projects count as content in their own right — a profile
+            // Projects count as content in their own right. A profile
             // holding nothing but shared projects must not fall into the
             // "No Details Yet" empty state and hide them.
             if person.hasAnyQuickInfo || !person.projectsArray.isEmpty {
@@ -25,7 +25,7 @@ struct QuickInfoView: View {
                 }
 
                 if (person.birthday != nil || !person.importantDatesArray.isEmpty) && !person.isDeceased {
-                    Text("Toggle a date to turn its reminder on or off — every date still shows on the Memento calendar either way.")
+                    Text("Toggle a date to turn its reminder on or off. Every date still shows on the Memento calendar either way.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -39,7 +39,7 @@ struct QuickInfoView: View {
                 ContentUnavailableView {
                     Label("No Details Yet", systemImage: "list.clipboard")
                 } description: {
-                    Text("Add the things you always want at your fingertips — birthday, family, hobbies, how you met.")
+                    Text("Add the things you always want at your fingertips: birthday, family, hobbies, how you met.")
                 } actions: {
                     Button("Add Details", action: onEdit)
                         .buttonStyle(.borderedProminent)
@@ -111,7 +111,7 @@ struct QuickInfoView: View {
         }
         if let birthday = person.birthday {
             // Reminders never fire for in-memoriam people, so a live-looking
-            // toggle would promise one that can't happen — plain text there.
+            // toggle would promise one that can't happen. Plain text there.
             if person.isDeceased {
                 InfoRow(icon: "gift", label: "Birthday", value: birthdayText(birthday))
             } else {
@@ -225,7 +225,7 @@ struct QuickInfoView: View {
     /// Same layout as `InfoRow`, plus a trailing reminder toggle. Mutating
     /// the toggle writes straight through to the live model (like
     /// PersonDetailView's "Mark as Deceased" toggle) rather than going
-    /// through the cancel-safe editor draft flow — it's a single boolean
+    /// through the cancel-safe editor draft flow. It's a single boolean
     /// flip with nothing to lose by committing immediately.
     private func dateRow(icon: String, label: String, value: String, isOn: Binding<Bool>) -> some View {
         HStack(alignment: .top, spacing: 12) {
@@ -252,7 +252,7 @@ struct QuickInfoView: View {
 
     /// Presets read naturally lowercased mid-sentence ("Mother" → "Your
     /// mother"), but the editor's "Other…" path stores the user's own
-    /// words — lowercasing those mangles names and acronyms ("CEO at
+    /// words. Lowercasing those mangles names and acronyms ("CEO at
     /// Acme" → "ceo at acme"), so custom text renders verbatim. Both
     /// vocabularies are checked: a workspace flip can leave either kind
     /// of preset on either kind of profile.
@@ -272,7 +272,7 @@ struct QuickInfoView: View {
 
     private func birthdayText(_ birthday: Date) -> String {
         // Year-less birthdays from contact import carry a placeholder year
-        // the user never entered — show only the month and day.
+        // the user never entered, so show only the month and day.
         let dateText = birthday.hasPlaceholderYear
             ? birthday.appFormattedMonthDay()
             : birthday.appFormatted()

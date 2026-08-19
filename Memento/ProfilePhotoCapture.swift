@@ -5,7 +5,7 @@ import AVFoundation
 import UniformTypeIdentifiers
 
 /// The camera badge on a profile photo: take a photo, pick one from Photos,
-/// or pick an image file — every route lands in the crop circle before it's
+/// or pick an image file. Every route lands in the crop circle before it's
 /// saved, the same path the editor's photos take.
 struct ProfilePhotoEditButton: View {
     let person: Person
@@ -17,8 +17,8 @@ struct ProfilePhotoEditButton: View {
     @State private var showingPhotos = false
     @State private var showingFiles = false
     @State private var photoItem: PhotosPickerItem?
-    // The camera's capture is staged until its cover finishes dismissing —
-    // presenting the crop sheet while the cover is still animating away
+    // The camera's capture is staged until its cover finishes dismissing.
+    // Presenting the crop sheet while the cover is still animating away
     // drops the sheet.
     @State private var capturedImage: UIImage?
     @State private var pendingCropImage: UIImage?
@@ -41,8 +41,8 @@ struct ProfilePhotoEditButton: View {
             if CameraCapture.isAvailable {
                 Button("Take Photo") {
                     // A denied permission presents as a black, dead capture
-                    // screen — explain instead. (.notDetermined is fine: the
-                    // picker raises the system prompt itself.)
+                    // screen, so explain instead. (.notDetermined is fine:
+                    // the picker raises the system prompt itself.)
                     switch AVCaptureDevice.authorizationStatus(for: .video) {
                     case .denied, .restricted: showingCameraDenied = true
                     default: showingCamera = true
@@ -55,7 +55,7 @@ struct ProfilePhotoEditButton: View {
         .alert("Camera Access Is Off", isPresented: $showingCameraDenied) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Turn on Camera access for Memento in \(ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"), then try again — or choose a photo from Photos or Files instead.")
+            Text("Turn on Camera access for Memento in \(ProcessInfo.processInfo.isiOSAppOnMac ? "System Settings" : "the iOS Settings app"), then try again. You can also choose a photo from Photos or Files instead.")
         }
         .photosPicker(isPresented: $showingPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -110,7 +110,7 @@ struct CameraCapture: UIViewControllerRepresentable {
 
     @Environment(\.dismiss) private var dismiss
 
-    /// False on Macs without a camera and on the Simulator — the Take Photo
+    /// False on Macs without a camera and on the Simulator. The Take Photo
     /// option hides rather than presenting a black screen.
     static var isAvailable: Bool {
         UIImagePickerController.isSourceTypeAvailable(.camera)
