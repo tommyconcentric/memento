@@ -5,7 +5,7 @@ import UIKit
 import os
 
 /// Dev-only stress tooling: launch with `--stress-seed 250` to fill the
-/// store with that many synthetic people — varied birthdays (Feb 29 and
+/// store with that many synthetic people: varied birthdays (Feb 29 and
 /// year-less included), important dates, extra contacts with stars, family
 /// links, notes with photos, both workspaces, pinned and deceased people.
 /// Idempotent (bails if the marker person exists) and compiled out of
@@ -24,7 +24,7 @@ enum StressSeeder {
         var descriptor = FetchDescriptor<Person>(predicate: #Predicate { $0.name == marker })
         descriptor.fetchLimit = 1
         if let hits = try? context.fetchCount(descriptor), hits > 0 {
-            log.notice("STRESS seed skipped — marker person already present")
+            log.notice("STRESS seed skipped, marker person already present")
             timeRefreshes(context)
             return
         }
@@ -53,8 +53,9 @@ enum StressSeeder {
             // Birthdays: most people have one; every 50th is Feb 29, every
             // 10th uses the year-less 1904 placeholder. Leap-day people skip
             // the no-birthday gate (index 67 would otherwise lose its Feb 29)
-            // and get a fixed leap year — 1950 + 17 is 1967, where
-            // Calendar.date(from:) silently rolls Feb 29 over to Mar 1.
+            // and get a fixed leap year: the usual 1950 + 17 is 1967, which
+            // isn't one, and Calendar.date(from:) would silently roll their
+            // Feb 29 over to Mar 1.
             let isLeapDay = index % 50 == 17
             if index % 4 != 3 || isLeapDay {
                 let year = index % 10 == 5 ? Date.placeholderYear : (isLeapDay ? 1968 : 1950 + (index % 50))
@@ -96,7 +97,7 @@ enum StressSeeder {
             }
 
             for noteIndex in 0..<(index % 4) {
-                let note = NoteEntry(text: "Stress note \(noteIndex) for \(name) — talked about the harbour, the boat, and dinner plans.",
+                let note = NoteEntry(text: "Stress note \(noteIndex) for \(name). Talked about the harbour, the boat, and dinner plans.",
                                      eventDate: Date.now.addingTimeInterval(-Double(index + noteIndex) * 86_400),
                                      location: noteIndex == 0 ? "Taverna" : "")
                 note.title = noteIndex == 1 ? "Catch-up" : ""

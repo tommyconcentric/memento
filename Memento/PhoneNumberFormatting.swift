@@ -57,9 +57,9 @@ struct PhoneTemplate: Equatable {
 
 // MARK: - Formatter
 
-/// Presents phone numbers the way iOS Contacts does — national grouping, with
-/// brackets for the countries that use them — and names the country behind an
-/// explicit `+` or `00` prefix so a flag can be shown beside it.
+/// Presents phone numbers the way iOS Contacts does: national grouping, with
+/// brackets for the countries that use them. It also names the country behind
+/// an explicit `+` or `00` prefix so a flag can be shown beside it.
 ///
 /// Apple exposes no public phone-formatting API and the app takes no
 /// third-party dependencies, so the grouping rules live in `regionTable`
@@ -80,8 +80,8 @@ enum PhoneNumberFormatter {
         formatted(raw, defaultRegion: defaultRegion) ?? raw.trimmed
     }
 
-    /// The country the number points at — but only when it says so itself with
-    /// a `+` or `00` prefix, since a bare national number is ambiguous.
+    /// The country the number points at, but only when it says so itself with
+    /// a `+` or `00` prefix. A bare national number is ambiguous.
     static func region(for raw: String) -> PhoneRegion? {
         guard let parsed = parse(raw.trimmed, defaultRegion: nil),
               parsed.isInternational,
@@ -97,12 +97,12 @@ enum PhoneNumberFormatter {
         var candidate = new
         // Only a genuine single-separator backspace takes a digit with it:
         // exactly one character gone, and it wasn't a digit. Anything else
-        // with matching digit counts — pasting a number over a selected,
-        // formatted one — must keep every digit.
+        // with matching digit counts (pasting a number over a selected,
+        // formatted one) must keep every digit.
         if old.count - new.count == 1, digitCount(of: new) == digitCount(of: old) {
             // The digit that owned the separator is the one just before the
-            // removal point — not the number's last digit, which a
-            // mid-string delete must leave alone.
+            // removal point, not the number's last digit. A mid-string
+            // delete must leave that one alone.
             let removalPoint = firstDivergence(old: old, new: new)
             if let owner = candidate[..<removalPoint].lastIndex(where: { digits.contains($0) }) {
                 candidate.remove(at: owner)
@@ -180,7 +180,7 @@ enum PhoneNumberFormatter {
             parsed.callingCode = region.callingCode
             var national = rest
             // People write +44 (0)7911…; a trunk code isn't part of the
-            // international form. Only 0-style trunks are safe to drop — +7 800
+            // international form. Only 0-style trunks are safe to drop: +7 800
             // numbers really do start with Russia's trunk digit. Taking every
             // leading zero, not just one, is what keeps reformatting settled:
             // whatever comes back out parses to the same number.
@@ -196,7 +196,7 @@ enum PhoneNumberFormatter {
             return parsed
         }
 
-        // Written the local way — group it using the device's own region.
+        // Written the local way, so group it using the device's own region.
         let region = defaultRegion.flatMap { self.region(iso: $0) }
         parsed.region = region
         if let region, !region.trunkPrefix.isEmpty, number.hasPrefix(region.trunkPrefix) {
@@ -256,8 +256,8 @@ enum PhoneNumberFormatter {
             result.append(digit)
         }
 
-        // Close a bracket the number opened — "(415" reads as "(415)" — but
-        // leave any other separator until the digit it divides is typed.
+        // Close a bracket the number opened, so "(415" reads as "(415)".
+        // Leave any other separator until the digit it divides is typed.
         if let closing = pending.lastIndex(of: ")") {
             result += pending[...closing]
         }
@@ -306,7 +306,7 @@ enum PhoneNumberFormatter {
     }
 
     /// Codes shared by several countries need the national number to tell them
-    /// apart — the area code across the North American plan, the leading digit
+    /// apart: the area code across the North American plan, the leading digit
     /// between Russia and Kazakhstan.
     private static func narrowed(_ region: PhoneRegion, nationalNumber: String) -> PhoneRegion {
         var narrowed = region
@@ -409,7 +409,7 @@ private extension PhoneNumberFormatter {
             PhoneTemplate("# ### ####", prefixes: ["1"]),
             PhoneTemplate("## ### ###")
         ]),
-        // Italian numbers keep their leading 0 — there's no trunk code to strip.
+        // Italian numbers keep their leading 0. There's no trunk code to strip.
         PhoneRegion(iso: "IT", callingCode: "39", templates: [
             PhoneTemplate("### #######", prefixes: ["3"]),
             PhoneTemplate("### ######", prefixes: ["3"]),

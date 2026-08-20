@@ -29,7 +29,7 @@ extension PersonGroup {
     /// their seeded order, everything else alphabetically after. Must match
     /// `starterFolderNames`, or a fresh install would already violate the
     /// order new folders are slotted in by. `sortOrder` stays the source of
-    /// truth for display — this only decides what that order starts out as,
+    /// truth for display. This only decides what that order starts out as,
     /// so reordering by hand always wins.
     private static let rankedFolderNames = starterFolderNames
 
@@ -66,7 +66,7 @@ final class Person {
     var isDeceased: Bool = false
     var isPinned: Bool = false            // held at the top of the people list until unpinned
     var isBusiness: Bool = false          // lives in the Business workspace instead of Personal
-    var relationshipToUser: String = ""   // e.g. "Mother" — places them on your family tree
+    var relationshipToUser: String = ""   // e.g. "Mother". Places them on your family tree
     var address: String = ""
     // Family-tree graph nodes that never appear in the people list (see the
     // "listed people" filter): `isSelf` is the single hidden "You" node the
@@ -75,7 +75,7 @@ final class Person {
     var isSelf: Bool = false
     var isGhost: Bool = false
 
-    // Quick-reference details — kept separate from the running notes
+    // Quick-reference details, kept separate from the running notes
     var birthday: Date?
     var birthdayReminderEnabled: Bool = true
     var partnerName: String = ""
@@ -168,9 +168,10 @@ extension Person {
     ]
 
     /// True when this person is *your* partner. Ex-partners deliberately
-    /// don't count — "Ex-partner" is exactly what the linking writes when a
-    /// partnership is marked former — and neither do business contacts,
-    /// where a custom "Partner" label means the other kind of partner.
+    /// don't count, since "Ex-partner" is exactly what the linking writes
+    /// when a partnership is marked former. Business contacts don't count
+    /// either, because a "Partner" label on a business profile means a
+    /// business partner.
     var isYourPartner: Bool {
         guard !isBusiness else { return false }
         let label = relationshipToUser.trimmed.lowercased()
@@ -230,9 +231,9 @@ extension Person {
         set { partnershipsAsB = newValue }
     }
 
-    /// Parentage edges where this person is the child — i.e. their parents.
+    /// Parentage edges where this person is the child, i.e. their parents.
     var parentEdges: [Parentage] { edgesAsChildArray }
-    /// Parentage edges where this person is the parent — i.e. their children.
+    /// Parentage edges where this person is the parent, i.e. their children.
     var childEdges: [Parentage] { edgesAsParentArray }
     var parents: [Person] { parentEdges.compactMap(\.parent) }
     var children: [Person] { childEdges.compactMap(\.child) }
@@ -256,14 +257,14 @@ extension Person {
             .sorted { $0.sortOrder < $1.sortOrder }
     }
 
-    /// The starred extra of one kind, if the user chose one — preferred over
-    /// the primary field and shown first on Quick Info.
+    /// The starred extra of one kind, if the user chose one. It wins over
+    /// the primary field and is shown first on Quick Info.
     func preferredContact(_ kind: ContactField.Kind) -> ContactField? {
         additionalContacts(kind).first(where: \.isPreferred)
     }
 
     /// Newest first. Backdated notes all land on midnight of their day, so
-    /// same-day ties are common — break them by `createdAt`, then by the
+    /// same-day ties are common. Break them by `createdAt`, then by the
     /// persistent ID, to keep timeline and PDF order stable across
     /// launches, devices and CloudKit refetches (Swift's sort isn't stable
     /// and the relationship's underlying order isn't guaranteed).
@@ -290,9 +291,10 @@ extension Person {
         return based.isEmpty ? hometown.trimmed : based
     }
 
-    /// Age usable for ordering — nil when there's no birthday, only a
-    /// year-less one (the placeholder year would fake a 120-year-old), or
-    /// the person is deceased (no age math for in-memoriam profiles).
+    /// Age usable for ordering. It's nil when there's no birthday, when the
+    /// birthday has no year (the placeholder year would fake a
+    /// 120-year-old), or when the person is deceased (no age math for
+    /// in-memoriam profiles).
     var sortableAge: Int? {
         guard let birthday, !birthday.hasPlaceholderYear, !isDeceased else { return nil }
         return age

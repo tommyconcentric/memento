@@ -18,16 +18,16 @@ struct NoteComposerView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     // Count of in-flight picker batches, not a Bool: each selection spawns
     // its own load Task, and a shared Bool would be cleared by whichever
-    // batch finished first — re-enabling Save while the other was still
-    // loading and silently dropping its photos.
+    // batch finished first. That would re-enable Save while the other batch
+    // was still loading, silently dropping its photos.
     @State private var photoLoadsInFlight = 0
     @State private var isSaving = false
     @State private var loadedInitial = false
     @State private var transcriber = SpeechTranscriber()
     @State private var dictationBaseText = ""
-    // Photos whose bytes haven't synced down from another device yet — kept
-    // out of `drafts` (nothing to preview) but must not be treated as
-    // user-removed when save() diffs against `drafts`.
+    // Photos whose bytes haven't synced down from another device yet. They
+    // stay out of `drafts` (nothing to preview), but save() must not treat
+    // them as user-removed when it diffs against `drafts`.
     @State private var unsyncedPhotoIDs: Set<PersistentIdentifier> = []
 
     struct DraftPhoto: Identifiable {
@@ -187,7 +187,7 @@ struct NoteComposerView: View {
     private func appendPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
         // Clear the selection synchronously, before the slow transferable
-        // loads — while it stayed populated, reopening the picker mid-load
+        // loads. While it stayed populated, reopening the picker mid-load
         // re-offered the same items and a second onChange appended them
         // all again, duplicating every photo. (The clear re-fires onChange
         // with an empty array; the guard above swallows it.)
@@ -232,15 +232,15 @@ struct NoteComposerView: View {
         target.eventDate = eventDate
         target.location = location.trimmed
 
-        // Remove photos that were deleted in the editor (but not photos that
-        // simply hadn't synced down yet — those were never shown as drafts).
+        // Remove photos that were deleted in the editor. Photos that hadn't
+        // synced down yet stay: they were never shown as drafts.
         let existing = target.photosArray
         let keptIDs = Set(drafts.compactMap(\.existingID)).union(unsyncedPhotoIDs)
         for photo in existing where !keptIDs.contains(photo.persistentModelID) {
             context.delete(photo)
         }
 
-        // Reindex everything the note keeps — drafts and the held-out
+        // Reindex everything the note keeps: drafts and the held-out
         // unsynced photos alike. Reindexing only the drafts would leave each
         // unsynced photo's stale sortOrder colliding with a reassigned draft
         // index, scrambling the order once its bytes arrive; instead each

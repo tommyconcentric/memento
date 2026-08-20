@@ -30,7 +30,7 @@ struct PhotoCropperView: View {
                 // Live preview: darken everything outside the circle.
                 // This layer must NOT ignore the safe area: the sheet's
                 // asymmetric insets on iPhone (0 top, home-indicator bottom)
-                // would re-center the mask — and its punched-out circle — in
+                // would re-center the mask (and its punched-out circle) in
                 // the expanded bounds, sliding the bright hole below the
                 // stroked ring and the region crop() captures. Laid out in
                 // the same geo bounds as the ring, the two stay concentric;
@@ -79,7 +79,7 @@ struct PhotoCropperView: View {
             // rather than joining the ZStack: as a stack child it was
             // proposed the union bounds (dominated by the zoomed image), so
             // its expanding bars stretched to the union's edges and the
-            // clip cut them off-screen — with a wide landscape photo,
+            // clip cut them off-screen. With a wide landscape photo,
             // Cancel/Choose sat past the screen edge even at zoom 1, and at
             // high zoom the whole toolbar (slider included) vanished. The
             // overlay is proposed the visible bounds, so the controls stay
@@ -94,7 +94,7 @@ struct PhotoCropperView: View {
 
     /// Cancel/Choose, the hint, and the click-reachable zoom slider (pinch
     /// works on touch screens and trackpads, but a mouse on the Mac has no
-    /// pinch input at all — without the slider, Mac users could never zoom
+    /// pinch input at all, so without the slider Mac users could never zoom
     /// past the minimum fit).
     private func toolbar(base: CGSize, side: CGFloat) -> some View {
         VStack {

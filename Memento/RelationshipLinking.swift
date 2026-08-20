@@ -19,20 +19,20 @@ extension FamilyRelation {
             if l.contains("daughter") || l.contains("son") || l.contains("child") { return "Parent-in-law" }
             return "Sibling-in-law"
         }
-        // Godparents before the plain parent branch — "godmother" would
-        // otherwise match "mother" and invert to "Child".
+        // Godparents come before the plain parent branch. Otherwise
+        // "godmother" would match "mother" and invert to "Child".
         if l.contains("god") {
             if l.contains("mother") || l.contains("father") || l.contains("parent") { return "Godchild" }
             return "Godparent"
         }
-        // Exes before the partner branch — "ex-girlfriend" contains
+        // Exes come before the partner branch. "ex-girlfriend" contains
         // "girlfriend" and must not invert to a current "Partner".
         if l.hasPrefix("ex-") || l.hasPrefix("ex ") { return "Ex-partner" }
         // Halves before the sibling branch, so the qualifier survives the
         // round trip.
         if l.contains("half") { return "Half-sibling" }
         // Step / adoptive / foster relations keep their qualifier across the
-        // link, the way half- and god- do — a stepfather's counterpart is a
+        // link, the way half- and god- do. A stepfather's counterpart is a
         // stepchild, not a plain child. Parent-side labels invert to the
         // child term and vice versa.
         if l.contains("step") || l.contains("adopt") || l.contains("foster") {
@@ -68,9 +68,9 @@ extension FamilyRelation {
 /// edge insertion. Shared by the one-time migration and `FamilyEdgeSync`
 /// so the two can never drift apart on what "Mother" means.
 enum FamilyEdgeBuilder {
-    // A direct parent/child is a plain mother/father/child term — not a
-    // grandparent, aunt/uncle, niece/nephew, in-law, or godparent, all of
-    // which contain those words but sit off the direct line.
+    // A direct parent/child is a plain mother/father/child term, not a
+    // grandparent, aunt/uncle, niece/nephew, in-law, or godparent. Those
+    // contain the same words but sit off the direct line.
     static func isIndirect(_ l: String) -> Bool {
         l.contains("grand") || l.contains("great") || l.contains("aunt")
             || l.contains("uncle") || l.contains("niece") || l.contains("nephew")
@@ -108,7 +108,7 @@ enum FamilyEdgeBuilder {
     }
 
     /// Inserts a couple edge unless one already links the pair (in either
-    /// direction — partnerships are undirected).
+    /// direction, since partnerships are undirected).
     static func addPartnership(_ a: Person, _ b: Person, kind: PartnershipKind, context: ModelContext) {
         guard a !== b else { return }
         let linked = a.partnershipsAsAArray.contains { $0.b === b }
@@ -117,7 +117,7 @@ enum FamilyEdgeBuilder {
         context.insert(Partnership(a: a, b: b, kind: kind))
     }
 
-    /// True when any direct edge already links the pair — either parentage
+    /// True when any direct edge already links the pair: either parentage
     /// direction, or a partnership in either orientation.
     static func areLinked(_ a: Person, _ b: Person) -> Bool {
         a.edgesAsParentArray.contains { $0.child === b }
@@ -130,13 +130,13 @@ enum FamilyEdgeBuilder {
 // MARK: - Editor save → edges (keeps the pedigree in step with the editor)
 
 /// The one-time migration seeds edges from the free-text fields, but only
-/// once — without this, any relationship set in the person editor *after*
+/// once. Without this, any relationship set in the person editor *after*
 /// that first launch would show on the classic chart yet never reach the
 /// (default) edge-driven pedigree, which reads only `Parentage`/`Partnership`.
 /// Called from `PersonEditorView.save()`.
 enum FamilyEdgeSync {
     static func apply(around subject: Person, context: ModelContext) {
-        // The subject may be the hidden self node — "My Profile" edits its
+        // The subject may be the hidden self node. "My Profile" edits its
         // partner/children/family fields through the same editor, and those
         // feed the pedigree directly. Only step 1 (the self↔subject label)
         // is meaningless for the self node itself.
@@ -145,7 +145,7 @@ enum FamilyEdgeSync {
         let selfNode = people.canonicalSelfNode
 
         // A ghost carrying the subject's name is this person, linked by name
-        // before the profile existed — fold its edges onto the profile so
+        // before the profile existed. Fold its edges onto the profile so
         // those links land here instead of on a second, untappable node.
         if !subject.isSelf {
             reconcileNamesakeGhost(with: subject, people: people, context: context)
@@ -159,11 +159,11 @@ enum FamilyEdgeSync {
             syncSelfEdge(subject: subject, selfNode: selfNode, context: context)
         }
 
-        // 2) Partner / children / named family members — add-only, mirroring
+        // 2) Partner / children / named family members: add-only, mirroring
         // migration step 2, so a routine editor save never tears down edges
         // hand-built in the family links editor. Names resolve through a
         // registry that learns each ghost as it's created (ghosts first so
-        // real profiles win), like the migration's — resolving against the
+        // real profiles win), like the migration's. Resolving against the
         // one-shot fetch alone would mint two ghost "Sam"s from a single
         // save naming Sam in two fields.
         var byName: [String: Person] = [:]
@@ -187,7 +187,7 @@ enum FamilyEdgeSync {
             // A name matching the user's own is either mirror text of an
             // existing You-link (reciprocal links write it) or a namesake.
             // Keep the mirror case on the self node; otherwise don't
-            // guess — a ghost twin of "you" is never right, and charting
+            // guess. A ghost twin of "you" is never right, and charting
             // a You-edge from plain text would fabricate one when a
             // namesake was meant. (On My Profile itself the name falls
             // through: a child named after the user is a namesake, minted
@@ -228,14 +228,14 @@ enum FamilyEdgeSync {
 
     /// Folds a ghost sharing the subject's name into the subject: the ghost
     /// was minted while the name had no profile, and left standing it keeps
-    /// drawing as a separate relative — an edge to the ghost never blocks
+    /// drawing as a separate relative. An edge to the ghost never blocks
     /// the same edge to the profile, so the next re-save of anyone naming
     /// them duplicates the relationship. Only an unambiguous fold: another
     /// same-named person makes the match a guess, and an edge *between* the
     /// pair proves they're genuinely different people (no one is their own
-    /// parent or partner — a son named after his father stays a ghost).
+    /// parent or partner, so a son named after his father stays a ghost).
     /// Matching by name alone can still hand a relative's edges to an
-    /// unrelated newcomer who happens to share the name — accepted, because
+    /// unrelated newcomer who happens to share the name. That's accepted:
     /// name-identity is the family features' convention throughout (the
     /// classic chart links profiles the same way).
     private static func reconcileNamesakeGhost(with subject: Person, people: [Person], context: ModelContext) {
@@ -250,7 +250,7 @@ enum FamilyEdgeSync {
             $0 !== subject && !$0.isSelf && $0.name.trimmed.lowercased() == key
         }
         guard namesakes.count == 1, let ghost = namesakes.first, ghost.isGhost else { return }
-        // A nil-ended edge can be a row still syncing in — wait for it to
+        // A nil-ended edge can be a row still syncing in. Wait for it to
         // resolve rather than let the re-point drop it.
         guard !FamilyEdgeBuilder.areLinked(ghost, subject),
               !FamilyGraphMaintenance.hasNilEndedEdge(ghost) else { return }
@@ -272,7 +272,7 @@ enum FamilyEdgeSync {
     private static func syncSelfEdge(subject: Person, selfNode: Person, context: ModelContext) {
         let label = subject.relationshipToUser.trimmed
         // Only preset labels chart (custom "Other…" text never does), and
-        // only direct terms map to an edge — "Aunt" or "Grandmother" can't
+        // only direct terms map to an edge. "Aunt" or "Grandmother" can't
         // be placed without inventing the person in between, so existing
         // hand-built edges are left alone. Likewise when the label is
         // cleared: absence of a label is not evidence the link is wrong.
@@ -286,7 +286,7 @@ enum FamilyEdgeSync {
         guard let desired else {
             // Chartable but indirect (Aunt, Grandmother, Cousin…): no edge
             // can be drawn, but the label still asserts this person is NOT
-            // a direct parent/child/partner — a mislabeled "Mother"
+            // a direct parent/child/partner. A mislabeled "Mother"
             // corrected to "Aunt" must stop charting as one. (Only a
             // cleared or custom label leaves hand-built edges alone.)
             removeDirectSelfEdges(subject: subject, selfNode: selfNode, context: context)
@@ -337,8 +337,8 @@ enum FamilyEdgeSync {
 /// edges once, so the new tree has data to draw. Best-effort: only relations
 /// that map to a *direct* edge are converted (parents, children, partners).
 /// Indirect ones (siblings, grandparents, aunts, cousins, in-laws) are left in
-/// the old fields for the user to re-link precisely in the family editor —
-/// they can't be placed without inventing intermediate people.
+/// the old fields for the user to re-link precisely in the family editor.
+/// They can't be placed without inventing intermediate people.
 enum FamilyGraphMigration {
     static let didRunKey = "didMigrateFamilyEdgesV1"
 
@@ -351,7 +351,7 @@ enum FamilyGraphMigration {
         // flag against it would leave legacy records that sync down minutes
         // later unconverted forever. An effectively-empty store has nothing
         // to migrate anyway, so wait for a launch that has people to look
-        // at — the same first-sync caution seedDefaultGroupsIfNeeded takes
+        // at. seedDefaultGroupsIfNeeded takes the same first-sync caution
         // before latching its flag.
         guard people.contains(where: { !$0.isSelf }) else { return }
 
@@ -378,7 +378,7 @@ enum FamilyGraphMigration {
             if let existing = byName[key] { return existing }
             // A name matching the user's own is either mirror text of a
             // You-link (step 1 just built those from the labels) or a
-            // namesake — keep the mirror case on the self node, otherwise
+            // namesake. Keep the mirror case on the self node, otherwise
             // don't guess (the same rule FamilyEdgeSync applies).
             if !subject.isSelf, selfNode.name.trimmed.lowercased() == key {
                 return FamilyEdgeBuilder.areLinked(subject, selfNode) ? selfNode : nil
@@ -457,11 +457,11 @@ enum FamilyGraphMigration {
 /// The one-time migration and `FamilyEdgeSync` both work against whatever
 /// has synced locally, so two devices acting before CloudKit merges can
 /// each mint a ghost for the same name plus twin edges between the same
-/// pair. CloudKit unions the records and nothing else folds them —
+/// pair. CloudKit unions the records and nothing else folds them:
 /// `SelfNodeMaintenance` covers only self nodes, the built-in-groups merge
 /// only folders. Idempotent; run from `RootView` alongside those.
 enum FamilyGraphMaintenance {
-    /// A nil end can be an edge row synced in ahead of its person — any
+    /// A nil end can be an edge row synced in ahead of its person, so any
     /// pass that folds or deletes must wait for it to resolve.
     static func hasNilEndedEdge(_ person: Person) -> Bool {
         person.edgesAsParentArray.contains { $0.child == nil }
@@ -471,7 +471,7 @@ enum FamilyGraphMaintenance {
     }
 
     /// Re-points every family edge on `donor` onto `keeper`. An edge the
-    /// keeper already carries — or one that would self-link — is dropped
+    /// keeper already carries (or one that would self-link) is dropped
     /// rather than duplicated, the same guard `SelfNodeMaintenance.ensure`
     /// applies when folding duplicate self nodes. A nil-ended donor edge
     /// is dropped too, so callers that must preserve possibly-mid-sync
@@ -515,7 +515,7 @@ enum FamilyGraphMaintenance {
 
     /// True when the extra ghost is a pure duplicate of the keeper: it
     /// carries at least one edge, none of its edges are nil-ended, and
-    /// every one of them — same far end, same kind — already sits on the
+    /// every one of them (same far end, same kind) already sits on the
     /// keeper. Deleting such a ghost provably loses nothing.
     private static func isPureDuplicate(_ extra: Person, of keeper: Person) -> Bool {
         let hasAnyEdge = !extra.edgesAsParentArray.isEmpty || !extra.edgesAsChildArray.isEmpty
@@ -545,11 +545,11 @@ enum FamilyGraphMaintenance {
         let partnerships = (try? context.fetch(FetchDescriptor<Partnership>())) ?? []
         var changed = false
 
-        // 1) Same-name ghost twins collapse — but only pure duplicates
+        // 1) Same-name ghost twins collapse, but only pure duplicates
         // (see isPureDuplicate). An edgeless ghost is never touched (it
         // may be a draft row in an open family-links editor, inserted
         // before Save), and a ghost carrying any edge the keeper lacks is
-        // a deliberate namesake — a bio-father and step-father pair both
+        // a deliberate namesake, so a bio-father and step-father pair both
         // survive. Two genuinely distinct same-name people with identical
         // edges do fold: by name alone they can't be told from the
         // cross-device twins this exists to clean up. The keeper is picked
@@ -582,7 +582,7 @@ enum FamilyGraphMaintenance {
         // profiles' text fields on the next editor save.
         var seenParentages: Set<[PersistentIdentifier]> = []
         for edge in parentages where !edge.isDeleted {
-            // A nil end can be a row still syncing in — leave it alone.
+            // A nil end can be a row still syncing in, so leave it alone.
             guard let parent = edge.parent, let child = edge.child else { continue }
             if !seenParentages.insert([parent.persistentModelID, child.persistentModelID]).inserted {
                 context.delete(edge)
@@ -592,7 +592,7 @@ enum FamilyGraphMaintenance {
         var seenCouples: Set<Set<PersistentIdentifier>> = []
         for edge in partnerships where !edge.isDeleted {
             guard let a = edge.a, let b = edge.b else { continue }
-            // Keyed by the unordered pair — partnerships are undirected.
+            // Keyed by the unordered pair, since partnerships are undirected.
             if !seenCouples.insert([a.persistentModelID, b.persistentModelID]).inserted {
                 context.delete(edge)
                 changed = true
@@ -615,7 +615,7 @@ enum RelationshipPath {
         let root = "\u{0}you"
         func key(_ name: String) -> String { name.trimmed.lowercased() }
         // The graph is keyed by name, which would merge two distinct people
-        // sharing one — a chain through the wrong "Sarah" reads as a
+        // sharing one. A chain through the wrong "Sarah" reads as a
         // confidently wrong relationship. Ambiguous names stay out of the
         // graph entirely; this feature is best-effort flavor text, and no
         // path beats a fabricated one.
@@ -629,7 +629,7 @@ enum RelationshipPath {
         guard unambiguous(target.name) else { return nil }
 
         var adjacency: [String: [(to: String, label: String)]] = [:]
-        // Business labels chart the corporate ladder, not the family — a
+        // Business labels chart the corporate ladder, not the family. A
         // path through "your manager" isn't a family relationship.
         for p in people where !p.relationshipToUser.trimmed.isEmpty && !p.isBusiness && unambiguous(p.name) {
             adjacency[root, default: []].append((key(p.name), p.relationshipToUser.lowercased()))
@@ -749,7 +749,7 @@ struct PersonOrGhostPicker: View {
     }
 
     private var exactMatchExists: Bool {
-        // Checked against the *pickable* results, not all people — an exact
+        // Checked against the *pickable* results, not all people. An exact
         // match on the hidden self node or an excluded person would
         // suppress the "add as a name" row while offering nothing to pick,
         // dead-ending a relative who shares your name.
@@ -798,9 +798,9 @@ struct PersonOrGhostPicker: View {
 /// editor convention: nothing touches the store until Save, X asks before
 /// discarding changes, and a saved banner confirms the commit. Saving also
 /// back-fills the affected *profiles* (relationship-to-you labels, family
-/// member rows) so the tree and the profiles can't disagree — and clears
-/// the fields that would otherwise resurrect a removed link on the next
-/// editor save.
+/// member rows) so the tree and the profiles can't disagree. It also
+/// clears the fields that would otherwise resurrect a removed link on the
+/// next editor save.
 struct FamilyLinksEditor: View {
     let subject: Person
 
@@ -831,8 +831,8 @@ struct FamilyLinksEditor: View {
     @State private var initialParentEdges: [Parentage] = []
     @State private var initialChildEdges: [Parentage] = []
     @State private var initialPartnerEdges: [Partnership] = []
-    // Ghosts minted by "add as a name" during this session — real store
-    // objects already, so a discard must delete them again.
+    // Ghosts minted by "add as a name" during this session. They're real
+    // store objects already, so a discard must delete them again.
     @State private var createdGhosts: [Person] = []
     @State private var confirmingDiscard = false
     @State private var showingSavedBanner = false
@@ -910,7 +910,7 @@ struct FamilyLinksEditor: View {
                         // The picker's exclusions carry through: resolving
                         // the typed name back to someone the picker just
                         // hid would draft a duplicate link (or, for the
-                        // subject's own name, silently nothing) — the row
+                        // subject's own name, silently nothing). The row
                         // exists to mint a namesake instead.
                         if let ghost = resolveGhost(named: name, excluding: excludeIDs(for: role)) {
                             addDraft(role, person: ghost)
@@ -1027,7 +1027,7 @@ struct FamilyLinksEditor: View {
         var ids: Set<PersistentIdentifier> = [subject.persistentModelID]
         switch role {
         case .parent:
-            // Exclude draft children too — offering one as a parent invites
+            // Exclude draft children too. Offering one as a parent invites
             // an A\u{21c4}B parentage cycle the pedigree can only draw as
             // contradictory descent loops.
             ids.formUnion(draftParents.map(\.person.persistentModelID))
@@ -1064,7 +1064,7 @@ struct FamilyLinksEditor: View {
     private func discardAndClose() {
         // Ghosts minted this session were inserted immediately (they need
         // identities for the draft rows); with the draft discarded they are
-        // edgeless orphans — delete them again.
+        // edgeless orphans, so delete them again.
         for ghost in createdGhosts where ghost.isGhost
             && ghost.edgesAsParentArray.isEmpty && ghost.edgesAsChildArray.isEmpty
             && ghost.partnershipsAsAArray.isEmpty && ghost.partnershipsAsBArray.isEmpty {
@@ -1122,7 +1122,7 @@ struct FamilyLinksEditor: View {
         }
 
         // A ghost minted this session whose draft row was removed again
-        // before Save was inserted into the store immediately — committing
+        // before Save was inserted into the store immediately. Committing
         // it would leave an invisible edgeless orphan (no delete UI reaches
         // ghosts, and dedupe deliberately skips edgeless ones) that spoils
         // name-ambiguity checks forever. Same sweep as discardAndClose,
@@ -1173,7 +1173,7 @@ struct FamilyLinksEditor: View {
 
     /// Saved links land on the profiles too: the subject gains a family
     /// member row, a real (non-ghost) counterpart gains the reciprocal row,
-    /// and — when the subject is the self node — the other person's
+    /// and, when the subject is the self node, the other person's
     /// "relationship to you" label is set unless a specific fitting label
     /// ("Mother") is already there. Custom unchartable labels are left
     /// alone.
@@ -1202,8 +1202,8 @@ struct FamilyLinksEditor: View {
             if l.isEmpty || (FamilyRelation.isChartable(other.relationshipToUser) && !fits) {
                 other.relationshipToUser = generic
             }
-            // Becoming your partner pins them to the top of the list — the
-            // same one-time nudge the editor gives, whichever path made
+            // Becoming your partner pins them to the top of the list. It's
+            // the same one-time nudge the editor gives, whichever path made
             // them your partner. Latched, so unpinning them later sticks.
             if other.isYourPartner, !other.didAutoPinAsPartner {
                 other.didAutoPinAsPartner = true
@@ -1212,7 +1212,7 @@ struct FamilyLinksEditor: View {
         }
     }
 
-    /// A removed link clears the profile fields that fed it — otherwise
+    /// A removed link clears the profile fields that fed it. Otherwise
     /// FamilyEdgeSync would faithfully rebuild the edge from the stale
     /// text on the very next editor save. Both sides need cleaning:
     /// backfill and the editor's applyReciprocalLinks wrote the link onto
@@ -1225,7 +1225,7 @@ struct FamilyLinksEditor: View {
             subject.partnerName = ""
         }
         // The legacy free-text children list feeds FamilyEdgeSync alongside
-        // the family rows — a removed child left there resurrects on the
+        // the family rows. A removed child left there resurrects on the
         // subject's own next save.
         if role == .child {
             removeChildName(other.name, from: subject)
@@ -1236,7 +1236,7 @@ struct FamilyLinksEditor: View {
             context.delete(member)
         }
 
-        // The counterpart's fields describe the subject from their side —
+        // The counterpart's fields describe the subject from their side:
         // the subject's parent lists the subject as a child, and partners
         // name each other.
         if role == .partner,
@@ -1253,7 +1253,7 @@ struct FamilyLinksEditor: View {
         }
 
         // Removing the hidden "You" node from this profile's links must
-        // also clear the profile's own "relationship to you" label —
+        // also clear the profile's own "relationship to you" label:
         // syncSelfEdge treats that label as authoritative and would
         // rebuild the edge on the subject's very next editor save. The
         // label describes the subject from the user's side, so it maps
@@ -1307,7 +1307,7 @@ struct FamilyLinksEditor: View {
         }
     }
 
-    /// True when the relation reads as this role *on its own* — everything
+    /// True when the relation reads as this role *on its own*: everything
     /// backfill and applyReciprocalLinks write ("Partner", "Stepmother").
     /// The keyword matchers alone would also hit hand-written compounds
     /// ("Mum's partner", "Father's brother") that describe a different
@@ -1321,8 +1321,8 @@ struct FamilyLinksEditor: View {
 }
 
 /// Finds a non-self profile/ghost by case-insensitive name, or creates a new
-/// ghost. `excluding` carries the caller's already-linked people — the same
-/// set its picker hides — so an "add as a name" for an excluded person's
+/// ghost. `excluding` carries the caller's already-linked people (the same
+/// set its picker hides), so an "add as a name" for an excluded person's
 /// name mints a namesake instead of resolving straight back to them.
 func resolveOrCreateGhost(named rawName: String, in context: ModelContext, among people: [Person],
                           excluding excluded: Set<PersistentIdentifier> = []) -> Person? {

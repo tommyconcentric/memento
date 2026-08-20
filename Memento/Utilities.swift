@@ -35,7 +35,7 @@ extension View {
     }
 }
 
-/// Shared geometry for the seven-column month grids — the editor's inline
+/// Shared geometry for the seven-column month grids: the editor's inline
 /// date picker (`AppDatePicker`) and the Important Dates calendar
 /// (`CalendarView`). Deriving cell size and gutter from the *actual*
 /// available width, rather than fixed points, keeps the day numbers a
@@ -82,7 +82,7 @@ extension String {
 extension Date {
     /// The sentinel year contact import stores when the source birthday has
     /// no year (1904 is a leap year, so Feb 29 still constructs). Displays
-    /// must hide it — the user never entered it.
+    /// must hide it, because the user never entered it.
     static let placeholderYear = 1904
 
     /// Placeholder years are Gregorian by definition; going through
@@ -140,7 +140,7 @@ enum AppDateFormat: String, CaseIterable, Identifiable {
 
     static let storageKey = "appDateFormat"
 
-    /// DD/MM/YYYY unless the user has chosen otherwise in Settings — an
+    /// DD/MM/YYYY unless the user has chosen otherwise in Settings. An
     /// explicit choice (including "System") is always honoured.
     static var current: AppDateFormat {
         AppDateFormat(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .dayMonthYear
@@ -154,7 +154,7 @@ enum AppDateFormat: String, CaseIterable, Identifiable {
         if let pattern = fullPattern {
             return Self.cachedFormatter(pattern).string(from: .now)
         }
-        return "System — \(Date.now.formatted(date: .abbreviated, time: .omitted))"
+        return "System (\(Date.now.formatted(date: .abbreviated, time: .omitted)))"
     }
 
     /// Explicit patterns; nil means "follow the device's region settings".
@@ -186,7 +186,7 @@ enum AppDateFormat: String, CaseIterable, Identifiable {
         if let cached = formatterCache[pattern] { return cached }
         let formatter = DateFormatter()
         if pattern == Self.iso8601.fullPattern || pattern == Self.iso8601.monthDayPattern {
-            // ISO 8601 fixes its digits as well as its calendar — pin
+            // ISO 8601 fixes its digits as well as its calendar. Pin
             // POSIX so locales with native numbering still emit ISO.
             formatter.locale = Locale(identifier: "en_US_POSIX")
         }
@@ -218,7 +218,7 @@ extension Date {
         }
     }
 
-    /// Month + day only — placeholder-year birthdays must never show the
+    /// Month + day only. Placeholder-year birthdays must never show the
     /// sentinel year.
     func appFormattedMonthDay() -> String {
         if let pattern = AppDateFormat.current.monthDayPattern {
@@ -307,7 +307,7 @@ struct AvatarView: View {
     }
 
     // Hoisted out of `fallbackColor` so an initials avatar doesn't rebuild
-    // these arrays on every render — they're rendered in every list row,
+    // these arrays on every render. They're rendered in every list row,
     // calendar cell and tree node.
     private static let businessPalette: [Color] = [
         Color(red: 0.18, green: 0.47, blue: 0.44),   // boardroom teal
@@ -341,7 +341,7 @@ struct AvatarView: View {
 /// again or anywhere outside to dismiss. Rendered as an anchored popover on
 /// iPhone too (not a sheet), so it behaves the same on iPad and Mac.
 ///
-/// For *tips* only — text a user needs once, not status. Anything dynamic
+/// For *tips* only: text a user needs once, not status. Anything dynamic
 /// (permission errors, sync results, validation notes) stays an inline
 /// footer, because feedback the user needs *now* can't hide behind a tap.
 struct TipHeader: View {
@@ -385,7 +385,7 @@ struct InfoRow<Accessory: View>: View {
     let icon: String
     let label: String
     let value: String
-    /// Sits flush right, level with the value — the country flag on phone numbers.
+    /// Sits flush right, level with the value, like the country flag on phone numbers.
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
@@ -417,11 +417,11 @@ extension InfoRow where Accessory == EmptyView {
 // MARK: - Card style
 
 /// The workspace whose surfaces `.mementoCard()` draws. Personal is the
-/// default so standalone surfaces (settings, calendar, import, lock
-/// screen — all on the personal whitewash) keep today's look; workspace-
-/// themed roots override it once so business screens get slate cards and
-/// a graphite hairline instead of Personal navy and aegean, without any
-/// call-site changes.
+/// default, so standalone surfaces keep today's look: settings, calendar,
+/// import and the lock screen all sit on the personal whitewash.
+/// Workspace-themed roots override it once so business screens get slate
+/// cards and a graphite hairline instead of Personal navy and aegean,
+/// without any call-site changes.
 private struct CardWorkspaceKey: EnvironmentKey {
     static let defaultValue = Workspace.personal
 }
@@ -434,9 +434,9 @@ extension EnvironmentValues {
 }
 
 /// The shared surface treatment: continuous corners, hairline border,
-/// soft shadow. Keeps every card in the app consistent — tinted by the
-/// `cardWorkspace` environment so each workspace's cards match its
-/// background.
+/// soft shadow. Keeps every card in the app consistent. The
+/// `cardWorkspace` environment tints it, so each workspace's cards match
+/// its background.
 struct MementoCard: ViewModifier {
     var padding: CGFloat = 16
     @Environment(\.cardWorkspace) private var workspace
@@ -461,7 +461,7 @@ extension View {
 
 // MARK: - Pill tab picker
 
-/// Editorial underline tabs with a sliding indicator — serif labels,
+/// Editorial underline tabs with a sliding indicator: serif labels,
 /// hairline baseline.
 struct PillPicker<Value: Hashable>: View {
     @Binding var selection: Value

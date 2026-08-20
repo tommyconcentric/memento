@@ -7,7 +7,7 @@ import UIKit
 
 /// Import people from iOS Contacts (which is also where WhatsApp keeps its
 /// contacts) or from a Facebook "Download Your Information" export / CSV.
-/// You pick exactly who comes in and which folder they land in — nothing
+/// You pick exactly who comes in and which folder they land in. Nothing
 /// imports without review.
 struct ImportContactsView: View {
     @Environment(\.modelContext) private var context
@@ -21,14 +21,14 @@ struct ImportContactsView: View {
     @State private var showingFilePicker = false
     @State private var errorMessage: String?
     @State private var isFetchingContacts = false
-    // Both import paths confirm first — a mis-tap on "Import All" could
+    // Both import paths confirm first. A mis-tap on "Import All" could
     // otherwise pour hundreds of contacts into the store with no way back
     // but deleting them one by one.
     @State private var pendingImport: PendingImport?
 
     enum PendingImport: Identifiable {
-        case selection(count: Int)   // the toolbar's "Import N" — ticked rows only
-        case everyone(count: Int)    // "Import All" — every new row plus hand-ticked duplicates
+        case selection(count: Int)   // the toolbar's "Import N": ticked rows only
+        case everyone(count: Int)    // "Import All": every new row plus hand-ticked duplicates
         var id: String {
             switch self {
             case .selection(let count): return "selection-\(count)"
@@ -44,8 +44,8 @@ struct ImportContactsView: View {
 
     /// The system contact picker (CNContactPickerViewController) presents
     /// nothing when the iOS app runs on a Mac ("Designed for iPad"), so the
-    /// Mac reads the Contacts database directly instead — which, unlike the
-    /// picker, requires the Contacts permission. The review list is the
+    /// Mac reads the Contacts database directly instead. Unlike the picker,
+    /// that path needs the Contacts permission. The review list is the
     /// picker there: everything is fetched, nothing imports unticked.
     private var usesDirectContactsFetch: Bool {
         ProcessInfo.processInfo.isiOSAppOnMac
@@ -69,8 +69,8 @@ struct ImportContactsView: View {
         candidates.filter(\.include).count
     }
 
-    /// Imports join whichever workspace is open — preview avatars in the
-    /// matching palette.
+    /// Imports join whichever workspace is open, so preview avatars use
+    /// the matching palette.
     private var importsAsBusiness: Bool {
         UserDefaults.standard.string(forKey: Workspace.storageKey) == Workspace.business.rawValue
     }
@@ -85,7 +85,7 @@ struct ImportContactsView: View {
         candidates.filter { !$0.alreadyExists || $0.include }.count
     }
 
-    // "All" means everyone not already in Memento — those default to
+    // "All" means everyone not already in Memento. Those default to
     // unticked precisely to avoid duplicate imports, and Select All
     // shouldn't quietly undo that. They can still be ticked by hand.
     private var allSelected: Bool {
@@ -152,7 +152,7 @@ struct ImportContactsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
                 Text(selectedGroup.map { "They'll be added to the “\($0.name)” folder." }
-                    ?? "They won't be filed in a folder — you can organize them later.")
+                    ?? "They won't be filed in a folder. You can organize them later.")
             }
         }
     }
@@ -166,8 +166,8 @@ struct ImportContactsView: View {
                     icon: "person.crop.circle.badge.plus",
                     title: isFetchingContacts ? "Loading Contacts…" : "From Contacts",
                     subtitle: usesDirectContactsFetch
-                        ? "Reads the contacts on this Mac — names, photos, birthdays and every number, email and address come along. You'll tick exactly who to keep on the next screen."
-                        : "Pick exactly who to import — names, photos, birthdays and every number, email and address come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
+                        ? "Reads the contacts on this Mac. Names, photos, birthdays and every number, email and address come along. You'll tick exactly who to keep on the next screen."
+                        : "Pick exactly who to import. Names, photos, birthdays and every number, email and address come along. WhatsApp uses your phone's contacts, so this covers your WhatsApp people too."
                 ) {
                     if usesDirectContactsFetch {
                         fetchAllContacts()
@@ -180,7 +180,7 @@ struct ImportContactsView: View {
                 optionCard(
                     icon: "doc.badge.plus",
                     title: "From Facebook Export or CSV",
-                    subtitle: "Facebook no longer offers a live friends API, so use its \"Download Your Information\" export (the friends JSON — names import, add details after) or any CSV with name, birthday, phone, email, address columns."
+                    subtitle: "Facebook won't let apps read your friends list any more, so use its \"Download Your Information\" export. Pick the friends JSON: it brings in names only, so you add the details after. Any CSV with name, birthday, phone, email, address columns works too."
                 ) {
                     showingFilePicker = true
                 }
@@ -241,7 +241,7 @@ struct ImportContactsView: View {
             }
             .listRowBackground(Theme.card)
 
-            // One-tap bulk import — the alternative to ticking each person.
+            // One-tap bulk import, the alternative to ticking each person.
             // "All" means everyone not already in Memento; duplicate rows
             // stay out unless ticked by hand (and a hand-ticked one still
             // comes along).
@@ -261,8 +261,8 @@ struct ImportContactsView: View {
                 TipHeader(
                     title: "",
                     tip: newCandidateCount == candidates.count
-                        ? "Brings everyone in at once — or tick people individually and use Import at the top."
-                        : "Brings in everyone not already in Memento — \"Already in Memento\" rows stay out unless you tick them."
+                        ? "Brings everyone in at once. Or tick people individually and use Import at the top."
+                        : "Brings in everyone not already in Memento. \"Already in Memento\" rows stay out unless you tick them."
                 )
             }
             .listRowBackground(Theme.card)
@@ -329,7 +329,7 @@ struct ImportContactsView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: - Contacts (direct fetch — Mac, where the picker can't present)
+    // MARK: - Contacts (direct fetch on the Mac, where the picker can't present)
 
     /// Requests Contacts access and reads every contact into the review
     /// list. Only used on the Mac: on iOS/iPadOS the system picker imports
@@ -346,7 +346,7 @@ struct ImportContactsView: View {
                 errorMessage = "Turn on Contacts access for Memento in System Settings → Privacy & Security → Contacts, then try again."
                 return
             }
-            // Enumerate off the main thread — a big Contacts database with
+            // Enumerate off the main thread. A big Contacts database with
             // photos takes long enough to hitch the sheet.
             let contacts: [CNContact] = await withCheckedContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
@@ -369,12 +369,12 @@ struct ImportContactsView: View {
                 return
             }
             // Everything arrives (there was no picker step), so nothing is
-            // pre-ticked — the review list is where the choosing happens.
+            // pre-ticked. The review list is where the choosing happens.
             handlePicked(contacts, preselectNew: false)
         }
     }
 
-    // MARK: - Contacts (system picker — iPhone/iPad, no permission needed)
+    // MARK: - Contacts (system picker on iPhone/iPad, no permission needed)
 
     private func handlePicked(_ contacts: [CNContact], preselectNew: Bool = true) {
         var results: [ImportCandidate] = []
@@ -403,7 +403,7 @@ struct ImportContactsView: View {
                 // displays hide it (see Date.placeholderYear). It's a leap
                 // year, so a Feb 29 birthday still constructs a valid date
                 // instead of silently failing.
-                // Built with the Gregorian calendar explicitly — CNContact
+                // Built with the Gregorian calendar explicitly. CNContact
                 // components are Gregorian, and the placeholder year only
                 // means 1904 there.
                 candidate.birthday = Date.gregorian.date(
@@ -440,7 +440,7 @@ struct ImportContactsView: View {
     }
 
     /// Contacts often repeat one value under several labels (e.g. the same
-    /// number as "mobile" and "iPhone") — drop exact repeats, keep order.
+    /// number as "mobile" and "iPhone"). Drops exact repeats, keeps order.
     private func uniqueValues(_ values: [String]) -> [String] {
         var seen: Set<String> = []
         return values.map { $0.trimmed }.filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -448,7 +448,7 @@ struct ImportContactsView: View {
 
     // MARK: - Files (Facebook export / CSV)
 
-    /// A generous ceiling for a contacts export — thousands of contacts are
+    /// A generous ceiling for a contacts export. Thousands of contacts are
     /// still only a few MB. Beyond this we refuse rather than slurp an
     /// arbitrarily large "Open in Memento" file whole into memory on the
     /// main thread (parseCSVRows then copies it into a `[Character]`), which
@@ -479,7 +479,7 @@ struct ImportContactsView: View {
     }
 
     /// CSVs don't declare their encoding, and Excel/Outlook on Windows
-    /// commonly save "ANSI" (Windows-1252) — decoding that with the
+    /// commonly save "ANSI" (Windows-1252). Decoding that with the
     /// never-failing repairing UTF-8 decoder turned every accented
     /// character into U+FFFD, corrupting names for good and defeating
     /// duplicate matching. Strict UTF-8 first, then a UTF-16 byte-order
@@ -522,7 +522,7 @@ struct ImportContactsView: View {
         func columnIndex(matching options: [String]) -> Int? {
             // An exact header wins outright. Among substring matches,
             // Google-style exports pair "Phone 1 - Type" with
-            // "Phone 1 - Value" — binding the first "phone" hit meant
+            // "Phone 1 - Value". Binding the first "phone" hit meant
             // every import stored junk like "Mobile" as the number.
             if let exact = headers.firstIndex(where: { options.contains($0) }) { return exact }
             let candidates = headers.indices.filter { index in
@@ -534,7 +534,7 @@ struct ImportContactsView: View {
         }
         // A combined "Name" column wins outright (Google's export leads
         // with one). Outlook-style exports instead split the name across
-        // "First Name" / "Middle Name" / "Last Name" — the substring
+        // "First Name" / "Middle Name" / "Last Name". The substring
         // fallback would bind "First Name" alone and import every contact
         // as a bare given name, so find the parts and join them per row.
         let hasCombinedNameColumn = headers.contains("name")
@@ -589,9 +589,9 @@ struct ImportContactsView: View {
 
     /// Parses the whole file as one quote-aware stream (rather than
     /// splitting into lines first), so a quoted field containing an
-    /// embedded newline — legal CSV, common in exported addresses — isn't
-    /// torn in half. Also collapses a doubled `""` into a literal `"`
-    /// instead of dropping both quote characters.
+    /// embedded newline isn't torn in half. Those are legal CSV and common
+    /// in exported addresses. Also collapses a doubled `""` into a literal
+    /// `"` instead of dropping both quote characters.
     private func parseCSVRows(_ text: String) -> [[String]] {
         var rows: [[String]] = []
         var fields: [String] = []
@@ -653,15 +653,15 @@ struct ImportContactsView: View {
         return rows
     }
 
-    /// Which side of a numeric slash date holds the day — the one genuinely
-    /// ambiguous birthday shape a CSV can contain.
+    /// Which side of a numeric slash date holds the day. It's the one
+    /// genuinely ambiguous birthday shape a CSV can contain.
     private enum SlashDateOrder {
         case dayFirst    // "03/07/1990" is 3 July (UK/EU exports)
         case monthFirst  // "03/07/1990" is March 7 (US/Outlook exports)
     }
 
-    /// A CSV is one export, so it uses one date convention throughout —
-    /// which means a single row valid in only one reading (a day over 12,
+    /// A CSV is one export, so it uses one date convention throughout. That
+    /// means a single row valid in only one reading (a day over 12,
     /// e.g. "25/12/1990") pins the order for every row in the file. A file
     /// whose rows are all ambiguous (every value ≤ 12) follows the device
     /// region's day/month order rather than a hardcoded guess.
@@ -672,15 +672,15 @@ struct ImportContactsView: View {
             guard let (first, second) = slashDateComponents(string) else { continue }
             let readsAsDayFirst = (1...31).contains(first) && (1...12).contains(second)
             let readsAsMonthFirst = (1...12).contains(first) && (1...31).contains(second)
-            // Only a value valid in exactly one reading is evidence —
-            // junk numbers pin nothing.
+            // Only a value valid in exactly one reading is evidence.
+            // Junk numbers pin nothing.
             if readsAsDayFirst && !readsAsMonthFirst { dayFirstEvidence = true }
             if readsAsMonthFirst && !readsAsDayFirst { monthFirstEvidence = true }
         }
         switch (dayFirstEvidence, monthFirstEvidence) {
         case (true, false): return .dayFirst
         case (false, true): return .monthFirst
-        // No evidence either way — or contradictory rows, which is no
+        // No evidence either way, or contradictory rows, which is no
         // single convention at all. The locale breaks the tie; either
         // way each unambiguous row still lands correctly via the
         // runner-up format in parseBirthday.
@@ -701,8 +701,8 @@ struct ImportContactsView: View {
     }
 
     /// The two leading numbers of a three-part slash date, e.g.
-    /// "03/07/1990" → (3, 7). Anything else — ISO dates, month names,
-    /// junk — returns nil.
+    /// "03/07/1990" → (3, 7). Anything else returns nil: ISO dates, month
+    /// names, junk.
     private func slashDateComponents(_ string: String) -> (first: Int, second: Int)? {
         let parts = string.trimmed.split(separator: "/")
         guard parts.count == 3,
@@ -728,8 +728,8 @@ struct ImportContactsView: View {
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        // ISO first — it's unambiguous — then both slash readings in the
-        // file's inferred order. The runner-up still runs: a row only it
+        // ISO first, since it's unambiguous, then both slash readings in
+        // the file's inferred order. The runner-up still runs: a row only it
         // fits has a day over 12 in the pinned format's month slot, so
         // the runner-up reading is the correct one for that row.
         let slashFormats = slashOrder == .dayFirst
@@ -745,7 +745,7 @@ struct ImportContactsView: View {
     /// `yyyy` parses a two-digit year as the literal number, so "5/6/90"
     /// landed in the year 90 AD. A two-digit year in a birthday means the
     /// recent past: pivot it into the century that keeps it at or before
-    /// today (90 → 1990, 08 → 2008 — never a future year).
+    /// today (90 → 1990, 08 → 2008), never a future year.
     private func pivotingTwoDigitYear(_ date: Date) -> Date {
         var comps = Date.gregorian.dateComponents([.year, .month, .day], from: date)
         guard let year = comps.year, year < 100 else { return date }
@@ -757,11 +757,11 @@ struct ImportContactsView: View {
 
     // MARK: - Shared
 
-    /// `preselectNew: false` starts every candidate unticked — used when the
+    /// `preselectNew: false` starts every candidate unticked. Used when the
     /// whole address book arrives at once (the Mac's direct fetch) rather
     /// than a hand-picked selection.
     private func setCandidates(_ results: [ImportCandidate], preselectNew: Bool = true) {
-        // Only visible contacts count as duplicates — a hidden tree ghost
+        // Only visible contacts count as duplicates. A hidden tree ghost
         // sharing a contact's name would otherwise flag "Already in
         // Memento" for someone the user has never seen in any list.
         let existingNames = Set(existingPeople.filter { !$0.isSelf && !$0.isGhost }.map { $0.name.lowercased() })
@@ -805,8 +805,8 @@ struct ImportContactsView: View {
             imported.append(person)
         }
         // Same pass every editor save runs: folds a namesake ghost onto the
-        // arriving profile so the pedigree doesn't chart the person twice —
-        // without this, a ghost "Sam" stays separate until Sam's profile
+        // arriving profile so the pedigree doesn't chart the person twice.
+        // Without this, a ghost "Sam" stays separate until Sam's profile
         // happens to be re-saved by hand.
         for person in imported {
             FamilyEdgeSync.apply(around: person, context: context)

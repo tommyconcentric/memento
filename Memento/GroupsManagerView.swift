@@ -50,7 +50,7 @@ struct GroupsManagerView: View {
                 } header: {
                     TipHeader(
                         title: "Drag ≡ to reorder",
-                        tip: "Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people — they move to Ungrouped."
+                        tip: "Folders show in this order everywhere, with Ungrouped last. Tap a folder to rename it. Deleting a folder keeps its people, and they move to Ungrouped."
                     )
                 }
             }
@@ -95,8 +95,8 @@ struct GroupsManagerView: View {
         let trimmed = newName.trimmed
         guard !trimmed.isEmpty else { return }
         // Slot it in alphabetically among its peers rather than dumping it at
-        // the bottom. Only an insert — every existing folder keeps its
-        // relative position, so a hand-dragged order survives.
+        // the bottom. This is only an insert: every existing folder keeps
+        // its relative position, so a hand-dragged order survives.
         let newRank = PersonGroup.defaultRank(of: trimmed)
         let ordered = groups.sorted { $0.sortOrder < $1.sortOrder }
         let insertion = ordered.firstIndex {
@@ -122,7 +122,7 @@ struct GroupsManagerView: View {
         guard !trimmed.isEmpty else { return }
         // Two built-in folders sharing a name is the exact shape the
         // duplicate-seed sweep (mergeDuplicateBuiltInGroups) folds on the
-        // next activation — it would silently delete whichever copy is
+        // next activation. It would silently delete whichever copy is
         // empty. Refuse the collision here instead of letting a rename
         // make a folder vanish later.
         if target.isBuiltIn {
@@ -137,7 +137,7 @@ struct GroupsManagerView: View {
             }
         }
         // A hidden folder that gets renamed un-hides (documented behavior),
-        // so retire the old name from the filter — otherwise a future folder
+        // so retire the old name from the filter. Otherwise a future folder
         // re-using it would be born hidden.
         removeFromHiddenFilters(target.name)
         target.name = trimmed
@@ -156,8 +156,8 @@ struct GroupsManagerView: View {
 
     private func delete(at offsets: IndexSet) {
         for index in offsets {
-            // A deleted folder leaves the hidden-folders filter too — a
-            // later folder with the same name must not be born hidden.
+            // A deleted folder leaves the hidden-folders filter too, so a
+            // later folder with the same name is never born hidden.
             removeFromHiddenFilters(groups[index].name)
             context.delete(groups[index])
         }

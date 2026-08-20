@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Memento's own date picker. The native compact picker hides day
 /// selection behind a tap on the month label; here month, year and day
-/// are all visible and directly adjustable at once — chevrons step,
+/// are all visible and directly adjustable at once. Chevrons step,
 /// tapping the month or year label opens an explicit menu, and the day
 /// grid is always on screen. Personal wears the serif/aegean voice,
 /// business the sans/graphite one.
@@ -10,13 +10,13 @@ struct AppDatePicker: View {
     let title: String
     @Binding var date: Date
     var business = false
-    /// What a typed date without a year means — birthdays keep "no year
-    /// recorded", anything else assumes the current year.
+    /// What a typed date without a year means. Birthdays keep "no year
+    /// recorded". Anything else assumes the current year.
     var yearlessStyle: TypedDateParser.YearlessStyle = .currentYear
 
     @State private var isExpanded: Bool
     // When a caller passes `expanded`, the header's collapse/expand writes
-    // through to the caller's state instead of the private one — the
+    // through to the caller's state instead of the private one. The
     // editor's year-less birthday row needs to know when the calendar
     // closes so it can take the header's place back.
     private var externalExpanded: Binding<Bool>?
@@ -50,14 +50,14 @@ struct AppDatePicker: View {
     }
 
     /// The picker runs in the device calendar so its numbers agree with the
-    /// header row and the rest of the app — Buddhist (year 2569) and Hebrew
+    /// header row and the rest of the app. Buddhist (year 2569) and Hebrew
     /// (5786) devices work natively. But a calendar whose current year sits
     /// below the year menu's 1900 floor (Japanese ≈ Reiwa 8, Republic of
     /// China ≈ 115, Persian ≈ 1405, Islamic ≈ 1447) would invert the
     /// `1900...` range and trap; those fall back to Gregorian arithmetic
-    /// (keeping locale, time zone and week start) — same defense as
-    /// `Date.gregorian` in Utilities — turning a guaranteed crash into
-    /// Gregorian year numbering.
+    /// (keeping locale, time zone and week start). That's the same defense
+    /// as `Date.gregorian` in Utilities, and it turns a guaranteed crash
+    /// into Gregorian year numbering.
     private var calendar: Calendar {
         let current = Calendar.current
         if current.component(.year, from: .now) >= 1900 { return current }
@@ -77,8 +77,8 @@ struct AppDatePicker: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // The date readout is a text field — typing is often quicker than
-            // the calendar — so only the title and chevron toggle expansion.
+            // The date readout is a text field, since typing is often quicker
+            // than the calendar. Only the title and chevron toggle expansion.
             HStack {
                 Button {
                     toggleExpanded()
@@ -134,7 +134,7 @@ struct AppDatePicker: View {
 
                 stepper(icon: "chevron.left") { shift(.year, by: -1) }
                 Menu {
-                    // Recent years first — birthdays live decades back.
+                    // Recent years first, since birthdays live decades back.
                     ForEach(yearOptions, id: \.self) { option in
                         Button(String(option)) { set(year: option) }
                     }
@@ -149,7 +149,7 @@ struct AppDatePicker: View {
         }
         .padding(12)
         .background(plateTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        // Grow with the form up to a tidy width, then centre — on a wide
+        // Grow with the form up to a tidy width, then centre. On a wide
         // Mac editor the plate would otherwise splay the numbers apart.
         .frame(maxWidth: 480)
         .frame(maxWidth: .infinity)

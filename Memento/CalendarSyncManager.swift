@@ -5,9 +5,9 @@ import SwiftUI
 
 /// Mirrors everyone's birthdays and important dates into a dedicated
 /// "Memento" calendar in the user's Calendar app, so it can be shown or
-/// hidden like any built-in calendar (Birthdays, Holidays, …). Independent
-/// of NotificationManager's per-date reminder toggle — every date syncs
-/// here regardless, matching the in-app Calendar tab.
+/// hidden like any built-in calendar (Birthdays, Holidays, …). This is
+/// independent of NotificationManager's per-date reminder toggle. Every
+/// date syncs here regardless, matching the in-app Calendar tab.
 enum CalendarSyncManager {
     nonisolated static let enabledKey = "appleCalendarSyncEnabled"
     nonisolated static let manualSyncOnlyKey = "appleCalendarManualSyncOnly"
@@ -30,7 +30,7 @@ enum CalendarSyncManager {
     nonisolated(unsafe) private static var latestGeneration = 0
     nonisolated private static let generationLock = NSLock()
 
-    /// One event to mirror — a plain value, because SwiftData models must
+    /// One event to mirror. A plain value, because SwiftData models must
     /// not cross to the sync queue.
     private struct EventSnapshot: Sendable {
         let title: String
@@ -50,7 +50,7 @@ enum CalendarSyncManager {
         syncNow(context)
     }
 
-    /// Rebuilds the calendar regardless of the auto/manual choice — backs
+    /// Rebuilds the calendar regardless of the auto/manual choice. Backs
     /// the "Sync Now" button and the initial population when the sync
     /// toggle is first turned on.
     static func syncNow(_ context: ModelContext) {
@@ -66,9 +66,9 @@ enum CalendarSyncManager {
 
         var events: [EventSnapshot] = []
         // Ghost nodes (name-only relatives) are excluded, matching the
-        // in-app calendar. The hidden self node's dates sync too — the My
-        // Profile editor accepts them — titled "Your …" rather than the
-        // node's name (which may still be the "You" placeholder).
+        // in-app calendar. The hidden self node's dates sync too (the My
+        // Profile editor accepts them). They are titled "Your …" rather
+        // than the node's name, which may still be the "You" placeholder.
         for person in people where !person.isDeceased && !person.isGhost {
             if let birthday = person.birthday {
                 events.append(EventSnapshot(
@@ -78,7 +78,7 @@ enum CalendarSyncManager {
             }
             for item in person.importantDatesArray {
                 events.append(EventSnapshot(
-                    title: person.isSelf ? "Your \(item.label)" : "\(item.label) — \(person.name)",
+                    title: person.isSelf ? "Your \(item.label)" : "\(person.name)'s \(item.label)",
                     date: item.date
                 ))
             }
@@ -116,7 +116,7 @@ enum CalendarSyncManager {
         // queue so the observation fires where SwiftUI expects.
         DispatchQueue.main.async {
             // A rebuild that raced the off-toggle must not write a fresh
-            // timestamp over the zero the off-handler just stored — a
+            // timestamp over the zero the off-handler just stored. A
             // nonzero lastSync with no stored identifier re-arms the
             // legacy title-adoption path against calendars this app
             // never created.
@@ -134,8 +134,8 @@ enum CalendarSyncManager {
     /// own calendar that happens to share the name.
     static func removeCalendar() {
         // Invalidate queued rebuilds, then run the removal ON the sync
-        // queue so it serializes behind any rebuild already executing —
-        // removing from the main thread mid-rebuild let the rebuild
+        // queue so it serializes behind any rebuild already executing.
+        // Removing from the main thread mid-rebuild let the rebuild
         // recreate and repopulate a zombie calendar after the toggle was
         // already off.
         generationLock.lock()
@@ -152,7 +152,7 @@ enum CalendarSyncManager {
                     defaults.removeObject(forKey: calendarAdoptedKey)
                 } catch {
                     // Keep both keys so a retry still knows which calendar
-                    // holds this app's events — and that it must never be
+                    // holds this app's events, and that it must never be
                     // deleted.
                 }
             } else {
@@ -162,8 +162,8 @@ enum CalendarSyncManager {
                     defaults.removeObject(forKey: calendarAdoptedKey)
                 } catch {
                     // Removal can fail (e.g. Calendar access was revoked).
-                    // Keep the identifier so re-enabling sync — or a later
-                    // toggle-off — still targets the real calendar instead
+                    // Keep the identifier so re-enabling sync, or a later
+                    // toggle-off, still targets the real calendar instead
                     // of stranding it in the user's account forever.
                 }
             }
@@ -172,7 +172,7 @@ enum CalendarSyncManager {
 
     /// Resolves the app's calendar by its persisted identifier. Falls back
     /// to a one-time title match only when a previous version already
-    /// synced (lastSync > 0) before identifiers were stored — for those
+    /// synced (lastSync > 0) before identifiers were stored. For those
     /// installs the same-titled calendar is the one this app created. A
     /// fresh setup never adopts here, so a toggle-off can't remove a
     /// calendar this app never claimed; *enabling* sync adopts via
@@ -202,17 +202,17 @@ enum CalendarSyncManager {
 
         // The stored identifier is device-local (UserDefaults), but the
         // calendar itself lives in the iCloud source precisely so it
-        // reaches all of the user's devices — so a second device (or this
-        // one after a reinstall) has no identifier while the calendar
-        // already exists. Adopt a same-titled writable calendar from the
-        // source we would create in, rather than standing up a duplicate
-        // "Memento" beside it that every device then maintains in
-        // parallel. Restricting adoption to that one source keeps this
-        // away from same-titled calendars in other accounts — and because
-        // the adopted calendar could still be one the *user* made by hand,
-        // it's marked adopted: rebuilds then remove only app-generated
-        // events from it (`isAppGeneratedTitle`) and toggle-off strips
-        // those events instead of deleting the calendar.
+        // reaches all of the user's devices. That means a second device
+        // (or this one after a reinstall) has no identifier while the
+        // calendar already exists. Adopt a same-titled writable calendar
+        // from the source we would create in, rather than standing up a
+        // duplicate "Memento" beside it that every device then maintains
+        // in parallel. Restricting adoption to that one source keeps this
+        // away from same-titled calendars in other accounts. The adopted
+        // calendar could still be one the *user* made by hand, so it's
+        // marked adopted: rebuilds then remove only app-generated events
+        // from it (`isAppGenerated`), and toggle-off strips those
+        // events instead of deleting the calendar.
         if let adopted = store.calendars(for: .event).first(where: {
             $0.title == calendarTitle
                 && $0.source?.sourceIdentifier == source.sourceIdentifier
@@ -233,8 +233,8 @@ enum CalendarSyncManager {
         do {
             try store.saveCalendar(calendar, commit: true)
             UserDefaults.standard.set(calendar.calendarIdentifier, forKey: calendarIdentifierKey)
-            // A calendar this app minted is provably its own — full-window
-            // rebuilds and delete-on-toggle-off apply.
+            // A calendar this app minted is provably its own, so
+            // full-window rebuilds and delete-on-toggle-off apply.
             UserDefaults.standard.removeObject(forKey: calendarAdoptedKey)
             return calendar
         } catch {
@@ -242,34 +242,46 @@ enum CalendarSyncManager {
         }
     }
 
-    /// Whether an event title has one of the exact shapes this manager
-    /// writes (see the snapshot loop in `refresh` — update this list
-    /// alongside any title format change):
-    ///   "🎂 <name>'s Birthday"     — someone's birthday
-    ///   "🎂 Your Birthday"         — the self node's birthday
-    ///   "<label> — <name>"         — someone's important date (em dash)
-    ///   "Your <label>"             — a self important date
+    /// Stamped into the notes of every event this manager writes, so a
+    /// rebuild can recognise its own events exactly instead of guessing
+    /// from the title.
+    nonisolated private static let signature = "Added by Memento"
+
+    /// Whether an event was written by this manager. Anything written from
+    /// version 1.2 on carries `signature` in its notes, which is an exact
+    /// test. Events from earlier versions have no stamp, so fall back to
+    /// the title shapes those versions wrote. Keep this list in step with
+    /// the snapshot loop in `refresh`:
+    ///   "🎂 <name>'s Birthday"   someone's birthday
+    ///   "🎂 Your Birthday"       the self node's birthday
+    ///   "Your <label>"           a self important date
     /// Scopes removals in an *adopted* calendar to app-generated events;
     /// everything else in such a calendar is the user's own content.
-    nonisolated private static func isAppGeneratedTitle(_ title: String?) -> Bool {
-        guard let title else { return false }
+    nonisolated private static func isAppGenerated(_ event: EKEvent) -> Bool {
+        if event.notes?.contains(signature) == true { return true }
+        guard let title = event.title else { return false }
         if title == "🎂 Your Birthday" { return true }
         if title.hasPrefix("🎂 ") && title.hasSuffix("'s Birthday") { return true }
         if title.hasPrefix("Your ") { return true }
+        // The one em dash left in the project, and no user ever reads it.
+        // Version 1.1 and earlier titled someone's important date as the
+        // label, this dash, then the name. Those events are still sitting
+        // in people's calendars, so they have to stay removable.
         if title.contains(" — ") { return true }
         return false
     }
 
-    /// Full rebuild rather than diffing — simpler and avoids needing to
-    /// persist per-date EventKit identifiers back into SwiftData. In an
-    /// adopted calendar (`onlyAppGenerated`) the wipe is scoped to titles
-    /// this app writes; a calendar the app created is cleared wholesale.
+    /// Full rebuild rather than diffing. That's simpler, and it avoids
+    /// having to persist per-date EventKit identifiers back into
+    /// SwiftData. In an adopted calendar (`onlyAppGenerated`) the wipe is
+    /// scoped to the events this app wrote; a calendar the app created is
+    /// cleared wholesale.
     nonisolated private static func removeAllEvents(in calendar: EKCalendar, onlyAppGenerated: Bool) {
         // EventKit silently truncates an events predicate to four years
         // from its start date, so one six-year predicate would stop
-        // matching at now+3y — leaving the Feb-29 branch's far-future
-        // concrete events (out to ~4.6 years ahead) unmatched and
-        // re-added as one more duplicate on every rebuild. Walk the
+        // matching at now+3y. That leaves the Feb-29 branch's far-future
+        // concrete events (out to ~4.6 years ahead) unmatched, so they
+        // get re-added as one more duplicate on every rebuild. Walk the
         // window in three-year chunks so every span stays under the cap.
         let end = Calendar.current.date(byAdding: .year, value: 5, to: .now) ?? .now
         var chunkStart = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
@@ -277,7 +289,7 @@ enum CalendarSyncManager {
             let chunkEnd = min(Calendar.current.date(byAdding: .year, value: 3, to: chunkStart) ?? end, end)
             let predicate = store.predicateForEvents(withStart: chunkStart, end: chunkEnd, calendars: [calendar])
             for event in store.events(matching: predicate) {
-                if onlyAppGenerated && !isAppGeneratedTitle(event.title) { continue }
+                if onlyAppGenerated && !isAppGenerated(event) { continue }
                 // A recurring series can surface occurrences in more than
                 // one chunk (removals are uncommitted until the rebuild's
                 // single commit); re-removing just throws, and is swallowed.
@@ -300,8 +312,8 @@ enum CalendarSyncManager {
             let thisYear = Calendar.current.component(.year, from: .now)
             // Only emit occurrences inside removeAllEvents' one-year
             // lookback: last year's date can fall before that window (Feb
-            // 28, 2025 against a July 2026 rebuild), where no rebuild could
-            // ever remove it — every sync would then stack one more
+            // 28, 2025 against a July 2026 rebuild), where no rebuild
+            // could ever remove it. Every sync would then stack one more
             // duplicate onto the user's calendar, forever.
             let windowStart = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
             for year in (thisYear - 1)...(thisYear + 4) {
@@ -313,6 +325,7 @@ enum CalendarSyncManager {
         }
         let event = EKEvent(eventStore: store)
         event.title = title
+        event.notes = signature
         event.calendar = calendar
         event.isAllDay = true
         event.startDate = recentAnchor(for: date)
@@ -324,6 +337,7 @@ enum CalendarSyncManager {
     nonisolated private static func addSingleEvent(title: String, on date: Date, calendar: EKCalendar) {
         let event = EKEvent(eventStore: store)
         event.title = title
+        event.notes = signature
         event.calendar = calendar
         event.isAllDay = true
         event.startDate = Calendar.current.startOfDay(for: date)

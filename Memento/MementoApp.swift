@@ -30,7 +30,7 @@ struct MementoApp: App {
     @AppStorage(Workspace.storageKey) private var storedWorkspace = Workspace.personal.rawValue
     // Only lock when a PIN actually exists to unlock with. The enabled flag
     // lives in UserDefaults (restored onto a new device by backup/migration)
-    // but the PIN is ThisDeviceOnly in the Keychain (not restored) — locking
+    // but the PIN is ThisDeviceOnly in the Keychain (not restored). Locking
     // on the flag alone would brick the app until a delete-and-reinstall.
     @State private var isLocked = UserDefaults.standard.bool(forKey: AppLock.enabledKey)
         && AppLock.storedPIN != nil
@@ -42,8 +42,8 @@ struct MementoApp: App {
     private static let activationRefreshInterval: TimeInterval = 15 * 60
 
     /// A backup restore or migration carries the UserDefaults flags to the
-    /// new device but not the ThisDeviceOnly Keychain PIN — leaving Settings
-    /// claiming "Require a PIN" is ON while the app (correctly, see
+    /// new device but not the ThisDeviceOnly Keychain PIN. That leaves
+    /// Settings claiming "Require a PIN" is ON while the app (correctly, see
     /// `isLocked` above) never locks. Reset the flags to match reality so
     /// Settings tells the truth and re-enabling routes through PIN setup;
     /// biometrics can't stay on without a PIN behind it.
@@ -81,7 +81,7 @@ struct MementoApp: App {
                     // On iPhone/iPad, lock on any departure from .active so
                     // an app-switcher snapshot never shows real notes. On
                     // the Mac, .inactive fires every time another app's
-                    // window takes focus — locking there would demand the
+                    // window takes focus. Locking there would demand the
                     // PIN on every app switch, so lock only when the app is
                     // actually hidden/minimized (.background); the Mac's own
                     // session lock covers the rest.
@@ -96,14 +96,14 @@ struct MementoApp: App {
                         Self.lastActivationRefresh = .now
                         // Pending notifications and the synced calendar are
                         // device-local snapshots taken at the last local
-                        // save — without this, edits synced from another
+                        // save. Without this, edits synced from another
                         // device keep firing stale reminders forever, and
                         // dates that grow into the nearest-60 window are
                         // never scheduled.
                         NotificationManager.refreshFromContext(container.mainContext)
                         CalendarSyncManager.refreshFromContext(container.mainContext)
                     }
-                    // Anonymous session counting — its own 30-minute gap
+                    // Anonymous session counting. Its own 30-minute gap
                     // logic keeps Mac focus churn from inflating anything.
                     if newPhase == .active {
                         UsageAnalytics.appBecameActive()
@@ -119,8 +119,8 @@ struct MementoApp: App {
 /// Guarantees exactly one hidden self node. Creates it when none exists
 /// (first launch, or after a full reset). When two devices each seeded and
 /// *used* their own "You" before CloudKit merged, deleting only edgeless
-/// duplicates left both forever — with the pedigree, My Profile and new
-/// edges each free to land on a different one. Duplicates are now merged:
+/// duplicates left both forever. The pedigree, My Profile and new edges
+/// could then each land on a different one. Duplicates are now merged:
 /// their edges re-point onto the canonical (earliest-created) node, profile
 /// fields the keeper lacks carry over, and only then is the duplicate
 /// deleted.
@@ -174,7 +174,7 @@ enum SelfNodeMaintenance {
                 }
             }
 
-            // My Profile may have been filled in on the other device —
+            // My Profile may have been filled in on the other device, so
             // carry anything the keeper is missing before deleting.
             let keeperUnnamed = keeper.name.trimmed.isEmpty || keeper.name == "You"
             if keeperUnnamed, !extra.name.trimmed.isEmpty, extra.name != "You" {
@@ -196,11 +196,11 @@ enum SelfNodeMaintenance {
             if keeper.howWeMet.isEmpty { keeper.howWeMet = extra.howWeMet }
 
             // The duplicate's to-many rows (important dates, contact fields,
-            // family rows, notes, projects) cascade-delete with it — re-home
-            // them onto the keeper so nothing entered on the other device is
-            // lost. A row the keeper already holds an identical copy of
-            // (both devices entered the same thing) cascades away instead of
-            // duplicating.
+            // family rows, notes, projects) cascade-delete with it, so
+            // re-home them onto the keeper. Nothing entered on the other
+            // device is lost that way. A row the keeper already holds an
+            // identical copy of (both devices entered the same thing)
+            // cascades away instead of duplicating.
             for date in extra.importantDatesArray
             where !keeper.importantDatesArray.contains(where: {
                 $0.label == date.label && $0.date == date.date
@@ -273,7 +273,7 @@ struct RootView: View {
             .alert("Not a Memento Profile", isPresented: $showingUnrecognizedFile) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Memento can open profile cards shared from another Memento — this text file isn't one.")
+                Text("Memento can open profile cards shared from another Memento. This text file isn't one.")
             }
             .onAppear {
                 retireLogoColorScheme()
@@ -286,7 +286,7 @@ struct RootView: View {
                 #endif
                 FamilyGraphMigration.runIfNeeded(context)
                 // Two devices migrating/editing before first sync can mint
-                // the same ghost (and its edges) twice — CloudKit merges
+                // the same ghost (and its edges) twice. CloudKit merges
                 // the records but never dedups them.
                 FamilyGraphMaintenance.dedupe(context)
             }
@@ -311,8 +311,8 @@ struct RootView: View {
     }
 
     /// The icon-recolor feature is gone. One-time cleanup: forget any stored
-    /// scheme and restore the primary Home Screen icon, so every logo —
-    /// in-app and on the Home Screen — is the default again.
+    /// scheme and restore the primary Home Screen icon, so every logo is
+    /// the default again, in-app and on the Home Screen.
     private func retireLogoColorScheme() {
         if UserDefaults.standard.object(forKey: "logoColorScheme") != nil {
             UserDefaults.standard.removeObject(forKey: "logoColorScheme")
@@ -323,7 +323,7 @@ struct RootView: View {
         }
     }
 
-    /// Existing installs were seeded with Family last. Move it to the top —
+    /// Existing installs were seeded with Family last. Move it to the top,
     /// but only for someone who never touched the order, which means the
     /// folders must still be exactly the four originals, still in exactly the
     /// order they were seeded in. Any rename, addition, deletion or drag and
@@ -346,8 +346,8 @@ struct RootView: View {
     private func seedDefaultGroupsIfNeeded() {
         guard !didSeedDefaultGroups else { return }
         guard groups.isEmpty else {
-            // Folders already exist (synced down from another device) —
-            // latch the flag so this device never "helpfully" re-seeds the
+            // Folders already exist (synced down from another device).
+            // Latch the flag so this device never "helpfully" re-seeds the
             // built-ins after the user deliberately deletes every folder.
             didSeedDefaultGroups = true
             return
@@ -368,9 +368,9 @@ struct RootView: View {
     /// CloudKit can't enforce uniqueness), leaving two of each built-in
     /// folder. Fold empty duplicates into the copy people are filed in.
     /// Only empty copies are ever deleted, and only when a non-empty
-    /// same-name copy exists — an indistinguishable empty-empty pair is
-    /// left alone, because two devices deleting "either one" concurrently
-    /// could sync away both.
+    /// same-name copy exists. An indistinguishable empty-empty pair is left
+    /// alone, because two devices deleting "either one" concurrently could
+    /// sync away both.
     private func mergeDuplicateBuiltInGroups() {
         var byName: [String: [PersonGroup]] = [:]
         for group in groups where group.isBuiltIn {

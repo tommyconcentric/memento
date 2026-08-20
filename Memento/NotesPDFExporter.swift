@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 // MARK: - FileDocument wrapper (for .fileExporter)
 
-/// Wraps rendered PDF bytes so SwiftUI's fileExporter can save them — the
+/// Wraps rendered PDF bytes so SwiftUI's fileExporter can save them. The
 /// exporter presents a save panel on the Mac and the Files sheet on iOS,
 /// the one delivery path that behaves identically on both.
 struct PDFExportDocument: FileDocument {
@@ -38,7 +38,7 @@ enum NotesPDFExporter {
         let composer = Composer(style: style)
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
-            kCGPDFContextTitle as String: "\(person.name) — Notes",
+            kCGPDFContextTitle as String: "Notes for \(person.name)",
             kCGPDFContextCreator as String: "Memento"
         ]
         let renderer = UIGraphicsPDFRenderer(
@@ -66,7 +66,7 @@ enum NotesPDFExporter {
     /// Suggested save name; the person's name may contain path separators.
     static func filename(for person: Person) -> String {
         let safeName = person.name.replacingOccurrences(of: "/", with: "-")
-        return person.isBusiness ? "\(safeName) — Notes Report" : "\(safeName) — Scrapbook"
+        return person.isBusiness ? "\(safeName) Notes Report" : "\(safeName) Scrapbook"
     }
 
     // MARK: - Style
@@ -101,8 +101,8 @@ enum NotesPDFExporter {
             }
         }
 
-        /// Serif for the scrapbook, system sans for the report — the same
-        /// split `Workspace.displayFontDesign` makes in the app.
+        /// Serif for the scrapbook, system sans for the report. It's the
+        /// same split `Workspace.displayFontDesign` makes in the app.
         func font(_ size: CGFloat, _ weight: UIFont.Weight, italic: Bool = false) -> UIFont {
             let base = UIFont.systemFont(ofSize: size, weight: weight)
             var descriptor = base.fontDescriptor
@@ -203,7 +203,7 @@ enum NotesPDFExporter {
         }
 
         func drawScrapbookHeader(_ person: Person, notes: [NoteEntry]) {
-            // Round portrait over a centred serif title — the framed-photo
+            // Round portrait over a centred serif title, the framed-photo
             // look of the app's tree portraits, in print.
             let portraitSize: CGFloat = 68
             let portraitRect = CGRect(x: (Self.pageSize.width - portraitSize) / 2, y: y,
@@ -217,7 +217,7 @@ enum NotesPDFExporter {
                                      color: style.subInk, alignment: .center), spacingAfter: 6)
             if let newest = notes.first?.eventDate, let oldest = notes.last?.eventDate {
                 let span = oldest.formatted(.dateTime.month(.abbreviated).year())
-                    + " — " + newest.formatted(.dateTime.month(.abbreviated).year())
+                    + " to " + newest.formatted(.dateTime.month(.abbreviated).year())
                 let meta = "\(notes.count) \(notes.count == 1 ? "note" : "notes") · \(span)"
                 drawParagraph(attributed(meta, font: style.font(9.5, .regular), color: style.subInk,
                                          alignment: .center), spacingAfter: 14)
@@ -254,7 +254,7 @@ enum NotesPDFExporter {
             }
             // Keep the date line together with what follows it: a couple of
             // text lines normally, or the first photo row for a photos-only
-            // note — otherwise its date prints stranded at a page bottom
+            // note. Otherwise its date prints stranded at a page bottom
             // with every polaroid on the next page.
             let hasText = !note.title.isEmpty || !note.text.isEmpty
             ensure(hasText ? 90 : (photos.isEmpty ? 40 : 250))
@@ -289,7 +289,7 @@ enum NotesPDFExporter {
         }
 
         /// Photos embed at roughly 3× their ~156 pt cell, not at their full
-        /// stored resolution — a photo-heavy export was otherwise hundreds
+        /// stored resolution. A photo-heavy export was otherwise hundreds
         /// of megabytes, too large to mail or AirDrop.
         private func downscaled(_ image: UIImage, maxDimension: CGFloat = 480) -> UIImage {
             let largest = max(image.size.width, image.size.height)
@@ -306,7 +306,7 @@ enum NotesPDFExporter {
         /// Up to three photos per row. Report style: clean rounded
         /// rectangles with a caption underneath. Scrapbook style: white
         /// polaroid frames with the caption on the mat, each tilted a
-        /// hair off level — casual, but on a straight baseline.
+        /// hair off level, casual but on a straight baseline.
         private func drawPhotoRows(_ photos: [(image: UIImage, caption: String)]) {
             let perRow = 3
             let gap: CGFloat = 10
@@ -404,7 +404,7 @@ enum NotesPDFExporter {
         /// gold dots in the scrapbook.
         func drawDivider() {
             ensure(24)
-            // A page break separates better than any ornament — dots or a
+            // A page break separates better than any ornament. Dots or a
             // rule stranded at the very top of a fresh page just read as
             // clutter above the next note.
             guard y > margin else { return }
@@ -440,7 +440,7 @@ enum NotesPDFExporter {
             return NSAttributedString(string: string, attributes: attributes)
         }
 
-        /// Draws attributed text at the cursor, flowing across page breaks —
+        /// Draws attributed text at the cursor, flowing across page breaks.
         /// Core Text lays out as much as fits, and the loop carries the
         /// remainder onto fresh pages until the string is spent.
         private func drawParagraph(_ text: NSAttributedString, spacingAfter: CGFloat) {

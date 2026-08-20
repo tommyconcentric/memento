@@ -8,7 +8,7 @@ struct NotesTimelineView: View {
 
     @Environment(\.modelContext) private var context
     @State private var showingComposer = false
-    // Reading and editing share one sheet whose content swaps — two
+    // Reading and editing share one sheet whose content swaps. Two
     // sibling .sheet(item:) modifiers racing a dismissal against a
     // presentation intermittently dropped the editor after tapping Edit
     // in the reading sheet.
@@ -30,7 +30,7 @@ struct NotesTimelineView: View {
             }
         }
     }
-    // Deleting a note asks first — it permanently destroys the entry and
+    // Deleting a note asks first. It permanently destroys the entry and
     // its photos, and the menu item sits one slip below "Edit Note".
     @State private var notePendingDelete: NoteEntry?
 
@@ -69,7 +69,7 @@ struct NotesTimelineView: View {
         }
         .sheet(item: $activeNoteSheet) { sheet in
             // A sync from another device can delete the note while its
-            // sheet is open — render nothing against the dead model (the
+            // sheet is open. Render nothing against the dead model (the
             // isDeleted defense PersonDetailView uses) while the onChange
             // below dismisses the sheet.
             if sheet.note.isDeleted {
@@ -209,7 +209,7 @@ struct NoteCard: View {
 
 // MARK: - Note reading sheet
 
-/// The full note, opened by tapping its card in the timeline — title,
+/// The full note, opened by tapping its card in the timeline: title,
 /// date, place, complete text and photos without the preview truncation.
 struct NoteDetailSheet: View {
     let note: NoteEntry
@@ -219,7 +219,7 @@ struct NoteDetailSheet: View {
     @State private var viewerPhoto: EventPhoto?
 
     var body: some View {
-        // Deleted by a CloudKit sync while open — render nothing (as
+        // Deleted by a CloudKit sync while open. Render nothing (as
         // PersonDetailView does); the presenting timeline dismisses it.
         if note.isDeleted {
             Color.clear
@@ -288,8 +288,8 @@ struct NoteDetailSheet: View {
             .navigationTitle("Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Edit is deliberately NOT the cancellation action — Esc/⌘.
-                // bind to that slot, and "cancel opens the editor" is
+                // Edit is deliberately NOT the cancellation action, because
+                // Esc/⌘. bind to that slot, and "cancel opens the editor" is
                 // exactly inverted from what an escape key should do.
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Edit", action: onEdit)
